@@ -1,0 +1,28 @@
+name: Feature request / 需求建议
+description: Suggest an idea or improvement / 提出需求或改进建议
+title: "[Feature/需求]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / 问题
+      description: What problem are you trying to solve? / 你想解决什么问题？
+      placeholder: Describe the user need or pain point. / 描述用户需求或痛点。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal / 方案
+      description: What would you like to happen? / 你希望如何改进？
+      placeholder: Describe the solution you have in mind. / 描述你设想的解决方案。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 备选方案
+      description: Any alternative solutions or workarounds considered? / 是否考虑过其他方案或替代做法？
+    validations:
+      required: false

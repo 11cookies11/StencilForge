@@ -1,0 +1,17 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Common build outputs (optional)
+dist/
+build/
+out/
+
