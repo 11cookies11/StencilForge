@@ -290,7 +290,7 @@ class WebView(QWebEngineView):
 
 
 def main() -> int:
-    flags = "--enable-webgl --ignore-gpu-blocklist --use-angle=d3d11 --disable-gpu-sandbox --disable-gpu-compositing"
+    flags = "--ignore-gpu-blocklist --use-angle=d3d11"
     existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
     if flags not in existing:
         combined = f"{existing} {flags}".strip()
@@ -314,7 +314,7 @@ def main() -> int:
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
     settings.setAttribute(QWebEngineSettings.WebGLEnabled, False)
-    settings.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, False)
+    settings.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
 
     channel = QWebChannel()
     backend = BackendBridge(project_root)
