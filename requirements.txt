@@ -1,0 +1,3 @@
+pcb-tools==0.1.6
+shapely==2.1.2
+trimesh==4.10.1

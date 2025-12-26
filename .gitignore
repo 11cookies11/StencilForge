@@ -9,9 +9,15 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
 
 # Common build outputs (optional)
 dist/
 build/
 out/
-
