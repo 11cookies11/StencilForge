@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
         if self._preview_dialog is not None:
             return
         dialog = QDialog(self)
-        dialog.setWindowTitle("Stencil Preview")
+        dialog.setWindowTitle("钢网预览")
         dialog.resize(900, 700)
         dialog.setStyleSheet(
             "QDialog { background-color: #f3e6d8; }"
@@ -68,10 +68,10 @@ class MainWindow(QMainWindow):
         viewer = VtkStlViewer(dialog)
         toolbar = QToolBar(dialog)
         toolbar.setMovable(False)
-        fit_action = toolbar.addAction("Fit")
-        reset_action = toolbar.addAction("Reset")
-        wire_action = toolbar.addAction("Wireframe")
-        axes_action = toolbar.addAction("Axes")
+        fit_action = toolbar.addAction("适配")
+        reset_action = toolbar.addAction("重置")
+        wire_action = toolbar.addAction("线框")
+        axes_action = toolbar.addAction("坐标轴")
         wire_action.setCheckable(True)
         axes_action.setCheckable(True)
         axes_action.setChecked(True)
@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
     def _pick_stl_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
             self,
-            "Select STL",
+            "选择 STL",
             str(Path.home()),
             "STL Files (*.stl)",
         )
