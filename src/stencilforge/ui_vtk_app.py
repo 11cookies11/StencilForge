@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
@@ -18,22 +18,32 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .title_bar import TitleBar
 from .vtk_viewer import VtkStlViewer
 from .web_bridge import WebBridge
 
 
 class MainWindow(QMainWindow):
-    """Main window: WebEngine UI on the left, VTK STL viewer on the right."""
+    """Main window: WebEngine UI + VTK preview dialog."""
 
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.setWindowTitle("StencilForge")
+        self.setWindowFlag(Qt.FramelessWindowHint, True)
+        self.setWindowFlag(Qt.Window, True)
         _fit_to_screen(self, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
 
         self._web = QWebEngineView()
         self._preview_dialog: QDialog | None = None
         self._preview_viewer: VtkStlViewer | None = None
-        self.setCentralWidget(self._web)
+
+        central = QWidget()
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(TitleBar(self, "StencilForge"))
+        layout.addWidget(self._web)
+        self.setCentralWidget(central)
 
         settings = self._web.settings()
         settings.setAttribute(QWebEngineSettings.WebGLEnabled, False)
@@ -42,7 +52,7 @@ class MainWindow(QMainWindow):
 
         ui_path = project_root / "ui" / "vtk_index.html"
         if not ui_path.exists():
-            raise FileNotFoundError(f"UI HTML not found: {ui_path}")
+            raise FileNotFoundError(f"未找到 UI HTML: {ui_path}")
 
         self._channel = QWebChannel()
         self._bridge = WebBridge(project_root / "output")
@@ -58,6 +68,8 @@ class MainWindow(QMainWindow):
             return
         dialog = QDialog(self)
         dialog.setWindowTitle("钢网预览")
+        dialog.setWindowFlag(Qt.FramelessWindowHint, True)
+        dialog.setWindowFlag(Qt.Window, True)
         _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
         dialog.setStyleSheet(
             "QDialog { background-color: #f3e6d8; }"
@@ -67,6 +79,7 @@ class MainWindow(QMainWindow):
             "QToolButton:checked { background-color: #e7c8a4; }"
         )
         viewer = VtkStlViewer(dialog)
+        title_bar = TitleBar(dialog, "钢网预览")
         toolbar = QToolBar(dialog)
         toolbar.setMovable(False)
         fit_action = toolbar.addAction("适配")
@@ -83,8 +96,9 @@ class MainWindow(QMainWindow):
         axes_action.toggled.connect(viewer.toggle_axes)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(title_bar)
         layout.addWidget(toolbar)
         layout.addWidget(viewer)
         self._preview_dialog = dialog
@@ -126,10 +140,6 @@ def main() -> int:
     return app.exec()
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-
 def _fit_to_screen(
     widget: QMainWindow | QDialog,
     max_ratio: tuple[float, float],
@@ -149,3 +159,7 @@ def _fit_to_screen(
     x = available.x() + max((available.width() - width) // 2, 0)
     y = available.y() + max((available.height() - height) // 2, 0)
     widget.move(x, y)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

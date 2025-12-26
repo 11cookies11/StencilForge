@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import os
@@ -9,15 +9,24 @@ import zipfile
 from fnmatch import fnmatch
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QUrl, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
-from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QToolBar, QVBoxLayout
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFileDialog,
+    QMainWindow,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .config import StencilConfig
 from .pipeline import generate_stencil
+from .title_bar import TitleBar
 from .vtk_viewer import VtkStlViewer
 
 
@@ -64,10 +73,14 @@ class BackendBridge(QObject):
         self._temp_dirs: list[Path] = []
         self._preview_dialog: QDialog | None = None
         self._preview_viewer: VtkStlViewer | None = None
+        self._window: QMainWindow | None = None
 
     def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer) -> None:
         self._preview_dialog = dialog
         self._preview_viewer = viewer
+
+    def attach_window(self, window: QMainWindow) -> None:
+        self._window = window
 
     def _show_preview(self) -> None:
         if self._preview_dialog is None:
@@ -236,6 +249,45 @@ class BackendBridge(QObject):
     def stopJob(self) -> None:
         self.jobLog.emit("已请求停止，当前任务暂不支持取消。")
 
+    @Slot()
+    def windowMinimize(self) -> None:
+        if self._window is not None:
+            self._window.showMinimized()
+
+    @Slot()
+    def windowMaximizeRestore(self) -> None:
+        if self._window is None:
+            return
+        if self._window.isMaximized():
+            self._window.showNormal()
+        else:
+            self._window.showMaximized()
+
+    @Slot()
+    def windowClose(self) -> None:
+        if self._window is not None:
+            self._window.close()
+
+
+class WebView(QWebEngineView):
+    def __init__(self, window: QMainWindow, drag_height: int, button_margin: int) -> None:
+        super().__init__(window)
+        self._window = window
+        self._drag_height = drag_height
+        self._button_margin = button_margin
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            pos = event.position().toPoint()
+            if pos.y() <= self._drag_height:
+                if pos.x() < max(self.width() - self._button_margin, 0):
+                    handle = self._window.windowHandle()
+                    if handle is not None:
+                        handle.startSystemMove()
+                        event.accept()
+                        return
+        super().mousePressEvent(event)
+
 
 def main() -> int:
     flags = "--enable-webgl --ignore-gpu-blocklist --use-angle=d3d11 --disable-gpu-sandbox --disable-gpu-compositing"
@@ -249,10 +301,15 @@ def main() -> int:
     html_path = project_root / "ui-vue" / "dist" / "index.html"
     if not html_path.exists():
         raise FileNotFoundError(
-            f"未找到 UI 构建产物: {html_path}。请在 ui-vue 中执行 `npm install` 和 `npm run build`。"
+            "未找到 UI 构建产物: "
+            f"{html_path}。请在 ui-vue 中执行 `npm install` 和 `npm run build`。"
         )
 
-    view = QWebEngineView()
+    window = QMainWindow()
+    window.setWindowTitle("StencilForge")
+    window.setWindowFlag(Qt.FramelessWindowHint, True)
+    window.setWindowFlag(Qt.Window, True)
+    view = WebView(window, drag_height=64, button_margin=190)
     settings = view.settings()
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
@@ -261,21 +318,24 @@ def main() -> int:
 
     channel = QWebChannel()
     backend = BackendBridge(project_root)
-    preview_dialog, preview_viewer = _build_preview_dialog(view)
+    preview_dialog, preview_viewer = _build_preview_dialog()
     backend.attach_preview(preview_dialog, preview_viewer)
     channel.registerObject("backend", backend)
     view.page().setWebChannel(channel)
     view.setUrl(QUrl.fromLocalFile(str(html_path)))
+    window.setCentralWidget(view)
+    backend.attach_window(window)
 
-    _fit_to_screen(view, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
-    view.setWindowTitle("StencilForge")
-    view.show()
+    _fit_to_screen(window, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
+    window.show()
     return app.exec()
 
 
-def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer]:
-    dialog = QDialog(parent)
+def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer]:
+    dialog = QDialog()
     dialog.setWindowTitle("钢网预览")
+    dialog.setWindowFlag(Qt.FramelessWindowHint, True)
+    dialog.setWindowFlag(Qt.Window, True)
     _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
     dialog.setStyleSheet(
         "QDialog { background-color: #f3e6d8; }"
@@ -285,6 +345,7 @@ def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer
         "QToolButton:checked { background-color: #e7c8a4; }"
     )
     viewer = VtkStlViewer(dialog)
+    title_bar = TitleBar(dialog, "钢网预览")
     toolbar = QToolBar(dialog)
     toolbar.setMovable(False)
     fit_action = toolbar.addAction("适配")
@@ -301,15 +362,16 @@ def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer
     axes_action.toggled.connect(viewer.toggle_axes)
 
     layout = QVBoxLayout(dialog)
-    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(0)
+    layout.addWidget(title_bar)
     layout.addWidget(toolbar)
     layout.addWidget(viewer)
     return dialog, viewer
 
 
 def _fit_to_screen(
-    widget: QDialog | QWebEngineView,
+    widget: QDialog | QMainWindow,
     max_ratio: tuple[float, float],
     max_size: tuple[int, int],
     min_size: tuple[int, int],
