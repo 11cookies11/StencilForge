@@ -40,7 +40,10 @@
               <input v-model="configPath" class="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-lg" placeholder="config/stencilforge.json" type="text" />
               <button class="px-4 h-10 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:text-primary" @click="pickConfigPath">Select</button>
             </div>
-            <button class="w-full h-11 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-blue-500/20 transition-all" @click="runJob">Generate STL</button>
+            <div class="grid grid-cols-2 gap-3">
+              <button class="h-11 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-blue-500/20 transition-all" @click="runJob">Generate STL</button>
+              <button class="h-11 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:text-primary hover:border-primary transition-colors" @click="importZip">Import ZIP</button>
+            </div>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
             <div class="text-xs font-semibold text-slate-500 uppercase mb-3">Detected Files</div>
@@ -123,6 +126,17 @@
           <p class="text-slate-500">Monitor generation progress and logs.</p>
         </div>
         <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-4">
+          <div class="rounded-xl border border-slate-200 bg-slate-50">
+            <div class="px-6 py-8 text-sm text-slate-500">
+              3D preview opens in a separate VTK window.
+            </div>
+            <div class="flex flex-wrap gap-3 px-6 pb-6">
+              <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="openPreview">Open Preview</button>
+              <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="previewOutput">Preview Output</button>
+              <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="pickStlForPreview">Load STL</button>
+            </div>
+          </div>
+          <div class="text-xs text-slate-500">STL: {{ outputPath || "Not set" }}</div>
           <div class="flex items-center justify-between">
             <div class="text-xs font-semibold text-slate-500 uppercase">Status</div>
             <div class="text-sm font-bold text-primary">{{ statusLabel }}</div>
@@ -134,6 +148,8 @@
           <div class="flex gap-3">
             <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="runJob">Generate</button>
             <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="stopJob">Stop</button>
+            <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="previewOutput">Preview Output</button>
+            <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="pickStlForPreview">Open STL</button>
           </div>
         </div>
       </section>
@@ -153,6 +169,7 @@
 </template>
 
 <script>
+
 export default {
   data() {
     return {
@@ -185,6 +202,8 @@ export default {
   mounted() {
     this.connectBackend();
   },
+  beforeUnmount() {
+  },
   methods: {
     connectBackend() {
       if (!window.qt || !window.QWebChannel) {
@@ -194,10 +213,11 @@ export default {
       new QWebChannel(qt.webChannelTransport, (channel) => {
         this.backend = channel.objects.backend;
         this.wireBackendSignals();
-        const cfg = this.backend.getConfig();
-        if (cfg) {
-          this.config = cfg;
-        }
+        this.backend.getConfig((cfg) => {
+          if (cfg) {
+            this.config = cfg;
+          }
+        });
       });
     },
     wireBackendSignals() {
@@ -220,6 +240,10 @@ export default {
       this.backend.jobDone.connect((result) => {
         this.status = "success";
         this.log = `Done: ${result.output_stl || ""}`;
+        if (result.output_stl) {
+          this.outputPath = result.output_stl;
+          this.backend.loadPreviewStl(result.output_stl);
+        }
       });
       this.backend.jobError.connect((message) => {
         this.status = "error";
@@ -231,26 +255,41 @@ export default {
     },
     pickInputDir() {
       if (!this.backend) return;
-      const picked = this.backend.pickDirectory();
-      if (picked) {
-        this.inputDir = picked;
-        this.scanFiles();
-      }
+      this.backend.pickDirectory((picked) => {
+        if (picked) {
+          this.inputDir = picked;
+          this.scanFiles();
+        }
+      });
     },
     pickOutputPath() {
       if (!this.backend) return;
-      const picked = this.backend.pickSaveFile("stencil.stl");
-      if (picked) {
-        this.outputPath = picked;
-      }
+      this.backend.pickSaveFile("stencil.stl", (picked) => {
+        if (picked) {
+          this.outputPath = picked;
+        }
+      });
     },
     pickConfigPath() {
       if (!this.backend) return;
-      const picked = this.backend.pickConfigFile();
-      if (picked) {
-        this.configPath = picked;
-        this.backend.loadConfig(picked);
-      }
+      this.backend.pickConfigFile((picked) => {
+        if (picked) {
+          this.configPath = picked;
+          this.backend.loadConfig(picked);
+        }
+      });
+    },
+    importZip() {
+      if (!this.backend) return;
+      this.backend.pickZipFile((zipPath) => {
+        if (!zipPath) return;
+        this.backend.importZip(zipPath, (extracted) => {
+          if (extracted) {
+            this.inputDir = extracted;
+            this.scanFiles();
+          }
+        });
+      });
     },
     scanFiles() {
       if (!this.backend || !this.inputDir) return;
@@ -282,6 +321,27 @@ export default {
     stopJob() {
       if (!this.backend) return;
       this.backend.stopJob();
+    },
+    openPreview() {
+      if (!this.backend) return;
+      this.backend.openPreview();
+    },
+    previewOutput() {
+      if (!this.backend) return;
+      if (!this.outputPath) {
+        this.status = "error";
+        this.log = "Output STL not set.";
+        return;
+      }
+      this.backend.loadPreviewStl(this.outputPath);
+    },
+    pickStlForPreview() {
+      if (!this.backend) return;
+      this.backend.pickStlFile((picked) => {
+        if (!picked) return;
+        this.outputPath = picked;
+        this.backend.loadPreviewStl(picked);
+      });
     },
   },
 };
