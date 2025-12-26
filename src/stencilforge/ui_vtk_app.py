@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QUrl
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -27,7 +28,7 @@ class MainWindow(QMainWindow):
     def __init__(self, project_root: Path) -> None:
         super().__init__()
         self.setWindowTitle("StencilForge")
-        self.resize(1400, 900)
+        _fit_to_screen(self, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
 
         self._web = QWebEngineView()
         self._preview_dialog: QDialog | None = None
@@ -57,7 +58,7 @@ class MainWindow(QMainWindow):
             return
         dialog = QDialog(self)
         dialog.setWindowTitle("钢网预览")
-        dialog.resize(900, 700)
+        _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
         dialog.setStyleSheet(
             "QDialog { background-color: #f3e6d8; }"
             "QToolBar { background-color: rgba(246, 232, 214, 0.95); "
@@ -127,3 +128,24 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _fit_to_screen(
+    widget: QMainWindow | QDialog,
+    max_ratio: tuple[float, float],
+    max_size: tuple[int, int],
+    min_size: tuple[int, int],
+) -> None:
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        widget.resize(*max_size)
+        return
+    available = screen.availableGeometry()
+    width = min(int(available.width() * max_ratio[0]), max_size[0])
+    height = min(int(available.height() * max_ratio[1]), max_size[1])
+    width = max(width, min_size[0])
+    height = max(height, min_size[1])
+    widget.resize(width, height)
+    x = available.x() + max((available.width() - width) // 2, 0)
+    y = available.y() + max((available.height() - height) // 2, 0)
+    widget.move(x, y)
