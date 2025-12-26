@@ -1,26 +1,35 @@
-# <PROJECT_NAME>
+# StencilForge
 
-<SHORT_DESCRIPTION>
+Fast PCB stencil model generator (Gerber -> STL).
 
 Language: English | [简体中文](README.zh-CN.md)
 
 ## Overview
 
-This is a tech-agnostic GitHub template repository for quickly bootstrapping
-any kind of project (library / service / scripts / docs / learning notes).
+This project converts Gerber + Excellon exports into a 3D stencil model (STL).
+It targets JLC EDA exports but keeps the pipeline generic.
 
-On first use, replace these placeholders:
+## Quick start
 
-- `<PROJECT_NAME>`: project name
-- `<SHORT_DESCRIPTION>`: one-line description
-- `LICENSE`: choose a license that fits your project
-- `.github/ISSUE_TEMPLATE/*`: adjust issue templates to your needs
+1. Create a venv and install deps: `pip install -r requirements.txt`
+2. Install the package: `pip install -e .`
+3. Update `config/stencilforge.json` as needed
+4. Run:
 
-## Getting started (as a template)
+```bash
+stencilforge <gerber_dir> <output_stl>
+```
 
-1. Click **Use this template** on GitHub to create a new repository
-2. Update `README.md` and other basics (e.g. `LICENSE`, `CONTRIBUTING.md`)
-3. Add your code / docs
+## Config parameters
+
+- `paste_patterns`: paste layer file patterns (top paste default)
+- `outline_patterns`: board outline patterns
+- `thickness_mm`: stencil thickness
+- `paste_offset_mm`: shrink/expand opening (negative shrinks)
+- `outline_margin_mm`: fallback outline margin when no outline file exists
+- `output_mode`: `holes_only` or `solid_with_cutouts`
+- `arc_steps`: number of steps to approximate arcs
+- `curve_resolution`: buffer resolution for circles
 
 ## Conventions (recommended)
 
