@@ -2,7 +2,8 @@
   <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800 pb-32">
     <header
       class="sticky top-0 z-40 bg-white border-b border-slate-200 h-16 app-titlebar"
-      @dblclick="windowMaximizeRestore"
+      @mousedown="onTitlebarMouseDown"
+      @dblclick="onTitlebarDoubleClick"
     >
       <div class="max-w-7xl mx-auto px-6 md:px-8 h-full flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -557,6 +558,16 @@ export default {
     windowClose() {
       if (!this.backend) return;
       this.backend.windowClose();
+    },
+    onTitlebarMouseDown(event) {
+      if (event.button !== 0) return;
+      if (event.target.closest(".window-controls")) return;
+      if (!this.backend) return;
+      this.backend.windowStartDrag();
+    },
+    onTitlebarDoubleClick(event) {
+      if (event.target.closest(".window-controls")) return;
+      this.windowMaximizeRestore();
     },
   },
 };

@@ -268,6 +268,14 @@ class BackendBridge(QObject):
         if self._window is not None:
             self._window.close()
 
+    @Slot()
+    def windowStartDrag(self) -> None:
+        if self._window is None:
+            return
+        handle = self._window.windowHandle()
+        if handle is not None:
+            handle.startSystemMove()
+
 
 class WebView(QWebEngineView):
     def __init__(self, window: QMainWindow, drag_height: int, button_margin: int) -> None:
@@ -287,6 +295,19 @@ class WebView(QWebEngineView):
                         event.accept()
                         return
         super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            pos = event.position().toPoint()
+            if pos.y() <= self._drag_height:
+                if pos.x() < max(self.width() - self._button_margin, 0):
+                    if self._window.isMaximized():
+                        self._window.showNormal()
+                    else:
+                        self._window.showMaximized()
+                    event.accept()
+                    return
+        super().mouseDoubleClickEvent(event)
 
 
 def main() -> int:
@@ -309,6 +330,8 @@ def main() -> int:
     window.setWindowTitle("StencilForge")
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
+    window.setWindowFlag(Qt.WindowSystemMenuHint, True)
+    window.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
     view = WebView(window, drag_height=64, button_margin=190)
     settings = view.settings()
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
