@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Model Export - StencilGen 3D</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2563eb", // Modern vivid blue
+                        "primary-dark": "#1d4ed8",
+                        "surface": "#ffffff",
+                        "background": "#f8fafc", // Very light cool gray
+                        "border": "#e2e8f0",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 4px 14px 0 rgba(37, 99, 235, 0.39)',
+                    }
+                },
+            },
+        }
+    </script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="../app.js"></script>
+</head>
+<body class="bg-background min-h-screen flex flex-col font-body text-slate-800 overflow-x-hidden antialiased selection:bg-primary/20 selection:text-primary">
+<header class="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+<div class="px-4 md:px-10 py-3 flex items-center justify-between max-w-[1600px] mx-auto">
+<div class="flex items-center gap-3">
+<div class="size-9 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+<span class="material-symbols-outlined">layers</span>
+</div>
+<h2 class="text-xl font-display font-bold text-slate-900 tracking-tight">StencilGen 3D</h2>
+</div>
+<div class="flex flex-1 justify-end gap-8 items-center">
+<div class="hidden md:flex items-center gap-4 text-xs font-semibold text-slate-500">
+<a class="hover:text-primary transition-colors" href="upload.html">Upload</a>
+<a class="hover:text-primary transition-colors" href="config.html">Config</a>
+<a class="hover:text-primary transition-colors" href="preview.html">Preview</a>
+<a class="hover:text-primary transition-colors" href="export.html">Export</a>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-sm font-medium text-slate-600 hover:text-primary transition-colors" href="#">Projects</a>
+<a class="text-sm font-medium text-slate-600 hover:text-primary transition-colors" href="#">Library</a>
+<a class="text-sm font-medium text-slate-600 hover:text-primary transition-colors" href="#">Settings</a>
+</nav>
+<div class="flex items-center gap-3 pl-4 border-l border-slate-200">
+<button class="flex items-center justify-center size-9 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+</button>
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-9 ring-2 ring-white shadow-sm" data-alt="User profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAENpIC_UjRcoDq1azz5MDNSYhUJO1stYFUBV0snIpdCVuSxkoz1KpR3ykIgV98dARqT-1USzwQLahFTAM6dFJWhIhzHjWnWFMbX_as0x6bADrYWLh5SBj_8K6mgLSO_ZldtiaTbDxW-3msauQw5u1dMei8-9UYEVimJJuFzYdTKlv6dS_WI4uEzwnDR9i9Kyqq38yTv4Xf43dZ5rmPY9LpG6iX0NqimqYEx5yf2Ro1NmsNhrMHVsg6JQdjY5U17-cIOvtWo95drvdY");'>
+</div>
+</div>
+</div>
+</div>
+</header>
+<main class="flex-1 flex justify-center py-8 px-4 md:px-10">
+<div class="w-full max-w-[1440px] flex flex-col gap-8">
+<div class="flex flex-wrap items-center gap-2 text-sm">
+<a class="text-slate-500 hover:text-primary transition-colors font-medium" href="#">Home</a>
+<span class="material-symbols-outlined text-xs text-slate-400">chevron_right</span>
+<a class="text-slate-500 hover:text-primary transition-colors font-medium" href="#">Project Alpha</a>
+<span class="material-symbols-outlined text-xs text-slate-400">chevron_right</span>
+<span class="text-primary font-semibold bg-blue-50 px-2 py-0.5 rounded-md">Export Model</span>
+</div>
+<div class="flex flex-col md:flex-row justify-between gap-6 md:items-end border-b border-slate-200 pb-6">
+<div class="flex flex-col gap-2">
+<h1 class="text-3xl md:text-4xl font-display font-bold text-slate-900 tracking-tight">Export Model: Project Alpha</h1>
+<p class="text-slate-500 text-lg max-w-2xl font-light">
+                    Configure export specifications and download your stencil model file.
+                </p>
+</div>
+<div class="flex items-center gap-3">
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+                    Ready
+                </span>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+<div class="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+<div class="relative w-full aspect-[4/3] lg:aspect-auto lg:h-[600px] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl shadow-slate-200 ring-1 ring-black/5 group">
+<div class="absolute inset-0 bg-center bg-no-repeat bg-cover opacity-90 transition-transform duration-700 group-hover:scale-105" data-alt="3D wireframe render of a PCB stencil model" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCno5GPu1rCtAg2w3Xsyg4kiMY4o5YQgCT2865_XzFZ4w2mVw-L6xx9wa5iGAsldOvgAAMXGzylpxmJmPlhUhapGB_fXGnXVHxnGKlI34GMECPyXrfWl5ie0TmIXfgsayY3NEF--Di5s0uJf9wXH5Yf0hH7g11Z-JB5JgL1z9wfyyDAaCaSH4OYBR49AvCdEcWfWEhFiTwCOuN9gXFxpoM4I5Va6XhDWW5damYNo8spugsVJbIKTbteMVmdx1Fl02q0W_GZsJ5a6An");'>
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/20 pointer-events-none"></div>
+<div class="absolute top-6 left-6 flex flex-col gap-2">
+<div class="flex flex-col bg-white/10 backdrop-blur-md rounded-lg overflow-hidden border border-white/20 shadow-lg">
+<button class="p-2.5 text-white hover:bg-white/20 transition-colors border-b border-white/10" title="Rotate">
+<span class="material-symbols-outlined">3d_rotation</span>
+</button>
+<button class="p-2.5 text-white hover:bg-white/20 transition-colors border-b border-white/10" title="Zoom In">
+<span class="material-symbols-outlined">add</span>
+</button>
+<button class="p-2.5 text-white hover:bg-white/20 transition-colors" title="Zoom Out">
+<span class="material-symbols-outlined">remove</span>
+</button>
+</div>
+</div>
+<div class="absolute bottom-6 left-6 right-6 flex justify-between items-end">
+<div class="bg-white/10 backdrop-blur-xl p-3 px-4 rounded-xl border border-white/20 shadow-xl">
+<p class="text-[10px] text-slate-300 uppercase tracking-widest font-bold mb-1">Dimensions</p>
+<p class="text-base font-bold font-mono text-white tracking-tight">100mm <span class="text-slate-400 font-light mx-1">x</span> 50mm <span class="text-slate-400 font-light mx-1">x</span> 0.12mm</p>
+</div>
+<button class="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/20 text-white hover:bg-white/20 transition-colors shadow-lg">
+<span class="material-symbols-outlined">fullscreen</span>
+</button>
+</div>
+</div>
+</div>
+<div class="lg:col-span-5 xl:col-span-4 flex flex-col justify-start">
+<div class="bg-white rounded-2xl shadow-soft border border-slate-200/60 overflow-hidden sticky top-24">
+<div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+<h3 class="font-display font-semibold text-slate-800 text-lg">Export Options</h3>
+<span class="material-symbols-outlined text-slate-400">tune</span>
+</div>
+<div class="p-6 space-y-8">
+<div>
+<label class="text-sm font-semibold text-slate-700 mb-3 block">Format</label>
+<div class="grid grid-cols-3 gap-3">
+<label class="relative cursor-pointer group">
+<input checked="" class="peer sr-only" name="format" type="radio"/>
+<div class="flex items-center justify-center p-3 text-sm font-bold rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-slate-300 peer-focus:ring-2 peer-focus:ring-primary peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary transition-all">
+                                        STL
+                                    </div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="format" type="radio"/>
+<div class="flex items-center justify-center p-3 text-sm font-bold rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-slate-300 peer-focus:ring-2 peer-focus:ring-primary peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary transition-all">
+                                        STEP
+                                    </div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="format" type="radio"/>
+<div class="flex items-center justify-center p-3 text-sm font-bold rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-slate-300 peer-focus:ring-2 peer-focus:ring-primary peer-checked:border-primary peer-checked:bg-blue-50 peer-checked:text-primary transition-all">
+                                        DXF
+                                    </div>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-5">
+<div>
+<label class="text-sm font-semibold text-slate-700 mb-1.5 block">Units</label>
+<select class="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none transition-shadow cursor-pointer hover:border-slate-300">
+<option>Millimeters (mm)</option>
+<option>Inches (in)</option>
+</select>
+</div>
+<div>
+<label class="text-sm font-semibold text-slate-700 mb-1.5 block">Quality</label>
+<select class="w-full bg-slate-50 border border-slate-200 text-slate-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none transition-shadow cursor-pointer hover:border-slate-300">
+<option>High</option>
+<option>Medium</option>
+<option>Low</option>
+</select>
+</div>
+</div>
+<div class="flex items-center justify-between py-1">
+<span class="text-sm font-medium text-slate-600">Include Thickness</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="border-t border-slate-100"></div>
+<div>
+<div class="flex justify-between items-end mb-4 px-1">
+<div class="flex flex-col">
+<span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Size</span>
+<span class="text-2xl font-bold text-slate-800 font-display tracking-tight">~15.2 MB</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Volume</span>
+<span class="text-base font-semibold text-slate-600">12.5 cm³</span>
+</div>
+</div>
+<button class="w-full group h-14 flex items-center justify-center gap-3 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]" id="DownloadButton">
+<span class="material-symbols-outlined transition-transform group-hover:translate-y-0.5">download</span>
+                                Download File
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

@@ -20,6 +20,14 @@
 stencilforge <gerber_dir> <output_stl>
 ```
 
+## 桌面 UI（PySide6 + Qt WebEngine）
+
+启动桌面界面：
+
+```bash
+stencilforge-ui
+```
+
 ## 配置参数
 
 - `paste_patterns`：焊膏层文件匹配（默认顶层焊膏）
