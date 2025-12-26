@@ -9,9 +9,15 @@ setup(
     packages=find_packages("src"),
     install_requires=[
         "pcb-tools==0.1.6",
+        "PySide6==6.10.1",
         "shapely==2.1.2",
         "trimesh==4.10.1",
     ],
     python_requires=">=3.10",
-    entry_points={"console_scripts": ["stencilforge=stencilforge.cli:main"]},
+    entry_points={
+        "console_scripts": [
+            "stencilforge=stencilforge.cli:main",
+            "stencilforge-ui=stencilforge.ui_app:main",
+        ]
+    },
 )

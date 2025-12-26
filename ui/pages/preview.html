@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>3D Solder Paste Stencil Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&amp;family=Noto+Sans:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "primary-hover": "#0f4bc4",
+                        "background-light": "#f8fafc",
+                        "surface": "#ffffff",
+                        "surface-muted": "#f1f5f9",
+                        "success": "#10b981",
+                        "danger": "#ef4444",
+                        "warning": "#f59e0b",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                        "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"],
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+                    boxShadow: {
+                        "soft": "0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)",
+                        "glow": "0 0 15px rgba(19, 91, 236, 0.3)",
+                    }
+                },
+            },
+        }
+    </script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script src="../app.js"></script>
+<style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .grid-bg {
+            background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="bg-background-light font-body text-slate-900 h-screen overflow-hidden flex flex-col selection:bg-primary/20">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-surface px-6 py-3 shrink-0 z-50 shadow-sm relative">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center size-9 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/10">
+<span class="material-symbols-outlined">deployed_code</span>
+</div>
+<div>
+<h2 class="text-base font-bold leading-none tracking-tight text-slate-800 font-display">StencilGen Studio</h2>
+<p class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-1">3D Solder Paste Modeler</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center gap-3 text-xs font-semibold text-slate-500">
+<a class="hover:text-primary transition-colors" href="upload.html">Upload</a>
+<a class="hover:text-primary transition-colors" href="config.html">Config</a>
+<a class="hover:text-primary transition-colors" href="preview.html">Preview</a>
+<a class="hover:text-primary transition-colors" href="export.html">Export</a>
+</div>
+<nav class="hidden md:flex items-center gap-1 bg-surface-muted p-1 rounded-lg border border-slate-200">
+<a class="px-4 py-1.5 text-xs font-bold text-slate-800 bg-white shadow-sm rounded-md ring-1 ring-black/5" href="#">Preview</a>
+<a class="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 rounded-md transition-colors" href="#">Editor</a>
+<a class="px-4 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 rounded-md transition-colors" href="#">Settings</a>
+</nav>
+<div class="h-6 w-px bg-slate-200 mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="size-8 bg-center bg-no-repeat bg-cover rounded-full border border-slate-200 shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all relative" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAcm73hxFZNOyPjHcH_CgMTVOx4azwI96AZVSmZMQTxopduWmCamBoI3-NGfva3Fhk1yW8yzg_c4ncFcAYuX7ZaWGMaQ3wvBfcb-JuYFQ5WQ1arPVOXc-J_Rxu9dzdnbMwTg9-Q_AwAjRZJ4r6iXEt2Tsm6NVIQwMoIRNyAdm4_cwGtzgbiOpUHDHakTQ8Oh8aOdnhG82gNwu-rlrUw6220j0BTQGISEr4ziSGjGMUodMAtIldK8tBjDTnN3iQOYrucXNcvHtx3hhwq");'>
+<div class="absolute bottom-0 right-0 size-2.5 bg-green-500 border-2 border-white rounded-full"></div>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<aside class="w-80 flex flex-col border-r border-slate-200 bg-surface shrink-0 z-40 h-full overflow-hidden">
+<div class="flex-1 overflow-y-auto">
+<div class="p-5 border-b border-slate-200 bg-slate-50/60">
+<h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4 font-display">Input Configuration</h3>
+<div class="mb-6">
+<label class="block text-xs font-semibold mb-2 text-slate-600">Source PCB File</label>
+<div class="flex w-full items-center rounded-lg bg-white border border-slate-200 overflow-hidden group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all shadow-sm">
+<span class="pl-3 text-slate-400 material-symbols-outlined text-[20px]">folder_open</span>
+<input class="w-full bg-transparent border-none text-xs px-2.5 py-2.5 focus:ring-0 text-slate-700 font-mono truncate placeholder-slate-400" readonly="" type="text" value="PCB_Rev3.gbr"/>
+</div>
+</div>
+<div class="space-y-6">
+<div>
+<div class="flex justify-between items-center mb-2">
+<label class="text-xs font-semibold text-slate-600">Stencil Thickness</label>
+<span class="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold border border-primary/10">0.12 mm</span>
+</div>
+<input class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary hover:accent-primary-hover focus:ring-0" max="0.30" min="0.08" step="0.01" type="range" value="0.12"/>
+<div class="flex justify-between text-[10px] text-slate-400 mt-1.5 font-mono">
+<span>0.08</span>
+<span>0.30</span>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold mb-2 text-slate-600">Aperture Modification</label>
+<div class="relative">
+<select class="w-full bg-white border border-slate-200 text-slate-700 text-xs rounded-lg focus:ring-primary focus:border-primary block p-2.5 pr-8 appearance-none font-medium transition-shadow shadow-sm">
+<option>None (1:1)</option>
+<option>Global Reduction (10%)</option>
+<option>Global Reduction (15%)</option>
+<option>Homeplate Pattern</option>
+</select>
+<span class="absolute right-2.5 top-2.5 pointer-events-none text-slate-400 material-symbols-outlined text-[18px]">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+<div class="p-5 border-b border-slate-200">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-display">Layer Stack</h3>
+<button class="text-slate-400 hover:text-primary text-[10px] font-bold flex items-center gap-1 hover:bg-slate-50 px-2 py-1 rounded transition-colors uppercase">
+                            Config <span class="material-symbols-outlined text-[12px]">settings</span>
+</button>
+</div>
+<div class="space-y-2.5">
+<div class="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer shadow-sm group hover:bg-primary/10 transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-[20px]">layers</span>
+<div class="flex flex-col">
+<span class="text-xs font-bold text-slate-800">Top Paste</span>
+<span class="text-[10px] text-slate-500">Visible • Edited</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary text-[18px]">visibility</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-white border border-slate-200 hover:border-slate-300 cursor-pointer transition-all hover:shadow-sm group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400 text-[20px] group-hover:text-slate-600">layers</span>
+<div class="flex flex-col">
+<span class="text-xs font-medium text-slate-500 group-hover:text-slate-700">Bottom Paste</span>
+<span class="text-[10px] text-slate-400">Hidden</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-slate-300 text-[18px] group-hover:text-slate-500">visibility_off</span>
+</div>
+</div>
+</div>
+<div class="p-5">
+<h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-4 font-display">Object Properties</h3>
+<div class="space-y-3">
+<div class="bg-surface-muted p-2.5 rounded-lg border border-slate-100 flex items-center justify-between">
+<span class="text-xs text-slate-500 font-medium">Material</span>
+<div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+<div class="size-2 rounded-full bg-slate-400 ring-2 ring-slate-200"></div>
+                                304 Stainless
+                            </div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-muted p-2.5 rounded-lg border border-slate-100">
+<span class="text-[10px] text-slate-500 block mb-0.5 font-medium">Area</span>
+<div class="text-xs font-bold text-slate-800">102 cm²</div>
+</div>
+<div class="bg-surface-muted p-2.5 rounded-lg border border-slate-100">
+<span class="text-[10px] text-slate-500 block mb-0.5 font-medium">Weight</span>
+<div class="text-xs font-bold text-slate-800">~45g</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 bg-slate-50 border-t border-slate-200 mt-auto">
+<div class="space-y-2 relative">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">folder_data</span>
+<h3 class="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-display">Project Meta</h3>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase text-slate-400 font-bold mb-0.5">Source Path</span>
+<div class="flex items-center gap-1 group cursor-pointer bg-white border border-slate-200 rounded px-1.5 py-1 shadow-sm">
+<span class="text-[10px] text-slate-600 font-mono truncate w-full" title="~/projects/hardware/pcb_rev3.gbr">~/projects/hardware/pcb_rev3.gbr</span>
+</div>
+</div>
+<div class="flex justify-between items-center pt-1">
+<span class="text-[10px] font-mono text-slate-500">v2.1.0-beta</span>
+<span class="text-[10px] font-mono text-slate-400">Last: 10:42</span>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 relative bg-slate-100 flex flex-col overflow-hidden">
+<div class="flex-1 relative w-full h-full overflow-hidden bg-[#f0f4f8] group select-none pb-16" id="StlPreview">
+<div class="absolute inset-0 opacity-30 pointer-events-none grid-bg" style="perspective: 1000px;"></div>
+<div class="absolute top-4 left-4 z-20 flex p-1 bg-surface/90 backdrop-blur border border-slate-200 rounded-lg shadow-sm">
+<button class="px-3 py-1.5 rounded-md bg-primary text-white shadow-sm text-xs font-bold transition-all flex items-center gap-2 hover:bg-primary-hover">
+<span class="material-symbols-outlined text-[16px]">view_in_ar</span> StlPreview
+                    </button>
+<button class="px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 text-xs font-bold transition-colors flex items-center gap-2" id="TwoDPreview">
+<span class="material-symbols-outlined text-[16px]">grid_view</span> 2dPreview 
+                    </button>
+</div>
+<div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-200 shadow-soft">
+<button class="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors tooltip-trigger" title="Select">
+<span class="material-symbols-outlined text-[20px]">near_me</span>
+</button>
+<div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+<button class="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors" title="Pan">
+<span class="material-symbols-outlined text-[20px]">pan_tool</span>
+</button>
+<button class="p-2 text-primary bg-primary/10 rounded-lg transition-colors ring-1 ring-primary/20" title="Rotate">
+<span class="material-symbols-outlined text-[20px]">3d_rotation</span>
+</button>
+<button class="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors" title="Zoom">
+<span class="material-symbols-outlined text-[20px]">zoom_in</span>
+</button>
+<div class="w-px h-5 bg-slate-200 mx-0.5"></div>
+<button class="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition-colors" title="Measure">
+<span class="material-symbols-outlined text-[20px]">straighten</span>
+</button>
+</div>
+<div class="absolute top-4 right-4 z-20 flex flex-col gap-2">
+<div class="bg-white/90 backdrop-blur rounded-lg border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+<button class="flex items-center justify-center size-9 text-slate-500 hover:bg-slate-50 hover:text-slate-900 border-b border-slate-100 transition-colors" title="Toggle Grid">
+<span class="material-symbols-outlined text-[20px]">grid_on</span>
+</button>
+<button class="flex items-center justify-center size-9 text-primary bg-primary/5 hover:bg-slate-50 border-b border-slate-100 transition-colors" title="Lighting">
+<span class="material-symbols-outlined text-[20px]">light_mode</span>
+</button>
+<button class="flex items-center justify-center size-9 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-colors" title="Center View">
+<span class="material-symbols-outlined text-[20px]">center_focus_strong</span>
+</button>
+</div>
+</div>
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[350px] transition-transform duration-500 hover:scale-[1.01]" style="transform-style: preserve-3d; transform: perspective(1000px) rotateX(20deg) rotateZ(-8deg);">
+<div class="w-full h-full relative rounded bg-gradient-to-br from-[#e4e4e7] via-[#d4d4d8] to-[#a1a1aa] shadow-2xl border border-white/40 ring-1 ring-black/5">
+<div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent opacity-60 rounded pointer-events-none mix-blend-overlay"></div>
+<div class="absolute top-1/4 left-1/4 w-8 h-8 bg-[#f0f4f8] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] rounded-sm"></div>
+<div class="absolute top-1/4 left-1/3 w-8 h-8 bg-[#f0f4f8] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] rounded-sm"></div>
+<div class="absolute top-1/4 left-[42%] w-8 h-8 bg-[#f0f4f8] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] rounded-sm"></div>
+<div class="absolute bottom-1/3 right-1/4 grid grid-cols-4 gap-1">
+<div class="w-3 h-6 bg-[#f0f4f8] shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]"></div>
+<div class="w-3 h-6 bg-[#f0f4f8] shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]"></div>
+<div class="w-3 h-6 bg-[#f0f4f8] shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]"></div>
+<div class="w-3 h-6 bg-[#f0f4f8] shadow-[inset_0_1px_3px_rgba(0,0,0,0.3)]"></div>
+</div>
+<div class="absolute top-1/3 right-1/3 grid grid-cols-2 gap-2 p-4 border border-slate-500/10 rounded bg-slate-400/5">
+<div class="w-12 h-12 bg-[#f0f4f8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] rounded-sm"></div>
+<div class="w-12 h-12 bg-[#f0f4f8] shadow-[inset_0_2px_5px_rgba(0,0,0,0.3)] rounded-sm"></div>
+</div>
+<div class="absolute bottom-3 left-3 text-[10px] font-mono text-slate-500 font-bold tracking-wider opacity-70">
+                            STL PREVIEW: 8842-XJ <br/> MESH: 45K POLY
+                        </div>
+</div>
+</div>
+<div class="absolute bottom-20 right-6 size-24 pointer-events-none opacity-90 mix-blend-multiply">
+<div class="relative w-full h-full">
+<div class="absolute bottom-0 left-0 w-0.5 h-16 bg-green-500 origin-bottom shadow-sm"></div>
+<div class="absolute bottom-0 left-0 w-16 h-0.5 bg-red-500 origin-left shadow-sm"></div>
+<div class="absolute bottom-0 left-0 w-12 h-0.5 bg-blue-500 origin-left rotate-45 transform -translate-x-1.5 translate-y-1.5 shadow-sm"></div>
+<span class="absolute -top-1 left-2 text-[10px] font-bold text-green-700 font-mono">Y</span>
+<span class="absolute bottom-1 right-0 text-[10px] font-bold text-red-700 font-mono">X</span>
+<span class="absolute bottom-0 left-0 text-[10px] font-bold text-blue-700 -translate-x-3 translate-y-4 font-mono">Z</span>
+</div>
+</div>
+</div>
+<div class="absolute bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+<div class="w-full h-1 bg-slate-100 absolute top-0 left-0">
+<div class="h-full bg-gradient-to-r from-primary to-blue-400 w-[35%] shadow-[0_0_8px_rgba(19,91,236,0.6)] relative overflow-hidden" id="ProgressBar">
+<div class="absolute inset-0 bg-white/30 animate-[pulse_2s_infinite]"></div>
+</div>
+</div>
+<div class="flex items-center justify-between px-6 py-2.5 h-16 gap-6">
+<div class="flex items-center gap-3 shrink-0">
+<button class="flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-white text-sm font-bold py-2 px-5 rounded-lg shadow-lg shadow-primary/20 transition-all transform active:scale-[0.98] ring-1 ring-white/20" data-action="run" id="RunButton">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+<span>Generate</span>
+</button>
+<button class="flex items-center justify-center size-9 bg-white hover:bg-red-50 text-slate-500 hover:text-danger border border-slate-200 hover:border-red-200 rounded-lg shadow-sm transition-all active:scale-[0.98]" data-action="stop" id="StopButton" title="Stop">
+<span class="material-symbols-outlined text-[20px]">stop</span>
+</button>
+</div>
+<div class="flex-1 flex flex-col justify-center px-6 border-l border-r border-slate-100 h-full overflow-hidden">
+<div class="flex items-center justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
+<div class="flex items-center gap-2">
+<span>Status:</span>
+<span class="inline-flex items-center gap-1.5 text-primary" id="StatusBadge">
+<span class="relative flex h-1.5 w-1.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+</span>
+                                    PROCESSING MESH...
+                                </span>
+</div>
+<span id="ProgressText">35%</span>
+</div>
+<div class="font-mono text-[11px] text-slate-600 truncate flex items-center gap-2 w-full opacity-80 hover:opacity-100 transition-opacity cursor-default" id="LogConsole" title="Show Log">
+<span class="text-slate-400 shrink-0">[10:42:05]</span>
+<span class="truncate">Applying aperture reduction (10% global)...</span>
+</div>
+</div>
+<div class="flex items-center gap-4 shrink-0">
+<div class="hidden lg:flex px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                            MODE: AUTO
+                        </div>
+<div class="h-8 w-px bg-slate-200"></div>
+<button class="py-2 px-4 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg hover:bg-slate-50 hover:text-primary hover:border-primary transition-all flex items-center gap-2 shadow-sm text-xs">
+<span class="material-symbols-outlined text-[16px]">download</span>
+                            Download STL
+                        </button>
+<button class="size-8 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+<span class="material-symbols-outlined text-[20px]">expand_less</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+</body></html>

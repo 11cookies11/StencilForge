@@ -20,6 +20,14 @@ It targets JLC EDA exports but keeps the pipeline generic.
 stencilforge <gerber_dir> <output_stl>
 ```
 
+## UI (PySide6 + Qt WebEngine)
+
+Launch the desktop UI:
+
+```bash
+stencilforge-ui
+```
+
 ## Config parameters
 
 - `paste_patterns`: paste layer file patterns (top paste default)
