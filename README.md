@@ -28,6 +28,8 @@ Launch the desktop UI:
 stencilforge-ui
 ```
 
+The Vue UI runs fully offline using vendored assets in `ui-vue/vendor`.
+
 ## Config parameters
 
 - `paste_patterns`: paste layer file patterns (top paste default)
