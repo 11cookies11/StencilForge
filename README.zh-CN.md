@@ -28,6 +28,8 @@ stencilforge <gerber_dir> <output_stl>
 stencilforge-ui
 ```
 
+Vue UI 使用 `ui-vue/vendor` 中的本地资源，可离线运行。
+
 ## 配置参数
 
 - `paste_patterns`：焊膏层文件匹配（默认顶层焊膏）
