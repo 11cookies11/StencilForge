@@ -1,24 +1,23 @@
 from __future__ import annotations
 
-import sys
-import threading
 import base64
 import os
+import sys
 import tempfile
+import threading
 import zipfile
 from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QToolBar, QVBoxLayout
-
-from .vtk_viewer import VtkStlViewer
 
 from .config import StencilConfig
 from .pipeline import generate_stencil
+from .vtk_viewer import VtkStlViewer
 
 
 def _config_to_dict(config: StencilConfig) -> dict:
@@ -71,7 +70,7 @@ class BackendBridge(QObject):
 
     def _show_preview(self) -> None:
         if self._preview_dialog is None:
-            self.jobLog.emit("Preview window not initialized.")
+            self.jobLog.emit("预览窗口未初始化。")
             return
         self._preview_dialog.show()
         self._preview_dialog.raise_()
@@ -85,7 +84,7 @@ class BackendBridge(QObject):
     def loadConfig(self, path: str) -> None:
         path_obj = Path(path)
         if not path_obj.exists():
-            self.jobLog.emit(f"Config not found: {path}")
+            self.jobLog.emit(f"未找到配置文件: {path}")
             return
         self._config_path = path_obj
         self._config = StencilConfig.from_json(path_obj)
@@ -111,7 +110,7 @@ class BackendBridge(QObject):
     def pickSaveFile(self, default_name: str) -> str:
         filename, _ = QFileDialog.getSaveFileName(
             None,
-            "Save STL",
+            "保存 STL",
             str(self._project_root / default_name),
             "STL Files (*.stl)",
         )
@@ -119,14 +118,16 @@ class BackendBridge(QObject):
 
     @Slot(result=str)
     def pickDirectory(self) -> str:
-        directory = QFileDialog.getExistingDirectory(None, "Select Gerber Folder", str(self._project_root))
+        directory = QFileDialog.getExistingDirectory(
+            None, "选择 Gerber 文件夹", str(self._project_root)
+        )
         return directory
 
     @Slot(result=str)
     def pickConfigFile(self) -> str:
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "Select Config",
+            "选择配置文件",
             str(self._project_root / "config"),
             "Config (*.json)",
         )
@@ -136,7 +137,7 @@ class BackendBridge(QObject):
     def pickZipFile(self) -> str:
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "Select Gerber ZIP",
+            "选择 Gerber ZIP",
             str(self._project_root),
             "ZIP Files (*.zip)",
         )
@@ -146,7 +147,7 @@ class BackendBridge(QObject):
     def pickStlFile(self) -> str:
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "Select STL",
+            "选择 STL",
             str(self._project_root),
             "STL Files (*.stl)",
         )
@@ -161,10 +162,10 @@ class BackendBridge(QObject):
         try:
             data = Path(path).read_bytes()
         except FileNotFoundError:
-            self.jobLog.emit(f"File not found: {path}")
+            self.jobLog.emit(f"文件不存在: {path}")
             return ""
         except OSError as exc:
-            self.jobLog.emit(f"Failed to read file: {exc}")
+            self.jobLog.emit(f"读取文件失败: {exc}")
             return ""
         return base64.b64encode(data).decode("ascii")
 
@@ -175,13 +176,13 @@ class BackendBridge(QObject):
     @Slot(str)
     def loadPreviewStl(self, path: str) -> None:
         if not path:
-            self.jobLog.emit("Preview STL path is empty.")
+            self.jobLog.emit("预览 STL 路径为空。")
             return
         if self._preview_viewer is None:
-            self.jobLog.emit("Preview viewer not initialized.")
+            self.jobLog.emit("预览视图未初始化。")
             return
         if not Path(path).exists():
-            self.jobLog.emit(f"STL not found: {path}")
+            self.jobLog.emit(f"未找到 STL: {path}")
             return
         self._preview_viewer.load_stl(path)
         self._show_preview()
@@ -190,7 +191,7 @@ class BackendBridge(QObject):
     def importZip(self, zip_path: str) -> str:
         path = Path(zip_path)
         if not path.exists():
-            self.jobLog.emit(f"ZIP not found: {zip_path}")
+            self.jobLog.emit(f"未找到 ZIP: {zip_path}")
             return ""
         temp_dir = Path(tempfile.mkdtemp(prefix="stencilforge_"))
         try:
@@ -199,14 +200,14 @@ class BackendBridge(QObject):
             self._temp_dirs.append(temp_dir)
             return str(temp_dir)
         except zipfile.BadZipFile:
-            self.jobLog.emit("Invalid ZIP file.")
+            self.jobLog.emit("无效的 ZIP 文件。")
             return ""
 
     @Slot(str, str, str)
     def runJob(self, input_dir: str, output_stl: str, config_path: str) -> None:
         with self._job_lock:
             if self._job_running:
-                self.jobLog.emit("Job already running.")
+                self.jobLog.emit("任务已在运行。")
                 return
             self._job_running = True
 
@@ -232,7 +233,7 @@ class BackendBridge(QObject):
 
     @Slot()
     def stopJob(self) -> None:
-        self.jobLog.emit("Stop requested. Current job cannot be cancelled yet.")
+        self.jobLog.emit("已请求停止，当前任务暂不支持取消。")
 
 
 def main() -> int:
@@ -247,7 +248,7 @@ def main() -> int:
     html_path = project_root / "ui-vue" / "dist" / "index.html"
     if not html_path.exists():
         raise FileNotFoundError(
-            f"UI build not found: {html_path}. Run `npm install` and `npm run build` in ui-vue."
+            f"未找到 UI 构建产物: {html_path}。请在 ui-vue 中执行 `npm install` 和 `npm run build`。"
         )
 
     view = QWebEngineView()
@@ -273,7 +274,7 @@ def main() -> int:
 
 def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer]:
     dialog = QDialog(parent)
-    dialog.setWindowTitle("Stencil Preview")
+    dialog.setWindowTitle("钢网预览")
     dialog.resize(980, 760)
     dialog.setStyleSheet(
         "QDialog { background-color: #f3e6d8; }"
@@ -285,10 +286,10 @@ def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer
     viewer = VtkStlViewer(dialog)
     toolbar = QToolBar(dialog)
     toolbar.setMovable(False)
-    fit_action = toolbar.addAction("Fit")
-    reset_action = toolbar.addAction("Reset")
-    wire_action = toolbar.addAction("Wireframe")
-    axes_action = toolbar.addAction("Axes")
+    fit_action = toolbar.addAction("适配")
+    reset_action = toolbar.addAction("重置")
+    wire_action = toolbar.addAction("线框")
+    axes_action = toolbar.addAction("坐标轴")
     wire_action.setCheckable(True)
     axes_action.setCheckable(True)
     axes_action.setChecked(True)
