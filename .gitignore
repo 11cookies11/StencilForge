@@ -17,6 +17,9 @@ __pycache__/
 *.pyo
 *.egg-info/
 
+# Frontend
+ui-vue/node_modules/
+
 # Common build outputs (optional)
 dist/
 build/

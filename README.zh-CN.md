@@ -20,7 +20,7 @@
 stencilforge <gerber_dir> <output_stl>
 ```
 
-## 桌面 UI（PySide6 + Qt WebEngine）
+## 桌面 UI（Vue + PySide6 + Qt WebEngine）
 
 启动桌面界面：
 

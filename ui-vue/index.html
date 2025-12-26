@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>StencilForge</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: "#2563eb",
+              "primary-dark": "#1d4ed8",
+              surface: "#ffffff",
+              subtle: "#f8fafc",
+              "surface-muted": "#f1f5f9",
+            },
+            fontFamily: {
+              display: ["Space Grotesk", "sans-serif"],
+              body: ["Noto Sans", "sans-serif"],
+              mono: [
+                "ui-monospace",
+                "SFMono-Regular",
+                "Menlo",
+                "Monaco",
+                "Consolas",
+                "Liberation Mono",
+                "Courier New",
+                "monospace",
+              ],
+            },
+            borderRadius: {
+              xl: "0.75rem",
+              "2xl": "1rem",
+              "3xl": "1.5rem",
+            },
+            boxShadow: {
+              soft: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+              glow: "0 0 20px -5px rgba(37, 99, 235, 0.15)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+    </style>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-body antialiased min-h-screen">
+    <div id="app"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
