@@ -72,17 +72,33 @@ def _extrude_geometry(geometry, thickness_mm: float):
     geometry = geometry.buffer(0)
     meshes = []
     if geometry.geom_type == "Polygon":
-        meshes.append(trimesh.creation.extrude_polygon(geometry, thickness_mm))
+        meshes.append(
+            trimesh.creation.extrude_polygon(
+                geometry, thickness_mm, engine="earcut"
+            )
+        )
     elif geometry.geom_type == "MultiPolygon":
         for poly in geometry.geoms:
-            meshes.append(trimesh.creation.extrude_polygon(poly, thickness_mm))
+            meshes.append(
+                trimesh.creation.extrude_polygon(
+                    poly, thickness_mm, engine="earcut"
+                )
+            )
     else:
         merged = unary_union([geometry])
         if merged.geom_type == "Polygon":
-            meshes.append(trimesh.creation.extrude_polygon(merged, thickness_mm))
+            meshes.append(
+                trimesh.creation.extrude_polygon(
+                    merged, thickness_mm, engine="earcut"
+                )
+            )
         elif merged.geom_type == "MultiPolygon":
             for poly in merged.geoms:
-                meshes.append(trimesh.creation.extrude_polygon(poly, thickness_mm))
+                meshes.append(
+                    trimesh.creation.extrude_polygon(
+                        poly, thickness_mm, engine="earcut"
+                    )
+                )
     if not meshes:
         raise ValueError("Failed to create STL mesh from geometry.")
     return trimesh.util.concatenate(meshes)
