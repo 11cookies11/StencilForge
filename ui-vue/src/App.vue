@@ -1,56 +1,77 @@
 <template>
-  <div class="min-h-screen flex flex-col">
-    <nav class="border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-50">
-      <div class="max-w-7xl mx-auto px-6 md:px-8 py-3 flex items-center justify-between">
+  <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800 pb-32">
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 h-16">
+      <div class="max-w-7xl mx-auto px-6 md:px-8 h-full flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="bg-primary text-white size-9 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <span class="material-symbols-outlined !text-[20px]">view_in_ar</span>
+          <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+            <span class="material-symbols-outlined text-white text-[20px]">view_in_ar</span>
           </div>
-          <h2 class="text-lg font-bold tracking-tight text-slate-900">StencilForge</h2>
+          <span class="text-xl font-bold tracking-tight text-slate-900">StencilForge</span>
         </div>
-        <div class="flex items-center gap-3 text-xs font-semibold text-slate-500">
-          <button class="hover:text-primary transition-colors" @click="setTab('upload')">上传</button>
-          <button class="hover:text-primary transition-colors" @click="setTab('config')">配置</button>
-          <button class="hover:text-primary transition-colors" @click="setTab('preview')">预览</button>
-          <button class="hover:text-primary transition-colors" @click="setTab('export')">导出</button>
-        </div>
+        <div class="text-xs text-slate-400">PCB 钢网与治具生成</div>
       </div>
-    </nav>
+    </header>
 
-    <main class="flex-1 max-w-6xl mx-auto w-full px-4 md:px-8 py-10 space-y-8">
-      <section v-show="currentTab === 'upload'" class="space-y-6">
+    <main class="flex-1 w-full max-w-7xl mx-auto px-6 md:px-8 py-10 pb-32">
+      <section v-show="currentTab === 'upload'" class="space-y-8">
         <div class="text-center space-y-2">
           <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">上传 PCB 文件</h1>
           <p class="text-slate-500">选择 Gerber 目录与输出 STL 路径。</p>
         </div>
-        <div class="grid md:grid-cols-2 gap-6">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-4">
-            <label class="text-xs font-semibold text-slate-500 uppercase">输入目录</label>
-            <div class="flex items-center gap-2">
-              <input v-model="inputDir" @change="scanFiles" class="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-lg" placeholder="Gerber 目录..." type="text" />
-              <button class="px-4 h-10 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:text-primary" @click="pickInputDir">浏览</button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <section class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 md:p-8 space-y-6">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">输入目录</label>
+              <div class="flex rounded-md shadow-sm">
+                <input v-model="inputDir" @change="scanFiles" class="flex-1 block w-full rounded-none rounded-l-md border-slate-300 bg-white text-slate-900 focus:border-primary focus:ring-primary sm:text-sm py-2.5 px-4" placeholder="Gerber 目录..." type="text" />
+                <button class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 rounded-r-md bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary" type="button" @click="pickInputDir">
+                  浏览
+                </button>
+              </div>
             </div>
-            <label class="text-xs font-semibold text-slate-500 uppercase">输出 STL</label>
-            <div class="flex items-center gap-2">
-              <input v-model="outputPath" class="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-lg" placeholder="输出文件..." type="text" />
-              <button class="px-4 h-10 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:text-primary" @click="pickOutputPath">浏览</button>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">输出 STL</label>
+              <div class="flex rounded-md shadow-sm">
+                <input v-model="outputPath" class="flex-1 block w-full rounded-none rounded-l-md border-slate-300 bg-white text-slate-900 focus:border-primary focus:ring-primary sm:text-sm py-2.5 px-4" placeholder="输出文件..." type="text" />
+                <button class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 rounded-r-md bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary" type="button" @click="pickOutputPath">
+                  浏览
+                </button>
+              </div>
             </div>
-            <label class="text-xs font-semibold text-slate-500 uppercase">配置（可选）</label>
-            <div class="flex items-center gap-2">
-              <input v-model="configPath" class="flex-1 h-10 px-3 text-sm bg-slate-50 border border-slate-200 rounded-lg" placeholder="config/stencilforge.json" type="text" />
-              <button class="px-4 h-10 bg-white border border-slate-200 rounded-lg text-xs font-bold hover:text-primary" @click="pickConfigPath">选择</button>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">配置（可选）</label>
+              <div class="flex rounded-md shadow-sm">
+                <input v-model="configPath" class="flex-1 block w-full rounded-none rounded-l-md border-slate-300 bg-white text-slate-600 focus:border-primary focus:ring-primary sm:text-sm py-2.5 px-4" placeholder="config/stencilforge.json" type="text" />
+                <button class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 rounded-r-md bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary" type="button" @click="pickConfigPath">
+                  选择
+                </button>
+              </div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-              <button class="h-11 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-blue-500/20 transition-all" @click="runJob">生成 STL</button>
-              <button class="h-11 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:text-primary hover:border-primary transition-colors" @click="importZip">导入 ZIP</button>
+            <div class="grid grid-cols-2 gap-4">
+              <button class="col-span-1 w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors" @click="runJob">
+                生成 STL
+              </button>
+              <button class="col-span-1 w-full flex justify-center py-3 px-4 border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors" @click="importZip">
+                导入 ZIP
+              </button>
             </div>
-          </div>
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
-            <div class="text-xs font-semibold text-slate-500 uppercase mb-3">检测到的文件</div>
-            <ul class="text-xs text-slate-500 space-y-1 max-h-64 overflow-y-auto">
-              <li v-for="file in files" :key="file">{{ file }}</li>
-            </ul>
-          </div>
+          </section>
+          <section class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 md:p-8 min-h-[420px]">
+            <h3 class="text-sm font-semibold text-slate-700 mb-4">检测到的文件</h3>
+            <div class="w-full h-[calc(100%-2rem)] rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/60 flex flex-col items-center justify-center p-8 text-center">
+              <div class="space-y-3">
+                <div class="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                  <span class="material-symbols-outlined text-slate-400 text-[24px]">description</span>
+                </div>
+                <p class="text-sm text-slate-500">
+                  {{ files.length ? "已检测到文件：" : "暂无文件，请选择目录或导入 ZIP。" }}
+                </p>
+                <ul v-if="files.length" class="text-xs text-slate-500 space-y-1 max-h-36 overflow-y-auto">
+                  <li v-for="file in files" :key="file">{{ file }}</li>
+                </ul>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -157,6 +178,27 @@
         </div>
       </section>
     </main>
+
+    <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 taskbar">
+      <div class="flex items-center px-2 py-2 bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-taskbar ring-1 ring-white/20 taskbar-shell">
+        <button :class="navClass('upload')" @click="setTab('upload')">
+          <span class="material-symbols-outlined text-2xl mb-0.5">cloud_upload</span>
+          <span class="nav-label">上传</span>
+        </button>
+        <button :class="navClass('config')" @click="setTab('config')">
+          <span class="material-symbols-outlined text-2xl mb-0.5">settings</span>
+          <span class="nav-label">配置</span>
+        </button>
+        <button :class="navClass('preview')" @click="setTab('preview')">
+          <span class="material-symbols-outlined text-2xl mb-0.5">visibility</span>
+          <span class="nav-label">预览</span>
+        </button>
+        <button :class="navClass('export')" @click="setTab('export')">
+          <span class="material-symbols-outlined text-2xl mb-0.5">download</span>
+          <span class="nav-label">导出</span>
+        </button>
+      </div>
+    </nav>
   </div>
 </template>
 
@@ -205,6 +247,13 @@ export default {
     this.connectBackend();
   },
   methods: {
+    navClass(tab) {
+      const active = this.currentTab === tab;
+      return [
+        "nav-item group relative flex flex-col items-center justify-center w-16 h-14 rounded-xl transition-all duration-200 mx-1",
+        active ? "text-primary bg-slate-100" : "text-slate-500 hover:text-primary hover:bg-slate-100",
+      ].join(" ");
+    },
     connectBackend() {
       if (!window.qt || !window.QWebChannel) {
         this.log = "Qt WebChannel 不可用。";
@@ -392,3 +441,27 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.nav-item .nav-label {
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.65;
+}
+.nav-item:hover .nav-label,
+.nav-item.text-primary .nav-label {
+  opacity: 1;
+}
+@media (max-height: 740px) {
+  .taskbar {
+    bottom: 8px;
+  }
+  .taskbar-shell {
+    padding: 6px 6px;
+  }
+  .nav-item {
+    width: 56px;
+    height: 48px;
+  }
+}
+</style>
