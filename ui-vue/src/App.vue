@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800 pb-32">
     <header
-      class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 h-16 app-titlebar"
+      class="sticky top-0 z-40 bg-white border-b border-slate-200 h-16 app-titlebar"
       @dblclick="windowMaximizeRestore"
     >
       <div class="max-w-7xl mx-auto px-6 md:px-8 h-full flex items-center justify-between">
@@ -288,7 +288,7 @@
     </main>
 
     <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 taskbar">
-      <div class="flex items-center px-2 py-2 bg-white/90 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-taskbar ring-1 ring-white/20 taskbar-shell">
+      <div class="flex items-center px-2 py-2 bg-white border border-slate-200/60 rounded-2xl shadow-taskbar ring-1 ring-white/20 taskbar-shell">
         <button :class="navClass('upload')" @click="setTab('upload')">
           <span class="material-symbols-outlined text-2xl mb-0.5">cloud_upload</span>
           <span class="nav-label">上传</span>
