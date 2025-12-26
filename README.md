@@ -22,13 +22,19 @@ stencilforge <gerber_dir> <output_stl>
 
 ## UI (Vue + PySide6 + Qt WebEngine)
 
+Build the UI:
+
+```bash
+cd ui-vue
+npm install
+npm run build
+```
+
 Launch the desktop UI:
 
 ```bash
 stencilforge-ui
 ```
-
-The Vue UI runs fully offline using vendored assets in `ui-vue/vendor`.
 
 ## Config parameters
 

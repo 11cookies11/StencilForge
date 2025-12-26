@@ -1,71 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>StencilForge</title>
-    <link rel="stylesheet" href="./vendor/fonts/space-grotesk.css" />
-    <link rel="stylesheet" href="./vendor/icons/material-symbols.css" />
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: "#2563eb",
-              "primary-dark": "#1d4ed8",
-              surface: "#ffffff",
-              subtle: "#f8fafc",
-              "surface-muted": "#f1f5f9",
-            },
-            fontFamily: {
-              display: ["Space Grotesk", "sans-serif"],
-              body: ["Space Grotesk", "Segoe UI", "sans-serif"],
-              mono: [
-                "ui-monospace",
-                "SFMono-Regular",
-                "Menlo",
-                "Monaco",
-                "Consolas",
-                "Liberation Mono",
-                "Courier New",
-                "monospace",
-              ],
-            },
-            borderRadius: {
-              xl: "0.75rem",
-              "2xl": "1rem",
-              "3xl": "1.5rem",
-            },
-            boxShadow: {
-              soft: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
-              glow: "0 0 20px -5px rgba(37, 99, 235, 0.15)",
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #d1d5db;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #9ca3af;
-      }
-    </style>
-    <script src="./vendor/tailwindcss.js"></script>
-    <script src="./vendor/vue.global.prod.js"></script>
-    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body class="bg-slate-50 text-slate-900 font-body antialiased min-h-screen">
     <div id="app"></div>
-    <script src="./app.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

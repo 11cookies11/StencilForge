@@ -147,9 +147,11 @@ class BackendBridge(QObject):
 def main() -> int:
     app = QApplication(sys.argv)
     project_root = Path(__file__).resolve().parents[2]
-    html_path = project_root / "ui-vue" / "index.html"
+    html_path = project_root / "ui-vue" / "dist" / "index.html"
     if not html_path.exists():
-        raise FileNotFoundError(f"UI file not found: {html_path}")
+        raise FileNotFoundError(
+            f"UI build not found: {html_path}. Run `npm install` and `npm run build` in ui-vue."
+        )
 
     view = QWebEngineView()
     settings = view.settings()

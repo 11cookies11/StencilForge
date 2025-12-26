@@ -22,13 +22,19 @@ stencilforge <gerber_dir> <output_stl>
 
 ## 桌面 UI（Vue + PySide6 + Qt WebEngine）
 
+先构建前端：
+
+```bash
+cd ui-vue
+npm install
+npm run build
+```
+
 启动桌面界面：
 
 ```bash
 stencilforge-ui
 ```
-
-Vue UI 使用 `ui-vue/vendor` 中的本地资源，可离线运行。
 
 ## 配置参数
 
