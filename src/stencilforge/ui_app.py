@@ -12,6 +12,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QApplication, QDialog, QFileDialog, QToolBar, QVBoxLayout
 
@@ -266,7 +267,7 @@ def main() -> int:
     view.page().setWebChannel(channel)
     view.setUrl(QUrl.fromLocalFile(str(html_path)))
 
-    view.resize(1280, 820)
+    _fit_to_screen(view, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
     view.setWindowTitle("StencilForge")
     view.show()
     return app.exec()
@@ -275,7 +276,7 @@ def main() -> int:
 def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer]:
     dialog = QDialog(parent)
     dialog.setWindowTitle("钢网预览")
-    dialog.resize(980, 760)
+    _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
     dialog.setStyleSheet(
         "QDialog { background-color: #f3e6d8; }"
         "QToolBar { background-color: rgba(246, 232, 214, 0.95); "
@@ -305,6 +306,27 @@ def _build_preview_dialog(parent: QWebEngineView) -> tuple[QDialog, VtkStlViewer
     layout.addWidget(toolbar)
     layout.addWidget(viewer)
     return dialog, viewer
+
+
+def _fit_to_screen(
+    widget: QDialog | QWebEngineView,
+    max_ratio: tuple[float, float],
+    max_size: tuple[int, int],
+    min_size: tuple[int, int],
+) -> None:
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        widget.resize(*max_size)
+        return
+    available = screen.availableGeometry()
+    width = min(int(available.width() * max_ratio[0]), max_size[0])
+    height = min(int(available.height() * max_ratio[1]), max_size[1])
+    width = max(width, min_size[0])
+    height = max(height, min_size[1])
+    widget.resize(width, height)
+    x = available.x() + max((available.width() - width) // 2, 0)
+    y = available.y() + max((available.height() - height) // 2, 0)
+    widget.move(x, y)
 
 
 if __name__ == "__main__":
