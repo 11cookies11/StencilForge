@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import logging
 from pathlib import Path
 from typing import Iterable
 
@@ -8,15 +9,19 @@ from gerber import load_layer
 from gerber import primitives as gprim
 from shapely import affinity
 from shapely.geometry import LineString, Point, Polygon
-from shapely.ops import unary_union
+from shapely.ops import unary_union, polygonize
 
 from .config import StencilConfig
+
+logger = logging.getLogger(__name__)
 
 
 def load_paste_geometry(paths: Iterable[Path], config: StencilConfig):
     geometries = []
     for path in paths:
+        logger.info("Loading paste layer: %s", path.name)
         layer = load_layer(str(path))
+        logger.info("Units: %s, primitives: %s", layer.cam_source.units, len(layer.primitives))
         geom = _primitives_to_geometry(layer.primitives, config)
         geom = _scale_to_mm(geom, layer.cam_source.units)
         geometries.append(geom)
@@ -24,7 +29,9 @@ def load_paste_geometry(paths: Iterable[Path], config: StencilConfig):
 
 
 def load_outline_geometry(path: Path, config: StencilConfig):
+    logger.info("Loading outline layer: %s", path.name)
     layer = load_layer(str(path))
+    logger.info("Units: %s, primitives: %s", layer.cam_source.units, len(layer.primitives))
     geom = _outline_from_primitives(layer.primitives, config)
     geom = _scale_to_mm(geom, layer.cam_source.units)
     return geom
@@ -176,6 +183,18 @@ def _outline_from_primitives(primitives, config: StencilConfig):
     for prim in primitives:
         if isinstance(prim, gprim.Region):
             return _region_to_shape(prim, config)
+    segments = []
+    for prim in primitives:
+        if isinstance(prim, gprim.Line):
+            segments.append(LineString([prim.start, prim.end]))
+        elif isinstance(prim, gprim.Arc):
+            arc_pts = _arc_points(prim, config.arc_steps)
+            if len(arc_pts) >= 2:
+                segments.append(LineString(arc_pts))
+    if segments:
+        polygons = list(polygonize(segments))
+        if polygons:
+            return max(polygons, key=lambda p: p.area)
     points = []
     for prim in primitives:
         if isinstance(prim, gprim.Line):

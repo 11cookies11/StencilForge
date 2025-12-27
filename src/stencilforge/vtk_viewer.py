@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
+import tempfile
+
+import numpy as np
+import trimesh
 
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
@@ -12,6 +17,9 @@ from vtkmodules.vtkRenderingAnnotation import vtkAxesActor
 from vtkmodules.vtkRenderingCore import vtkLightKit
 from vtkmodules.vtkFiltersCore import vtkFeatureEdges
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals
+from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
+from vtkmodules.vtkCommonCore import vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
 try:
     import vtkmodules.vtkRenderingOpenGL2  # noqa: F401
 except Exception:
@@ -24,13 +32,14 @@ class VtkStlViewer(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._renderer = vtkRenderer()
-        self._renderer.SetBackground(0.93, 0.88, 0.80)
-        self._renderer.SetBackground2(0.86, 0.76, 0.64)
+        self._renderer.SetBackground(0.92, 0.94, 0.96)
+        self._renderer.SetBackground2(0.80, 0.86, 0.92)
         self._renderer.GradientBackgroundOn()
         self._viewer = QVTKRenderWindowInteractor(self)
         self._viewer.GetRenderWindow().AddRenderer(self._renderer)
         self._actor: vtkActor | None = None
         self._edge_actor: vtkActor | None = None
+        self._outline_actor: vtkActor | None = None
         self._axes = vtkAxesActor()
         self._axes.SetTotalLength(20.0, 20.0, 20.0)
         self._orientation_widget: vtkOrientationMarkerWidget | None = None
@@ -71,39 +80,69 @@ class VtkStlViewer(QWidget):
         stl_path = Path(path)
         if not stl_path.exists():
             return
+        load_path = stl_path
+        if not stl_path.name.isascii() or any(not c.isascii() for c in str(stl_path)):
+            temp_dir = Path(tempfile.mkdtemp(prefix="stencilforge_stl_"))
+            load_path = temp_dir / stl_path.name
+            shutil.copy2(stl_path, load_path)
 
         reader = vtkSTLReader()
-        reader.SetFileName(str(stl_path))
+        reader.SetFileName(str(load_path))
         reader.Update()
         output = reader.GetOutput()
+        polydata = output
         if output is None or output.GetNumberOfCells() == 0:
-            print(f"[VTK] STL has no cells: {stl_path}")
-            return
+            print(f"[VTK] STL has no cells: {load_path}, trying trimesh fallback")
+            polydata = self._load_with_trimesh(load_path)
+            if polydata is None or polydata.GetNumberOfCells() == 0:
+                print(f"[VTK] STL fallback failed: {load_path}")
+                return
 
         mapper = vtkPolyDataMapper()
-        mapper.SetInputConnection(reader.GetOutputPort())
+        if polydata is output:
+            mapper.SetInputConnection(reader.GetOutputPort())
+        else:
+            mapper.SetInputData(polydata)
         mapper.ScalarVisibilityOff()
 
         actor = vtkActor()
         actor.SetMapper(mapper)
-        actor.GetProperty().SetColor(0.62, 0.68, 0.78)
+        actor.GetProperty().SetColor(0.20, 0.32, 0.60)
         actor.GetProperty().SetAmbient(0.35)
         actor.GetProperty().SetDiffuse(0.65)
         actor.GetProperty().SetSpecular(0.05)
         actor.GetProperty().SetSpecularPower(8.0)
         actor.GetProperty().SetInterpolationToFlat()
+        actor.GetProperty().EdgeVisibilityOff()
 
         if self._actor is not None:
             self._renderer.RemoveActor(self._actor)
         if self._edge_actor is not None:
             self._renderer.RemoveActor(self._edge_actor)
+        if self._outline_actor is not None:
+            self._renderer.RemoveActor(self._outline_actor)
         self._actor = actor
         self._renderer.AddActor(self._actor)
-        self._edge_actor = self._build_edge_actor(reader)
+        self._edge_actor = self._build_edge_actor(output if polydata is output else polydata)
         if self._edge_actor is not None:
             self._renderer.AddActor(self._edge_actor)
-        bounds = output.GetBounds()
-        print(f"[VTK] Loaded STL: {stl_path} bounds={bounds} cells={output.GetNumberOfCells()}")
+        bounds = polydata.GetBounds()
+        thickness = bounds[5] - bounds[4]
+        if thickness < 0.2:
+            self._outline_actor = self._build_outline_actor(polydata)
+            if self._outline_actor is not None:
+                self._renderer.AddActor(self._outline_actor)
+        if thickness > 0:
+            target_thickness = 0.5
+            scale_z = max(1.0, target_thickness / thickness)
+            if scale_z > 1.0:
+                actor.SetScale(1.0, 1.0, scale_z)
+                if self._edge_actor is not None:
+                    self._edge_actor.SetScale(1.0, 1.0, scale_z)
+                if self._outline_actor is not None:
+                    self._outline_actor.SetScale(1.0, 1.0, scale_z)
+                print(f"[VTK] Applied preview Z scale: {scale_z:.2f}")
+        print(f"[VTK] Loaded STL: {load_path} bounds={bounds} cells={polydata.GetNumberOfCells()}")
         self.fit_view(bounds)
         self._default_camera = self._renderer.GetActiveCamera()
 
@@ -158,9 +197,12 @@ class VtkStlViewer(QWidget):
         self._orientation_widget.SetEnabled(1 if enabled else 0)
         self._viewer.GetRenderWindow().Render()
 
-    def _build_edge_actor(self, reader: vtkSTLReader) -> vtkActor | None:
+    def _build_edge_actor(self, source) -> vtkActor | None:
         normals = vtkPolyDataNormals()
-        normals.SetInputConnection(reader.GetOutputPort())
+        if isinstance(source, vtkPolyData):
+            normals.SetInputData(source)
+        else:
+            normals.SetInputConnection(source.GetOutputPort())
         normals.SetSplitting(1)
         normals.SetConsistency(1)
         normals.AutoOrientNormalsOn()
@@ -182,3 +224,44 @@ class VtkStlViewer(QWidget):
         edge_actor.GetProperty().SetColor(0.02, 0.02, 0.02)
         edge_actor.GetProperty().SetLineWidth(1.6)
         return edge_actor
+
+    def _build_outline_actor(self, polydata: vtkPolyData) -> vtkActor | None:
+        outline = vtkOutlineFilter()
+        outline.SetInputData(polydata)
+        outline.Update()
+
+        outline_mapper = vtkPolyDataMapper()
+        outline_mapper.SetInputConnection(outline.GetOutputPort())
+
+        outline_actor = vtkActor()
+        outline_actor.SetMapper(outline_mapper)
+        outline_actor.GetProperty().SetColor(0.92, 0.23, 0.18)
+        outline_actor.GetProperty().SetLineWidth(2.5)
+        return outline_actor
+
+    def _load_with_trimesh(self, path: Path) -> vtkPolyData | None:
+        try:
+            mesh = trimesh.load_mesh(path, force="mesh")
+        except Exception as exc:
+            print(f"[VTK] Trimesh load failed: {exc}")
+            return None
+        if mesh.is_empty:
+            return None
+        vertices = np.asarray(mesh.vertices, dtype=float)
+        faces = np.asarray(mesh.faces, dtype=np.int64)
+        if faces.size == 0 or vertices.size == 0:
+            return None
+        points = vtkPoints()
+        points.SetNumberOfPoints(len(vertices))
+        for idx, (x, y, z) in enumerate(vertices):
+            points.SetPoint(idx, float(x), float(y), float(z))
+        cells = vtkCellArray()
+        for a, b, c in faces:
+            cells.InsertNextCell(3)
+            cells.InsertCellPoint(int(a))
+            cells.InsertCellPoint(int(b))
+            cells.InsertCellPoint(int(c))
+        polydata = vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetPolys(cells)
+        return polydata

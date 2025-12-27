@@ -98,6 +98,12 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "thickness_mm": config.thickness_mm,
         "paste_offset_mm": config.paste_offset_mm,
         "outline_margin_mm": config.outline_margin_mm,
+        "locator_enabled": config.locator_enabled,
+        "locator_height_mm": config.locator_height_mm,
+        "locator_width_mm": config.locator_width_mm,
+        "locator_clearance_mm": config.locator_clearance_mm,
+        "locator_open_side": config.locator_open_side,
+        "locator_open_width_mm": config.locator_open_width_mm,
         "output_mode": config.output_mode,
         "arc_steps": config.arc_steps,
         "curve_resolution": config.curve_resolution,
@@ -298,6 +304,9 @@ class BackendBridge(QObject):
                 self.jobStatus.emit("success")
                 self.jobDone.emit({"output_stl": output_stl})
             except Exception as exc:
+                import traceback
+
+                traceback.print_exc()
                 self.jobStatus.emit("error")
                 self.jobError.emit(str(exc))
             finally:

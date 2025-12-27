@@ -192,6 +192,72 @@
                 />
               </label>
             </div>
+            <div class="pt-2 border-t border-slate-100 space-y-3">
+              <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input
+                  v-model="config.locator_enabled"
+                  @change="updateConfig"
+                  class="h-4 w-4 text-primary border-slate-300 rounded"
+                  type="checkbox"
+                />
+                启用 PCB 定位台阶
+              </label>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="text-xs font-semibold text-slate-600">台阶高度 (mm)
+                  <input
+                    v-model.number="config.locator_height_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                  />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">台阶宽度 (mm)
+                  <input
+                    v-model.number="config.locator_width_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                  />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">定位间隙 (mm)
+                  <input
+                    v-model.number="config.locator_clearance_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.05"
+                    min="0"
+                  />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">开口方向
+                  <select
+                    v-model="config.locator_open_side"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                  >
+                    <option value="none">无</option>
+                    <option value="top">上</option>
+                    <option value="right">右</option>
+                    <option value="bottom">下</option>
+                    <option value="left">左</option>
+                  </select>
+                </label>
+                <label class="text-xs font-semibold text-slate-600">开口宽度 (mm)
+                  <input
+                    v-model.number="config.locator_open_width_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
           <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
             <div>
@@ -323,6 +389,12 @@ export default {
         thickness_mm: 0.12,
         paste_offset_mm: -0.05,
         outline_margin_mm: 5.0,
+        locator_enabled: false,
+        locator_height_mm: 2.0,
+        locator_width_mm: 2.0,
+        locator_clearance_mm: 0.2,
+        locator_open_side: "none",
+        locator_open_width_mm: 0.0,
         output_mode: "solid_with_cutouts",
         arc_steps: 64,
         curve_resolution: 16,
