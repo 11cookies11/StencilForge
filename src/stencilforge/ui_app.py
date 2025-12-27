@@ -1,16 +1,19 @@
 ﻿from __future__ import annotations
 
 import base64
+import ctypes
 import os
 import sys
 import tempfile
 import threading
 import zipfile
+from ctypes import Structure
+from ctypes import wintypes
 from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QCursor, QGuiApplication
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -28,6 +31,64 @@ from .config import StencilConfig
 from .pipeline import generate_stencil
 from .title_bar import TitleBar
 from .vtk_viewer import VtkStlViewer
+
+if sys.platform == "win32":
+    WM_NCHITTEST = 0x0084
+    WM_NCLBUTTONDBLCLK = 0x00A3
+    HTCAPTION = 0x0002
+    HTLEFT = 0x000A
+    HTRIGHT = 0x000B
+    HTTOP = 0x000C
+    HTTOPLEFT = 0x000D
+    HTTOPRIGHT = 0x000E
+    HTBOTTOM = 0x000F
+    HTBOTTOMLEFT = 0x0010
+    HTBOTTOMRIGHT = 0x0011
+    GWL_STYLE = -16
+    WS_THICKFRAME = 0x00040000
+    WS_MAXIMIZEBOX = 0x00010000
+    WS_MINIMIZEBOX = 0x00020000
+    WS_SYSMENU = 0x00080000
+    SWP_NOMOVE = 0x0002
+    SWP_NOSIZE = 0x0001
+    SWP_NOZORDER = 0x0004
+    SWP_FRAMECHANGED = 0x0020
+    SM_CXSIZEFRAME = 32
+    SM_CYSIZEFRAME = 33
+    SM_CXPADDEDBORDER = 92
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+
+    class MSG(Structure):
+        _fields_ = [
+            ("hwnd", wintypes.HWND),
+            ("message", wintypes.UINT),
+            ("wParam", wintypes.WPARAM),
+            ("lParam", wintypes.LPARAM),
+            ("time", wintypes.DWORD),
+            ("pt", wintypes.POINT),
+        ]
+
+    def _resize_border() -> int:
+        return (
+            user32.GetSystemMetrics(SM_CXSIZEFRAME)
+            + user32.GetSystemMetrics(SM_CXPADDEDBORDER)
+        )
+
+    def _apply_snap_styles(hwnd: int) -> None:
+        style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+        style |= WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU
+        user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+        user32.SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        )
 
 
 def _config_to_dict(config: StencilConfig) -> dict:
@@ -276,6 +337,10 @@ class BackendBridge(QObject):
         if handle is not None:
             handle.startSystemMove()
 
+    @Slot(result=bool)
+    def windowUsesNativeHitTest(self) -> bool:
+        return sys.platform == "win32"
+
 
 class WebView(QWebEngineView):
     def __init__(self, window: QMainWindow, drag_height: int, button_margin: int) -> None:
@@ -309,6 +374,80 @@ class WebView(QWebEngineView):
                     return
         super().mouseDoubleClickEvent(event)
 
+    def nativeEvent(self, eventType, message):  # noqa: N802
+        if sys.platform == "win32" and eventType in ("windows_generic_MSG", "windows_dispatcher_MSG"):
+            try:
+                msg = MSG.from_address(int(message))
+            except (ValueError, OSError):
+                return super().nativeEvent(eventType, message)
+            if msg.message == WM_NCHITTEST:
+                pos = self.mapFromGlobal(QCursor.pos())
+                if pos.y() <= self._drag_height:
+                    if pos.x() < max(self.width() - self._button_margin, 0):
+                        return True, HTCAPTION
+            if msg.message == WM_NCLBUTTONDBLCLK:
+                pos = self.mapFromGlobal(QCursor.pos())
+                if pos.y() <= self._drag_height:
+                    if pos.x() < max(self.width() - self._button_margin, 0):
+                        if self._window.isMaximized():
+                            self._window.showNormal()
+                        else:
+                            self._window.showMaximized()
+                        return True, 0
+        return super().nativeEvent(eventType, message)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, drag_height: int, button_margin: int) -> None:
+        super().__init__()
+        self._drag_height = drag_height
+        self._button_margin = button_margin
+        self._win_style_applied = False
+        self._resize_border = _resize_border() if sys.platform == "win32" else 0
+        self._top_resize_border = 1 if sys.platform == "win32" else 0
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        if sys.platform == "win32" and not self._win_style_applied:
+            _apply_snap_styles(int(self.winId()))
+            self._win_style_applied = True
+
+    def nativeEvent(self, eventType, message):  # noqa: N802
+        if sys.platform == "win32" and eventType in ("windows_generic_MSG", "windows_dispatcher_MSG"):
+            try:
+                msg = MSG.from_address(int(message))
+            except (ValueError, OSError):
+                return super().nativeEvent(eventType, message)
+            if msg.message == WM_NCHITTEST:
+                pos = self.mapFromGlobal(QCursor.pos())
+                if not self.isMaximized():
+                    border = self._resize_border
+                    top_border = self._top_resize_border
+                    left = pos.x() <= border
+                    right = pos.x() >= self.width() - border
+                    top = pos.y() <= top_border
+                    bottom = pos.y() >= self.height() - border
+                    if top and left:
+                        return True, HTTOPLEFT
+                    if top and right:
+                        return True, HTTOPRIGHT
+                    if bottom and left:
+                        return True, HTBOTTOMLEFT
+                    if bottom and right:
+                        return True, HTBOTTOMRIGHT
+                    if left:
+                        return True, HTLEFT
+                    if right:
+                        return True, HTRIGHT
+                    if top:
+                        return True, HTTOP
+                    if bottom:
+                        return True, HTBOTTOM
+                if pos.y() <= self._drag_height:
+                    if pos.x() < max(self.width() - self._button_margin, 0):
+                        return True, HTCAPTION
+        return super().nativeEvent(eventType, message)
+
 
 def main() -> int:
     flags = "--ignore-gpu-blocklist --use-angle=d3d11"
@@ -326,13 +465,13 @@ def main() -> int:
             f"{html_path}。请在 ui-vue 中执行 `npm install` 和 `npm run build`。"
         )
 
-    window = QMainWindow()
+    window = MainWindow(drag_height=64, button_margin=190)
     window.setWindowTitle("StencilForge")
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
     window.setWindowFlag(Qt.WindowSystemMenuHint, True)
     window.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
-    view = WebView(window, drag_height=64, button_margin=190)
+    view = WebView(window, drag_height=1, button_margin=190)
     settings = view.settings()
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
