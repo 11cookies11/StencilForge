@@ -5,7 +5,7 @@
       @mousedown="onTitlebarMouseDown"
       @dblclick="onTitlebarDoubleClick"
     >
-      <div class="max-w-7xl mx-auto px-6 md:px-8 h-full flex items-center justify-between">
+      <div class="w-full h-full flex items-center justify-between px-4 sm:px-6">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
             <span class="material-symbols-outlined text-white text-[20px]">view_in_ar</span>
@@ -339,6 +339,7 @@ export default {
       lastProgress: 0,
       pendingProgress: null,
       pendingStatus: null,
+      useNativeTitlebar: false,
     };
   },
   computed: {
@@ -375,6 +376,9 @@ export default {
           if (cfg) {
             this.config = cfg;
           }
+        });
+        this.backend.windowUsesNativeHitTest((value) => {
+          this.useNativeTitlebar = !!value;
         });
       });
     },
@@ -562,11 +566,13 @@ export default {
     onTitlebarMouseDown(event) {
       if (event.button !== 0) return;
       if (event.target.closest(".window-controls")) return;
+      if (this.useNativeTitlebar) return;
       if (!this.backend) return;
       this.backend.windowStartDrag();
     },
     onTitlebarDoubleClick(event) {
       if (event.target.closest(".window-controls")) return;
+      if (this.useNativeTitlebar) return;
       this.windowMaximizeRestore();
     },
   },
