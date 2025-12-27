@@ -8,4 +8,3 @@
 - 推荐使用 GitHub Discussions（如启用）；若是缺陷/需求，请开 Issue。
 
 安全问题请参考 `SECURITY.md`。
-
