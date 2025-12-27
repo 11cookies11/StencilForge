@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules
 
-project_root = Path(__file__).resolve().parents[1]
+project_root = Path(SPECPATH).resolve().parent
 entry_script = project_root / "src" / "stencilforge" / "ui_app.py"
 
 datas = []
