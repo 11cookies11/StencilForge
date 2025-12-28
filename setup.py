@@ -10,6 +10,8 @@ setup(
     install_requires=[
         "mapbox-earcut==1.0.1",
         "pcb-tools==0.1.6",
+        "cadquery==2.4.0",
+        "numpy<2.0",
         "PySide6==6.10.1",
         "shapely==2.1.2",
         "trimesh==4.10.1",

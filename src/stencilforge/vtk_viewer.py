@@ -146,7 +146,11 @@ class VtkStlViewer(QWidget):
         self.fit_view(bounds)
         self._default_camera = self._renderer.GetActiveCamera()
 
-    def fit_view(self, bounds: tuple[float, float, float, float, float, float] | None = None) -> None:
+    def fit_view(
+        self, bounds: tuple[float, float, float, float, float, float] | None | bool = None
+    ) -> None:
+        if isinstance(bounds, bool):
+            bounds = None
         if bounds is None and self._actor is None:
             return
         if bounds is None and self._actor is not None:

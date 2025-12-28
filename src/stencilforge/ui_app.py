@@ -105,6 +105,9 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "locator_open_side": config.locator_open_side,
         "locator_open_width_mm": config.locator_open_width_mm,
         "output_mode": config.output_mode,
+        "model_backend": config.model_backend,
+        "stl_linear_deflection": config.stl_linear_deflection,
+        "stl_angular_deflection": config.stl_angular_deflection,
         "arc_steps": config.arc_steps,
         "curve_resolution": config.curve_resolution,
     }

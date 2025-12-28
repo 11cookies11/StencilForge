@@ -44,6 +44,9 @@ stencilforge-ui
 - `paste_offset_mm`: shrink/expand opening (negative shrinks)
 - `outline_margin_mm`: fallback outline margin when no outline file exists
 - `output_mode`: `holes_only` or `solid_with_cutouts`
+- `model_backend`: `trimesh` or `cadquery`
+- `stl_linear_deflection`: STL linear deflection (mm, smaller = finer)
+- `stl_angular_deflection`: STL angular deflection (radians)
 - `arc_steps`: number of steps to approximate arcs
 - `curve_resolution`: buffer resolution for circles
 

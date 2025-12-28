@@ -20,6 +20,9 @@ class StencilConfig:
     locator_open_side: str
     locator_open_width_mm: float
     output_mode: str
+    model_backend: str
+    stl_linear_deflection: float
+    stl_angular_deflection: float
     arc_steps: int
     curve_resolution: int
 
@@ -46,6 +49,9 @@ class StencilConfig:
         locator_open_side = str(data.get("locator_open_side", "none"))
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
+        model_backend = str(data.get("model_backend", "cadquery"))
+        stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
+        stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
         arc_steps = int(data.get("arc_steps", 64))
         curve_resolution = int(data.get("curve_resolution", 16))
         return StencilConfig(
@@ -61,6 +67,9 @@ class StencilConfig:
             locator_open_side=locator_open_side,
             locator_open_width_mm=locator_open_width_mm,
             output_mode=output_mode,
+            model_backend=model_backend,
+            stl_linear_deflection=stl_linear_deflection,
+            stl_angular_deflection=stl_angular_deflection,
             arc_steps=arc_steps,
             curve_resolution=curve_resolution,
         )
@@ -74,6 +83,12 @@ class StencilConfig:
             raise ValueError("curve_resolution must be >= 4")
         if self.output_mode not in {"holes_only", "solid_with_cutouts"}:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
+        if self.model_backend not in {"trimesh", "cadquery"}:
+            raise ValueError("model_backend must be trimesh or cadquery")
+        if self.stl_linear_deflection <= 0:
+            raise ValueError("stl_linear_deflection must be > 0")
+        if self.stl_angular_deflection <= 0:
+            raise ValueError("stl_angular_deflection must be > 0")
         if self.locator_height_mm < 0:
             raise ValueError("locator_height_mm must be >= 0")
         if self.locator_width_mm < 0:

@@ -61,7 +61,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
 
     logger.info("Output mode: %s", config.output_mode)
     if config.output_mode == "holes_only":
-        mesh = _extrude_geometry(paste_geom, config.thickness_mm)
+        stencil_2d = paste_geom
     else:
         stencil_2d = outline_geom.difference(paste_geom)
         hole_count = _count_holes(stencil_2d)
@@ -73,18 +73,18 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             hole_count,
         )
         _write_debug_svg(output_path, outline_geom, paste_geom, stencil_2d)
-        mesh = _extrude_geometry(stencil_2d, config.thickness_mm)
     logger.info("Base thickness: %s mm", config.thickness_mm)
 
+    locator_geom = None
     if config.locator_enabled and outline_geom is not None and not outline_geom.is_empty:
-        locator = _build_locator_ring(
+        locator_geom = _build_locator_ring(
             outline_geom,
             config.locator_clearance_mm,
             config.locator_width_mm,
             config.locator_open_side,
             config.locator_open_width_mm,
         )
-        if locator is not None and not locator.is_empty and config.locator_height_mm > 0:
+        if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
             logger.info(
                 "Locator: height=%s width=%s clearance=%s open=%s(%s)",
                 config.locator_height_mm,
@@ -93,9 +93,16 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                 config.locator_open_side,
                 config.locator_open_width_mm,
             )
-            locator_mesh = _extrude_geometry(locator, config.locator_height_mm)
-            locator_mesh.apply_translation((0, 0, config.thickness_mm))
-            mesh = trimesh.util.concatenate([mesh, locator_mesh])
+
+    if config.model_backend == "cadquery":
+        _export_cadquery_stl(stencil_2d, locator_geom, output_path, config)
+        return
+
+    mesh = _extrude_geometry(stencil_2d, config.thickness_mm)
+    if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
+        locator_mesh = _extrude_geometry(locator_geom, config.locator_height_mm)
+        locator_mesh.apply_translation((0, 0, config.thickness_mm))
+        mesh = trimesh.util.concatenate([mesh, locator_mesh])
 
     logger.info("Cleaning mesh...")
     try:
@@ -248,6 +255,117 @@ def _count_holes(geometry) -> int:
     if geometry.geom_type == "MultiPolygon":
         return sum(len(poly.interiors) for poly in geometry.geoms)
     return 0
+
+
+def _export_cadquery_stl(stencil_2d, locator_geom, output_path: Path, config: StencilConfig) -> None:
+    try:
+        import cadquery as cq
+    except ImportError as exc:
+        raise ImportError("CadQuery is required for model_backend=cadquery") from exc
+
+    solids = _cadquery_extrude_geometry(stencil_2d, config.thickness_mm, cq)
+    if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
+        locator_solids = _cadquery_extrude_geometry(locator_geom, config.locator_height_mm, cq)
+        for solid in locator_solids:
+            solids.append(solid.translate((0, 0, config.thickness_mm)))
+
+    if not solids:
+        raise ValueError("Failed to create CadQuery solids from geometry.")
+
+    solid = _combine_cadquery_solids(solids, cq)
+    solid = _translate_cadquery_to_origin(solid)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    cq.exporters.export(
+        solid,
+        str(output_path),
+        exportType="STL",
+        tolerance=config.stl_linear_deflection,
+        angularTolerance=config.stl_angular_deflection,
+    )
+    try:
+        size = output_path.stat().st_size
+    except OSError:
+        size = 0
+    logger.info("STL size: %s bytes", size)
+    if size <= 0:
+        raise ValueError("Exported STL file is empty.")
+
+
+def _cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
+    geometry = _ensure_valid(geometry)
+    geometry = _orient_geometry(geometry)
+    geometry = _solidify_geometry(geometry)
+
+    polygons = []
+    if geometry.geom_type == "Polygon":
+        if geometry.area > 0:
+            polygons.append(geometry)
+    elif geometry.geom_type == "MultiPolygon":
+        polygons.extend([poly for poly in geometry.geoms if poly.area > 0])
+    else:
+        merged = unary_union([geometry])
+        if merged.geom_type == "Polygon":
+            if merged.area > 0:
+                polygons.append(merged)
+        elif merged.geom_type == "MultiPolygon":
+            polygons.extend([poly for poly in merged.geoms if poly.area > 0])
+
+    solids = []
+    for poly in polygons:
+        solid = _cadquery_extrude_polygon(poly, thickness_mm, cq)
+        if solid is None:
+            continue
+        solids.append(solid)
+    return solids
+
+
+def _cadquery_extrude_polygon(poly, thickness_mm: float, cq):
+    outer = _ring_to_cadquery_wire(poly.exterior, cq)
+    if outer is None:
+        return None
+    base = cq.Workplane("XY").add(outer).toPending().extrude(thickness_mm).val()
+    hole_solids = []
+    for hole in poly.interiors:
+        hole_wire = _ring_to_cadquery_wire(hole, cq)
+        if hole_wire is None:
+            continue
+        hole_solid = cq.Workplane("XY").add(hole_wire).toPending().extrude(thickness_mm).val()
+        hole_solids.append(hole_solid)
+    if hole_solids:
+        try:
+            base = base.cut(cq.Compound.makeCompound(hole_solids))
+        except Exception:
+            for hole_solid in hole_solids:
+                base = base.cut(hole_solid)
+    return base
+
+
+def _ring_to_cadquery_wire(ring, cq):
+    coords = list(ring.coords)
+    if len(coords) < 3:
+        return None
+    if coords[0] == coords[-1]:
+        coords = coords[:-1]
+    return cq.Wire.makePolygon(coords, close=True)
+
+
+def _combine_cadquery_solids(solids, cq):
+    if len(solids) == 1:
+        return solids[0]
+    result = solids[0]
+    for solid in solids[1:]:
+        try:
+            result = result.fuse(solid)
+        except Exception:
+            return cq.Compound.makeCompound(solids)
+    return result
+
+
+def _translate_cadquery_to_origin(solid):
+    bbox = solid.BoundingBox()
+    offset = (-bbox.xmin, -bbox.ymin, -bbox.zmin)
+    return solid.translate(offset)
 
 
 def _extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:

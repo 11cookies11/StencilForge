@@ -44,6 +44,9 @@ stencilforge-ui
 - `paste_offset_mm`：开口缩放（负值为缩小）
 - `outline_margin_mm`：无板框时的回退外扩
 - `output_mode`：`holes_only` 或 `solid_with_cutouts`
+- `model_backend`：`trimesh` 或 `cadquery`
+- `stl_linear_deflection`：STL 线性偏差（mm，越小越精细）
+- `stl_angular_deflection`：STL 角度偏差（弧度）
 - `arc_steps`：圆弧采样步数
 - `curve_resolution`：圆形缓冲精度
 
