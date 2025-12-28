@@ -33,8 +33,8 @@ class VtkStlViewer(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._renderer = vtkRenderer()
-        self._renderer.SetBackground(0.92, 0.94, 0.96)
-        self._renderer.SetBackground2(0.80, 0.86, 0.92)
+        self._renderer.SetBackground(0.96, 0.97, 0.99)
+        self._renderer.SetBackground2(0.90, 0.93, 0.97)
         self._renderer.GradientBackgroundOn()
         self._viewer = QVTKRenderWindowInteractor(self)
         self._viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)

@@ -43,11 +43,11 @@ def main() -> int:
 
     container = QWidget(window)
     container.setStyleSheet(
-        "QWidget { background-color: #f3e6d8; }"
-        "QToolBar { background-color: rgba(246, 232, 214, 0.95); "
-        "border: 1px solid #e2c7a6; color: #5b3a1e; }"
-        "QToolButton { color: #5b3a1e; padding: 4px 10px; }"
-        "QToolButton:checked { background-color: #e7c8a4; }"
+        "QWidget { background-color: #f8fafc; }"
+        "QToolBar { background-color: rgba(255, 255, 255, 0.95); "
+        "border: 1px solid #e2e8f0; color: #334155; }"
+        "QToolButton { color: #334155; padding: 4px 10px; }"
+        "QToolButton:checked { background-color: #e2e8f0; }"
     )
     layout = QVBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)

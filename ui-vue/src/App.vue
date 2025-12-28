@@ -384,6 +384,48 @@
       </section>
     </main>
 
+    <teleport to="body">
+      <div :class="['progress-overlay', { 'is-visible': progressVisible }]" role="dialog" aria-modal="true" aria-labelledby="progress-title">
+        <div :class="['progress-backdrop', { 'is-visible': progressVisible }]"></div>
+        <div class="progress-shell">
+          <div :class="['progress-card', { 'is-visible': progressVisible }]">
+            <div class="sm:flex sm:items-start">
+              <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 sm:mx-0 sm:h-10 sm:w-10">
+                <span class="material-symbols-outlined text-primary animate-spin">autorenew</span>
+              </div>
+              <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                <h3 id="progress-title" class="text-lg font-semibold leading-6 text-slate-900">正在生成 STL 文件...</h3>
+                <div class="mt-2">
+                  <p class="text-sm text-slate-500">正在处理 PCB 层级数据并构建 3D 模型，请不要关闭窗口。</p>
+                </div>
+                <div class="mt-6">
+                  <div class="flex mb-2 items-center justify-between">
+                    <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-100">
+                      进行中
+                    </span>
+                    <span class="text-xs font-semibold inline-block text-slate-500">处理中</span>
+                  </div>
+                  <div class="loader-track">
+                    <div class="loader-bar"></div>
+                  </div>
+                  <p class="text-xs text-slate-400 text-center">预计剩余时间：计算中</p>
+                </div>
+              </div>
+            </div>
+            <div class="mt-5 sm:mt-6 sm:flex sm:flex-row-reverse">
+              <button
+                class="inline-flex w-full justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-colors"
+                type="button"
+                @click="stopJob"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </teleport>
+
     <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 taskbar">
       <div class="flex items-center px-2 py-2 bg-white border border-slate-200/60 rounded-2xl shadow-taskbar ring-1 ring-white/20 taskbar-shell">
         <button :class="navClass('upload')" @click="setTab('upload')">
@@ -438,6 +480,11 @@ export default {
       files: [],
       status: "ready",
       progress: 0,
+      progressValue: 0,
+      progressVisible: false,
+      progressStartAt: 0,
+      progressHideTimer: null,
+      progressPulseTimer: null,
       log: "空闲。",
       logBuffer: [],
       logFlushTimer: null,
@@ -456,6 +503,10 @@ export default {
         error: "错误",
       };
       return map[this.status] || this.status;
+    },
+    progressPercent() {
+      const value = Math.max(0, Math.min(100, this.progressValue || 0));
+      return Math.round(value);
     },
   },
   mounted() {
@@ -497,6 +548,11 @@ export default {
       });
       this.backend.jobStatus.connect((status) => {
         this.pendingStatus = status || "ready";
+        if (this.pendingStatus === "running") {
+          this.progressValue = 0;
+          this.progressStartAt = Date.now();
+          this.progressVisible = true;
+        }
         if (this.currentTab === "preview") {
           this.status = this.pendingStatus;
         }
@@ -519,14 +575,18 @@ export default {
       this.backend.jobDone.connect((result) => {
         this.status = "success";
         this.log = `完成: ${result.output_stl || ""}`;
+        this.progressValue = 100;
+        this._scheduleProgressHide(300);
         if (result.output_stl) {
           this.outputPath = result.output_stl;
+          this.setTab("preview");
           this.backend.loadPreviewStl(result.output_stl);
         }
       });
       this.backend.jobError.connect((message) => {
         this.status = "error";
         this.log = `错误: ${message}`;
+        this._scheduleProgressHide(300);
       });
     },
     queueLog(message) {
@@ -668,6 +728,19 @@ export default {
       if (!this.backend) return;
       this.backend.windowClose();
     },
+    _scheduleProgressHide(minVisible = 300) {
+      const elapsed = Date.now() - this.progressStartAt;
+      const remaining = Math.max(0, minVisible - elapsed);
+      if (this.progressHideTimer) {
+        clearTimeout(this.progressHideTimer);
+      }
+      this.progressHideTimer = setTimeout(() => {
+        this.progressVisible = false;
+        this.progressHideTimer = null;
+      }, remaining);
+    },
+    _startProgressPulse() {},
+    _stopProgressPulse() {},
     onTitlebarMouseDown(event) {
       if (event.button !== 0) return;
       if (event.target.closest(".window-controls")) return;
@@ -714,6 +787,69 @@ export default {
 .nav-item:hover .nav-label,
 .nav-item.text-primary .nav-label {
   opacity: 1;
+}
+.progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+.progress-overlay.is-visible {
+  pointer-events: auto;
+}
+.progress-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  opacity: 0;
+}
+.progress-backdrop.is-visible {
+  opacity: 1;
+}
+.progress-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.progress-card {
+  width: min(90vw, 520px);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  opacity: 0;
+}
+.progress-card.is-visible {
+  opacity: 1;
+}
+.loader-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+.loader-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 35%;
+  background: #2563eb;
+  transform: translateX(-100%);
+  animation: loader-slide 1.1s infinite linear;
+}
+@keyframes loader-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }
 @media (max-height: 740px) {
   .taskbar {
