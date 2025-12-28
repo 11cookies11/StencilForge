@@ -206,7 +206,11 @@ class BackendBridge(QObject):
 
     @Slot(str)
     def scanFiles(self, input_dir: str) -> None:
-        path = Path(input_dir)
+        resolved = self._resolve_input_dir(input_dir)
+        if not resolved:
+            self.filesScanned.emit({"files": []})
+            return
+        path = Path(resolved)
         if not path.exists():
             self.filesScanned.emit({"files": []})
             return
@@ -335,10 +339,13 @@ class BackendBridge(QObject):
             try:
                 self.jobStatus.emit("running")
                 self.jobProgress.emit(0)
+                resolved_input = self._resolve_input_dir(input_dir)
+                if not resolved_input:
+                    raise ValueError("无法解压 ZIP 输入。")
                 config = self._config
                 if config_path:
                     config = StencilConfig.from_json(Path(config_path))
-                generate_stencil(Path(input_dir), Path(output_stl), config)
+                generate_stencil(Path(resolved_input), Path(output_stl), config)
                 self.jobProgress.emit(100)
                 self.jobStatus.emit("success")
                 self.jobDone.emit({"output_stl": output_stl})
@@ -353,6 +360,17 @@ class BackendBridge(QObject):
                     self._job_running = False
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _resolve_input_dir(self, input_dir: str) -> str:
+        if not input_dir:
+            return ""
+        path = Path(input_dir)
+        if path.is_file() and path.suffix.lower() == ".zip":
+            extracted = self.importZip(str(path))
+            if extracted:
+                self.jobLog.emit(f"已解压 ZIP: {path.name}")
+            return extracted or ""
+        return str(path)
 
     @Slot()
     def stopJob(self) -> None:

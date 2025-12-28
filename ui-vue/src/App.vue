@@ -38,21 +38,28 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <section class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 md:p-8 space-y-6">
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-2">输入目录</label>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">输入目录 / ZIP</label>
               <div class="flex rounded-md shadow-sm">
                 <input
                   v-model="inputDir"
                   @change="scanFiles"
                   class="flex-1 block w-full rounded-none rounded-l-md border-slate-300 bg-white text-slate-900 focus:border-primary focus:ring-primary sm:text-sm py-2.5 px-4"
-                  placeholder="Gerber 目录..."
+                  placeholder="Gerber 目录或 ZIP..."
                   type="text"
                 />
                 <button
-                  class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 rounded-r-md bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary"
+                  class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary"
                   type="button"
                   @click="pickInputDir"
                 >
-                  浏览
+                  文件夹
+                </button>
+                <button
+                  class="inline-flex items-center px-4 py-2 border border-l-0 border-slate-300 rounded-r-md bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-1 focus:ring-primary"
+                  type="button"
+                  @click="pickInputZip"
+                >
+                  ZIP
                 </button>
               </div>
             </div>
@@ -92,18 +99,12 @@
                 </button>
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
               <button
                 class="col-span-1 w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                 @click="runJob"
               >
                 生成 STL
-              </button>
-              <button
-                class="col-span-1 w-full flex justify-center py-3 px-4 border border-slate-300 rounded-lg shadow-sm text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-                @click="importZip"
-              >
-                导入 ZIP
               </button>
             </div>
           </section>
@@ -625,6 +626,15 @@ export default {
     pickInputDir() {
       if (!this.backend) return;
       this.backend.pickDirectory((picked) => {
+        if (picked) {
+          this.inputDir = picked;
+          this.scanFiles();
+        }
+      });
+    },
+    pickInputZip() {
+      if (!this.backend) return;
+      this.backend.pickZipFile((picked) => {
         if (picked) {
           this.inputDir = picked;
           this.scanFiles();
