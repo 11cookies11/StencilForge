@@ -1,28 +1,63 @@
-# StencilForge
+# StencilForge 🛠️
 
-快速生成 PCB 钢网模型（Gerber -> STL）。
+<p align="left">
+  <a href="https://github.com/11cookies11/StencilForge">
+    <img alt="GitHub Repo" src="https://img.shields.io/badge/GitHub-11cookies11%2FStencilForge-181717?logo=github&logoColor=white">
+  </a>
+  <a href="https://github.com/11cookies11/StencilForge/blob/main/LICENSE">
+    <img alt="License" src="https://img.shields.io/github/license/11cookies11/StencilForge?color=2b6cb0">
+  </a>
+  <a href="https://github.com/11cookies11/StencilForge/stargazers">
+    <img alt="Stars" src="https://img.shields.io/github/stars/11cookies11/StencilForge?style=flat">
+  </a>
+  <a href="https://github.com/11cookies11/StencilForge/issues">
+    <img alt="Issues" src="https://img.shields.io/github/issues/11cookies11/StencilForge">
+  </a>
+  <a href="https://github.com/11cookies11/StencilForge/releases">
+    <img alt="Release" src="https://img.shields.io/github/v/release/11cookies11/StencilForge">
+  </a>
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42b883?logo=vue.js&logoColor=white">
+  <img alt="CadQuery" src="https://img.shields.io/badge/CadQuery-2.4-3b82f6">
+  <img alt="VTK" src="https://img.shields.io/badge/VTK-9.3-8a2be2">
+</p>
 
-语言：简体中文 | [English](README.md)
+```
++--------------------------------------------------+
+|  StencilForge                                    |
+|  PCB 钢网与定位治具生成 (Gerber -> STL)          |
++--------------------------------------------------+
+```
 
-## 概览
+语言: 简体中文 | [English](README.md)
 
-本项目将 Gerber + Excellon 导出转换为 3D 钢网模型（STL），
-默认面向嘉立创 EDA 的导出，但管线保持通用。
+## 简介 ✨
 
-## 快速开始
+StencilForge 用于把 Gerber + Excellon 导出转换为 3D 钢网模型 (STL)。
+支持桌面 UI 预览，适合快速生成钢网和定位治具。
 
-1. 创建 venv 并安装依赖：`pip install -r requirements.txt`
-2. 安装包：`pip install -e .`
-3. 根据需要修改 `config/stencilforge.json`
-4. 运行：
+## 特性 🚀
+
+- Gerber -> STL 一键生成
+- CadQuery/Trimesh 建模后端可选
+- 钢网开口与外形自动处理
+- PCB 定位结构: 台阶或外框墙
+- VTK 预览窗口 (不依赖 WebGL)
+
+## 快速开始 ⚡
+
+1. 创建 venv 并安装依赖: `pip install -r requirements.txt`
+2. 安装包: `pip install -e .`
+3. 按需修改 `config/stencilforge.json`
+4. 运行:
 
 ```bash
 stencilforge <gerber_dir> <output_stl>
 ```
 
-## 桌面 UI（Vue + PySide6 + Qt WebEngine）
+## 桌面 UI (Vue + PySide6 + Qt WebEngine) 🧭
 
-先构建前端：
+构建前端:
 
 ```bash
 cd ui-vue
@@ -30,33 +65,41 @@ npm install
 npm run build
 ```
 
-启动桌面界面：
+启动桌面 UI:
 
 ```bash
 stencilforge-ui
 ```
 
-## 配置参数
+## 配置参数 🧰
 
-- `paste_patterns`：焊膏层文件匹配（默认顶层焊膏）
-- `outline_patterns`：板框文件匹配
-- `thickness_mm`：钢网厚度
-- `paste_offset_mm`：开口缩放（负值为缩小）
-- `outline_margin_mm`：无板框时的回退外扩
-- `output_mode`：`holes_only` 或 `solid_with_cutouts`
-- `model_backend`：`trimesh` 或 `cadquery`
-- `stl_linear_deflection`：STL 线性偏差（mm，越小越精细）
-- `stl_angular_deflection`：STL 角度偏差（弧度）
-- `arc_steps`：圆弧采样步数
-- `curve_resolution`：圆形缓冲精度
+- `paste_patterns`: 焊膏层文件匹配规则
+- `outline_patterns`: 外形层文件匹配规则
+- `thickness_mm`: 钢网厚度
+- `paste_offset_mm`: 开口偏移 (负值为缩小)
+- `outline_margin_mm`: 无外形时的回退边距
+- `output_mode`: `holes_only` 或 `solid_with_cutouts`
+- `model_backend`: `trimesh` 或 `cadquery`
+- `locator_enabled`: 是否启用定位结构
+- `locator_mode`: `step` (台阶) 或 `wall` (外框墙)
+- `locator_height_mm`: 外框墙高度
+- `locator_width_mm`: 外框墙宽度
+- `locator_clearance_mm`: 定位间隙
+- `locator_step_height_mm`: 台阶高度 (PCB 下沉高度)
+- `locator_step_width_mm`: 台阶宽度 (向外扩展)
+- `locator_open_side`: 开口方向 (`none/top/right/bottom/left`)
+- `locator_open_width_mm`: 开口宽度
+- `stl_linear_deflection`: STL 线性偏差 (mm)
+- `stl_angular_deflection`: STL 角度偏差 (弧度)
+- `arc_steps`: 圆弧采样步数
+- `curve_resolution`: 圆形缓冲分辨率
 
-## 约定（建议）
+## 约定 (建议) 📌
 
-- 变更记录：`CHANGELOG.md`（Keep a Changelog 风格）
-- 提交信息与 PR 标题：Conventional Commits（例如 `feat:`, `fix:`, `chore:`）
-- 社区文档：`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`
-- Issue / PR 模板：`.github/`
+- Changelog: `CHANGELOG.md` (Keep a Changelog 风格)
+- 提交信息与 PR 标题: Conventional Commits
+- 社区文档: `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`
 
-## 许可证
+## 许可证 📄
 
 见 `LICENSE`。
