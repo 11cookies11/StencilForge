@@ -45,6 +45,17 @@ keeping the pipeline generic and configurable.
 - Locator structure: step or wall
 - VTK preview window (no WebGL)
 
+## Gallery 🖼️
+
+**Printed stencil**
+![Printed stencil](assets/images/实物照片.jpg)
+
+**UI main screen**
+![UI main screen](assets/images/菜单照片.png)
+
+**STL preview**
+![STL preview](assets/images/预览照片.png)
+
 ## Quick start ⚡
 
 1. Create a venv and install deps: `pip install -r requirements.txt`
