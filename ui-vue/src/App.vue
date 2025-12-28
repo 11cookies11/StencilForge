@@ -356,19 +356,15 @@
           <div class="text-xs text-slate-500">当前 STL: {{ outputPath || "未设置" }}</div>
           <div class="flex flex-wrap gap-3">
             <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="runJob">生成</button>
-            <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="stopJob">停止</button>
             <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="openPreview">打开预览</button>
-            <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="previewOutput">预览输出</button>
-            <button class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600" @click="pickStlForPreview">打开 STL</button>
           </div>
           <div class="flex items-center justify-between">
             <div class="text-xs font-semibold text-slate-500 uppercase">状态</div>
             <div class="text-sm font-bold text-primary">{{ statusLabel }}</div>
           </div>
-          <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full bg-primary" :style="{ width: progress + '%' }"></div>
+          <div class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+            {{ log.split("\n").slice(-1)[0] || log }}
           </div>
-          <div class="text-xs font-mono text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">{{ log }}</div>
         </div>
       </section>
 
