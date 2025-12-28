@@ -25,3 +25,7 @@ ui-vue/dist/
 dist/
 build/
 out/
+
+# Generated stencil outputs
+stencil.stl
+stencil_debug_*.svg

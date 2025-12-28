@@ -17,6 +17,9 @@ class StencilConfig:
     locator_height_mm: float
     locator_width_mm: float
     locator_clearance_mm: float
+    locator_step_height_mm: float
+    locator_step_width_mm: float
+    locator_mode: str
     locator_open_side: str
     locator_open_width_mm: float
     output_mode: str
@@ -42,10 +45,13 @@ class StencilConfig:
         thickness_mm = float(data.get("thickness_mm", 0.12))
         paste_offset_mm = float(data.get("paste_offset_mm", -0.05))
         outline_margin_mm = float(data.get("outline_margin_mm", 5.0))
-        locator_enabled = bool(data.get("locator_enabled", False))
+        locator_enabled = bool(data.get("locator_enabled", True))
         locator_height_mm = float(data.get("locator_height_mm", 2.0))
         locator_width_mm = float(data.get("locator_width_mm", 2.0))
         locator_clearance_mm = float(data.get("locator_clearance_mm", 0.2))
+        locator_step_height_mm = float(data.get("locator_step_height_mm", 1.0))
+        locator_step_width_mm = float(data.get("locator_step_width_mm", 1.5))
+        locator_mode = str(data.get("locator_mode", "step"))
         locator_open_side = str(data.get("locator_open_side", "none"))
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
@@ -64,6 +70,9 @@ class StencilConfig:
             locator_height_mm=locator_height_mm,
             locator_width_mm=locator_width_mm,
             locator_clearance_mm=locator_clearance_mm,
+            locator_step_height_mm=locator_step_height_mm,
+            locator_step_width_mm=locator_step_width_mm,
+            locator_mode=locator_mode,
             locator_open_side=locator_open_side,
             locator_open_width_mm=locator_open_width_mm,
             output_mode=output_mode,
@@ -95,6 +104,15 @@ class StencilConfig:
             raise ValueError("locator_width_mm must be >= 0")
         if self.locator_clearance_mm < 0:
             raise ValueError("locator_clearance_mm must be >= 0")
+        if self.locator_step_height_mm < 0:
+            raise ValueError("locator_step_height_mm must be >= 0")
+        if self.locator_step_width_mm < 0:
+            raise ValueError("locator_step_width_mm must be >= 0")
+        if self.locator_mode not in {"step", "wall"}:
+            raise ValueError("locator_mode must be step or wall")
+        if self.locator_step_height_mm > 0 and self.locator_height_mm > 0:
+            if self.locator_step_height_mm > self.locator_height_mm:
+                raise ValueError("locator_step_height_mm must be <= locator_height_mm")
         if self.locator_open_width_mm < 0:
             raise ValueError("locator_open_width_mm must be >= 0")
         if self.locator_open_side not in {"none", "top", "right", "bottom", "left"}:

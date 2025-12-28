@@ -200,10 +200,20 @@
                   class="h-4 w-4 text-primary border-slate-300 rounded"
                   type="checkbox"
                 />
-                启用 PCB 定位台阶
+                启用 PCB 定位
               </label>
               <div class="grid grid-cols-2 gap-4">
-                <label class="text-xs font-semibold text-slate-600">台阶高度 (mm)
+                <label class="text-xs font-semibold text-slate-600">定位结构
+                  <select
+                    v-model="config.locator_mode"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                  >
+                    <option value="step">台阶</option>
+                    <option value="wall">外框墙</option>
+                  </select>
+                </label>
+                <label class="text-xs font-semibold text-slate-600">外框高度 (mm)
                   <input
                     v-model.number="config.locator_height_mm"
                     @change="updateConfig"
@@ -213,7 +223,7 @@
                     min="0"
                   />
                 </label>
-                <label class="text-xs font-semibold text-slate-600">台阶宽度 (mm)
+                <label class="text-xs font-semibold text-slate-600">外框宽度 (mm)
                   <input
                     v-model.number="config.locator_width_mm"
                     @change="updateConfig"
@@ -230,6 +240,26 @@
                     class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
                     type="number"
                     step="0.05"
+                    min="0"
+                  />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">台阶高度 (mm)
+                  <input
+                    v-model.number="config.locator_step_height_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                  />
+                </label>
+                <label class="text-xs font-semibold text-slate-600">台阶宽度 (mm)
+                  <input
+                    v-model.number="config.locator_step_width_mm"
+                    @change="updateConfig"
+                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                    type="number"
+                    step="0.1"
                     min="0"
                   />
                 </label>
@@ -389,10 +419,13 @@ export default {
         thickness_mm: 0.12,
         paste_offset_mm: -0.05,
         outline_margin_mm: 5.0,
-        locator_enabled: false,
+        locator_enabled: true,
         locator_height_mm: 2.0,
         locator_width_mm: 2.0,
         locator_clearance_mm: 0.2,
+        locator_step_height_mm: 1.0,
+        locator_step_width_mm: 1.5,
+        locator_mode: "step",
         locator_open_side: "none",
         locator_open_width_mm: 0.0,
         output_mode: "solid_with_cutouts",

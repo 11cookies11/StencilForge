@@ -73,29 +73,88 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             hole_count,
         )
         _write_debug_svg(output_path, outline_geom, paste_geom, stencil_2d)
-    logger.info("Base thickness: %s mm", config.thickness_mm)
-
-    locator_geom = None
-    if config.locator_enabled and outline_geom is not None and not outline_geom.is_empty:
-        locator_geom = _build_locator_ring(
+    locator_bridge_geom = None
+    if (
+        config.locator_enabled
+        and config.locator_mode == "step"
+        and outline_geom is not None
+        and not outline_geom.is_empty
+        and config.locator_clearance_mm > 0
+    ):
+        locator_bridge_geom = _build_locator_bridge(
             outline_geom,
             config.locator_clearance_mm,
-            config.locator_width_mm,
             config.locator_open_side,
             config.locator_open_width_mm,
         )
-        if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
-            logger.info(
-                "Locator: height=%s width=%s clearance=%s open=%s(%s)",
-                config.locator_height_mm,
-                config.locator_width_mm,
+        if locator_bridge_geom is not None and not locator_bridge_geom.is_empty:
+            stencil_2d = unary_union([stencil_2d, locator_bridge_geom])
+            logger.info("Locator bridge: clearance=%s open=%s(%s)", config.locator_clearance_mm, config.locator_open_side, config.locator_open_width_mm)
+
+    logger.info("Base thickness: %s mm", config.thickness_mm)
+
+    locator_geom = None
+    locator_step_geom = None
+    if config.locator_enabled and outline_geom is not None and not outline_geom.is_empty:
+        if config.locator_mode == "step":
+            locator_step_geom = _build_locator_step(
+                outline_geom,
                 config.locator_clearance_mm,
+                config.locator_step_width_mm,
                 config.locator_open_side,
                 config.locator_open_width_mm,
             )
+            if (
+                locator_step_geom is not None
+                and not locator_step_geom.is_empty
+                and config.locator_step_height_mm > 0
+            ):
+                logger.info(
+                    "Locator step: height=%s width=%s clearance=%s open=%s(%s)",
+                    config.locator_step_height_mm,
+                    config.locator_step_width_mm,
+                    config.locator_clearance_mm,
+                    config.locator_open_side,
+                    config.locator_open_width_mm,
+                )
+            else:
+                locator_step_geom = None
+                locator_geom = _build_locator_ring(
+                    outline_geom,
+                    config.locator_clearance_mm,
+                    config.locator_width_mm,
+                    config.locator_open_side,
+                    config.locator_open_width_mm,
+                )
+                if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
+                    logger.info(
+                        "Locator wall: height=%s width=%s clearance=%s open=%s(%s)",
+                        config.locator_height_mm,
+                        config.locator_width_mm,
+                        config.locator_clearance_mm,
+                        config.locator_open_side,
+                        config.locator_open_width_mm,
+                    )
+        else:
+            locator_geom = _build_locator_ring(
+                outline_geom,
+                config.locator_clearance_mm,
+                config.locator_width_mm,
+                config.locator_open_side,
+                config.locator_open_width_mm,
+            )
+            if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
+                logger.info(
+                    "Locator wall: height=%s width=%s clearance=%s open=%s(%s)",
+                    config.locator_height_mm,
+                    config.locator_width_mm,
+                    config.locator_clearance_mm,
+                    config.locator_open_side,
+                    config.locator_open_width_mm,
+                )
 
     if config.model_backend == "cadquery":
-        _export_cadquery_stl(stencil_2d, locator_geom, output_path, config)
+        _export_cadquery_stl(stencil_2d, locator_geom, locator_step_geom, output_path, config)
         return
 
     mesh = _extrude_geometry(stencil_2d, config.thickness_mm)
@@ -103,6 +162,10 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         locator_mesh = _extrude_geometry(locator_geom, config.locator_height_mm)
         locator_mesh.apply_translation((0, 0, config.thickness_mm))
         mesh = trimesh.util.concatenate([mesh, locator_mesh])
+    if locator_step_geom is not None and not locator_step_geom.is_empty and config.locator_step_height_mm > 0:
+        step_mesh = _extrude_geometry(locator_step_geom, config.locator_step_height_mm)
+        step_mesh.apply_translation((0, 0, config.thickness_mm))
+        mesh = trimesh.util.concatenate([mesh, step_mesh])
 
     logger.info("Cleaning mesh...")
     try:
@@ -176,6 +239,36 @@ def _build_locator_ring(
     inner = outline_geom.buffer(clearance_mm)
     outer = outline_geom.buffer(clearance_mm + width_mm)
     ring = outer.difference(inner)
+    ring = _apply_open_side(ring, outer, open_side, open_width_mm)
+    return ring
+
+
+def _build_locator_step(
+    outline_geom,
+    clearance_mm: float,
+    step_width_mm: float,
+    open_side: str,
+    open_width_mm: float,
+):
+    if step_width_mm <= 0:
+        return None
+    inner = outline_geom.buffer(clearance_mm)
+    outer = outline_geom.buffer(clearance_mm + step_width_mm)
+    step = outer.difference(inner)
+    step = _apply_open_side(step, outer, open_side, open_width_mm)
+    return step
+
+
+def _build_locator_bridge(
+    outline_geom,
+    clearance_mm: float,
+    open_side: str,
+    open_width_mm: float,
+):
+    if clearance_mm <= 0:
+        return None
+    outer = outline_geom.buffer(clearance_mm)
+    ring = outer.difference(outline_geom)
     ring = _apply_open_side(ring, outer, open_side, open_width_mm)
     return ring
 
@@ -257,7 +350,13 @@ def _count_holes(geometry) -> int:
     return 0
 
 
-def _export_cadquery_stl(stencil_2d, locator_geom, output_path: Path, config: StencilConfig) -> None:
+def _export_cadquery_stl(
+    stencil_2d,
+    locator_geom,
+    locator_step_geom,
+    output_path: Path,
+    config: StencilConfig,
+) -> None:
     try:
         import cadquery as cq
     except ImportError as exc:
@@ -267,6 +366,12 @@ def _export_cadquery_stl(stencil_2d, locator_geom, output_path: Path, config: St
     if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
         locator_solids = _cadquery_extrude_geometry(locator_geom, config.locator_height_mm, cq)
         for solid in locator_solids:
+            solids.append(solid.translate((0, 0, config.thickness_mm)))
+    if locator_step_geom is not None and not locator_step_geom.is_empty and config.locator_step_height_mm > 0:
+        step_solids = _cadquery_extrude_geometry(
+            locator_step_geom, config.locator_step_height_mm, cq
+        )
+        for solid in step_solids:
             solids.append(solid.translate((0, 0, config.thickness_mm)))
 
     if not solids:
