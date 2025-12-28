@@ -16,6 +16,10 @@ config_dir = project_root / "config"
 if config_dir.exists():
     datas.append((str(config_dir), "config"))
 
+assets_dir = project_root / "assets"
+if assets_dir.exists():
+    datas.append((str(assets_dir), "assets"))
+
 hiddenimports = collect_submodules("vtkmodules")
 
 a = Analysis(
@@ -39,6 +43,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="StencilForge",
+    icon=str(project_root / "assets" / "icon.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

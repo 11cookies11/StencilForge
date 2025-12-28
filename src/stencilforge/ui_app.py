@@ -14,7 +14,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QCoreApplication
-from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat
+from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat, QIcon
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -500,6 +500,11 @@ class MainWindow(QMainWindow):
 def main() -> int:
     os.environ.setdefault("QT_OPENGL", "software")
     os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("StencilForge")
+        except Exception:
+            pass
     QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     try:
         QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
@@ -517,6 +522,13 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     project_root = Path(__file__).resolve().parents[2]
+    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
+    icon_path = project_root / "assets" / icon_name
+    if not icon_path.exists():
+        icon_path = project_root / "assets" / "icon.svg"
+    if icon_path.exists():
+        icon = QIcon(str(icon_path))
+        app.setWindowIcon(icon)
     html_path = project_root / "ui-vue" / "dist" / "index.html"
     if not html_path.exists():
         raise FileNotFoundError(
@@ -526,6 +538,8 @@ def main() -> int:
 
     window = MainWindow(drag_height=64, button_margin=190)
     window.setWindowTitle("StencilForge")
+    if icon_path.exists():
+        window.setWindowIcon(QIcon(str(icon_path)))
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
     window.setWindowFlag(Qt.WindowSystemMenuHint, True)

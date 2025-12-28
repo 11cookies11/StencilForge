@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QCoreApplication
-from PySide6.QtGui import QGuiApplication, QSurfaceFormat
+from PySide6.QtGui import QGuiApplication, QSurfaceFormat, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
@@ -24,6 +24,13 @@ def main() -> int:
 
     os.environ.setdefault("QT_OPENGL", "software")
     os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("StencilForge")
+        except Exception:
+            pass
     QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     try:
         QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
@@ -40,6 +47,15 @@ def main() -> int:
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
     _center_window(window, target_size=(980, 760))
+    project_root = Path(__file__).resolve().parents[2]
+    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
+    icon_path = project_root / "assets" / icon_name
+    if not icon_path.exists():
+        icon_path = project_root / "assets" / "icon.svg"
+    if icon_path.exists():
+        icon = QIcon(str(icon_path))
+        app.setWindowIcon(icon)
+        window.setWindowIcon(icon)
 
     container = QWidget(window)
     container.setStyleSheet(
