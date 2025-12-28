@@ -171,7 +171,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         mesh = trimesh.util.concatenate([mesh, locator_mesh])
     if locator_step_geom is not None and not locator_step_geom.is_empty and config.locator_step_height_mm > 0:
         step_mesh = _extrude_geometry(locator_step_geom, config.locator_step_height_mm)
-        step_mesh.apply_translation((0, 0, config.thickness_mm))
+        step_mesh.apply_translation((0, 0, -config.locator_step_height_mm))
         mesh = trimesh.util.concatenate([mesh, step_mesh])
 
     logger.info("Cleaning mesh...")
@@ -379,7 +379,7 @@ def _export_cadquery_stl(
             locator_step_geom, config.locator_step_height_mm, cq
         )
         for solid in step_solids:
-            solids.append(solid.translate((0, 0, config.thickness_mm)))
+            solids.append(solid.translate((0, 0, -config.locator_step_height_mm)))
 
     if not solids:
         raise ValueError("Failed to create CadQuery solids from geometry.")
