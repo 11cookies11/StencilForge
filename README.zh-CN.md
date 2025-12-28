@@ -106,4 +106,4 @@ stencilforge-ui
 
 ## 许可证 📄
 
-见 `LICENSE`。
+GPL-3.0-only?? `LICENSE`?

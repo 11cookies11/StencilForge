@@ -108,4 +108,4 @@ stencilforge-ui
 
 ## License 📄
 
-See `LICENSE`.
+GPL-3.0-only. See `LICENSE`.
