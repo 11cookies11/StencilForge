@@ -22,7 +22,7 @@
   <img alt="VTK" src="https://img.shields.io/badge/VTK-9.3-8a2be2">
 </p>
 
-```
+```text
 +--------------------------------------------------+
 |  StencilForge                                    |
 |  PCB 钢网与定位治具生成 (Gerber -> STL)          |
