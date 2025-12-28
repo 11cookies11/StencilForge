@@ -25,5 +25,9 @@
   "stl_linear_deflection": 0.05,
   "stl_angular_deflection": 0.1,
   "arc_steps": 64,
-  "curve_resolution": 16
+  "curve_resolution": 16,
+  "qfn_regen_enabled": true,
+  "qfn_min_feature_mm": 0.6,
+  "qfn_confidence_threshold": 0.75,
+  "qfn_max_pad_width_mm": 1.2
 }

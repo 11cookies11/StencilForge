@@ -28,6 +28,10 @@ class StencilConfig:
     stl_angular_deflection: float
     arc_steps: int
     curve_resolution: int
+    qfn_regen_enabled: bool
+    qfn_min_feature_mm: float
+    qfn_confidence_threshold: float
+    qfn_max_pad_width_mm: float
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
@@ -60,6 +64,10 @@ class StencilConfig:
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
         arc_steps = int(data.get("arc_steps", 64))
         curve_resolution = int(data.get("curve_resolution", 16))
+        qfn_regen_enabled = bool(data.get("qfn_regen_enabled", True))
+        qfn_min_feature_mm = float(data.get("qfn_min_feature_mm", 0.6))
+        qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
+        qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
@@ -81,6 +89,10 @@ class StencilConfig:
             stl_angular_deflection=stl_angular_deflection,
             arc_steps=arc_steps,
             curve_resolution=curve_resolution,
+            qfn_regen_enabled=qfn_regen_enabled,
+            qfn_min_feature_mm=qfn_min_feature_mm,
+            qfn_confidence_threshold=qfn_confidence_threshold,
+            qfn_max_pad_width_mm=qfn_max_pad_width_mm,
         )
 
     def validate(self) -> None:
@@ -90,6 +102,12 @@ class StencilConfig:
             raise ValueError("arc_steps must be >= 8")
         if self.curve_resolution < 4:
             raise ValueError("curve_resolution must be >= 4")
+        if self.qfn_min_feature_mm <= 0:
+            raise ValueError("qfn_min_feature_mm must be > 0")
+        if not 0.0 < self.qfn_confidence_threshold <= 1.0:
+            raise ValueError("qfn_confidence_threshold must be in (0, 1]")
+        if self.qfn_max_pad_width_mm <= 0:
+            raise ValueError("qfn_max_pad_width_mm must be > 0")
         if self.output_mode not in {"holes_only", "solid_with_cutouts"}:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
         if self.model_backend not in {"trimesh", "cadquery"}:

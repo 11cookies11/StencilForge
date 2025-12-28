@@ -7,7 +7,8 @@ import tempfile
 import numpy as np
 import trimesh
 
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QVBoxLayout, QWidget, QSizePolicy
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper, vtkRenderer
@@ -36,6 +37,12 @@ class VtkStlViewer(QWidget):
         self._renderer.SetBackground2(0.80, 0.86, 0.92)
         self._renderer.GradientBackgroundOn()
         self._viewer = QVTKRenderWindowInteractor(self)
+        self._viewer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._viewer.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self._viewer.setAttribute(Qt.WA_NoSystemBackground, True)
+        self._viewer.setAutoFillBackground(False)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumSize(240, 180)
         self._viewer.GetRenderWindow().AddRenderer(self._renderer)
         self._actor: vtkActor | None = None
         self._edge_actor: vtkActor | None = None
@@ -63,6 +70,10 @@ class VtkStlViewer(QWidget):
         if interactor is not None:
             interactor.SetInteractorStyle(vtkInteractorStyleTrackballCamera())
             interactor.Initialize()
+            try:
+                interactor.Start()
+            except Exception:
+                pass
             try:
                 from vtkmodules.vtkInteractionWidgets import vtkOrientationMarkerWidget
             except Exception:
@@ -145,6 +156,8 @@ class VtkStlViewer(QWidget):
         print(f"[VTK] Loaded STL: {load_path} bounds={bounds} cells={polydata.GetNumberOfCells()}")
         self.fit_view(bounds)
         self._default_camera = self._renderer.GetActiveCamera()
+        self.refresh_view()
+        self._viewer.update()
 
     def fit_view(
         self, bounds: tuple[float, float, float, float, float, float] | None | bool = None
@@ -182,7 +195,29 @@ class VtkStlViewer(QWidget):
         camera = self._renderer.GetActiveCamera()
         camera.DeepCopy(self._default_camera)
         self._renderer.ResetCameraClippingRange()
-        self._viewer.GetRenderWindow().Render()
+        self.refresh_view()
+
+    def refresh_view(self) -> None:
+        render_window = self._viewer.GetRenderWindow()
+        if render_window is None:
+            return
+        interactor = render_window.GetInteractor()
+        if interactor is not None:
+            interactor.Render()
+        else:
+            render_window.Render()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        render_window = self._viewer.GetRenderWindow()
+        if render_window is None:
+            return
+        render_window.SetSize(self.width(), self.height())
+        self.refresh_view()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self.refresh_view()
 
     def set_wireframe(self, enabled: bool) -> None:
         if self._actor is None:

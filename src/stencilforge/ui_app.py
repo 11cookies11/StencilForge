@@ -3,6 +3,7 @@
 import base64
 import ctypes
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -12,8 +13,8 @@ from ctypes import wintypes
 from fnmatch import fnmatch
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot
-from PySide6.QtGui import QCursor, QGuiApplication
+from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QCoreApplication
+from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -31,6 +32,7 @@ from .config import StencilConfig
 from .pipeline import generate_stencil
 from .title_bar import TitleBar
 from .vtk_viewer import VtkStlViewer
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 if sys.platform == "win32":
     WM_NCHITTEST = 0x0084
@@ -113,6 +115,10 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "stl_angular_deflection": config.stl_angular_deflection,
         "arc_steps": config.arc_steps,
         "curve_resolution": config.curve_resolution,
+        "qfn_regen_enabled": config.qfn_regen_enabled,
+        "qfn_min_feature_mm": config.qfn_min_feature_mm,
+        "qfn_confidence_threshold": config.qfn_confidence_threshold,
+        "qfn_max_pad_width_mm": config.qfn_max_pad_width_mm,
     }
 
 
@@ -147,8 +153,12 @@ class BackendBridge(QObject):
         self._preview_dialog: QDialog | None = None
         self._preview_viewer: VtkStlViewer | None = None
         self._window: QMainWindow | None = None
+        self._last_preview_path: str | None = None
+        self._external_preview = sys.platform == "win32"
 
     def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer) -> None:
+        if self._external_preview:
+            return
         self._preview_dialog = dialog
         self._preview_viewer = viewer
 
@@ -156,12 +166,22 @@ class BackendBridge(QObject):
         self._window = window
 
     def _show_preview(self) -> None:
+        if self._external_preview:
+            if self._last_preview_path:
+                self._launch_external_preview(self._last_preview_path)
+            else:
+                self.jobLog.emit("预览 STL 路径为空。")
+            return
         if self._preview_dialog is None:
             self.jobLog.emit("预览窗口未初始化。")
             return
         self._preview_dialog.show()
         self._preview_dialog.raise_()
         self._preview_dialog.activateWindow()
+        if self._preview_viewer is not None:
+            self._preview_viewer.show()
+            self._preview_viewer.fit_view()
+            self._preview_viewer.refresh_view()
 
     @Slot(result=dict)
     def getConfig(self) -> dict:
@@ -265,6 +285,10 @@ class BackendBridge(QObject):
         if not path:
             self.jobLog.emit("预览 STL 路径为空。")
             return
+        self._last_preview_path = path
+        if self._external_preview:
+            self._launch_external_preview(path)
+            return
         if self._preview_viewer is None:
             self.jobLog.emit("预览视图未初始化。")
             return
@@ -273,6 +297,15 @@ class BackendBridge(QObject):
             return
         self._preview_viewer.load_stl(path)
         self._show_preview()
+
+    def _launch_external_preview(self, path: str) -> None:
+        if not Path(path).exists():
+            self.jobLog.emit(f"未找到 STL: {path}")
+            return
+        try:
+            subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path])
+        except Exception as exc:
+            self.jobLog.emit(f"启动预览失败: {exc}")
 
     @Slot(str, result=str)
     def importZip(self, zip_path: str) -> str:
@@ -465,6 +498,17 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    os.environ.setdefault("QT_OPENGL", "software")
+    os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    try:
+        QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
+    except Exception:
+        pass
+    try:
+        QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
+    except Exception:
+        pass
     flags = "--ignore-gpu-blocklist --use-angle=d3d11"
     existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
     if flags not in existing:
@@ -495,8 +539,11 @@ def main() -> int:
 
     channel = QWebChannel()
     backend = BackendBridge(project_root)
-    preview_dialog, preview_viewer = _build_preview_dialog()
-    backend.attach_preview(preview_dialog, preview_viewer)
+    preview_dialog = None
+    preview_viewer = None
+    if not backend._external_preview:
+        preview_dialog, preview_viewer = _build_preview_dialog()
+        backend.attach_preview(preview_dialog, preview_viewer)
     channel.registerObject("backend", backend)
     view.page().setWebChannel(channel)
     view.setUrl(QUrl.fromLocalFile(str(html_path)))

@@ -93,6 +93,10 @@ stencilforge-ui
 - `stl_angular_deflection`: STL 角度偏差 (弧度)
 - `arc_steps`: 圆弧采样步数
 - `curve_resolution`: 圆形缓冲分辨率
+- `qfn_regen_enabled`: 是否启用 QFN 开口重建
+- `qfn_min_feature_mm`: FDM 最小可打印特征
+- `qfn_confidence_threshold`: 置信度阈值 (低于该值不修改)
+- `qfn_max_pad_width_mm`: 识别 QFN pad 的最大宽度
 
 ## 约定 (建议) 📌
 

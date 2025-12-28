@@ -94,6 +94,10 @@ stencilforge-ui
 - `stl_angular_deflection`: STL angular deflection (radians)
 - `arc_steps`: number of steps to approximate arcs
 - `curve_resolution`: buffer resolution for circles
+- `qfn_regen_enabled`: enable QFN paste regeneration
+- `qfn_min_feature_mm`: minimum printable feature for FDM
+- `qfn_confidence_threshold`: confidence threshold to modify apertures
+- `qfn_max_pad_width_mm`: max pad width to consider as QFN pad
 
 ## Conventions (recommended) 📌
 
