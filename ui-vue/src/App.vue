@@ -808,6 +808,9 @@ export default {
     },
     setLocale() {
       this.applyLocale(true);
+      if (this.backend && this.backend.setLocale) {
+        this.backend.setLocale(this.locale);
+      }
     },
     setLocaleFromMenu(nextLocale) {
       this.locale = nextLocale;
@@ -851,6 +854,9 @@ export default {
         this.backend.windowUsesNativeHitTest((value) => {
           this.useNativeTitlebar = !!value;
         });
+        if (this.backend.setLocale) {
+          this.backend.setLocale(this.locale);
+        }
       });
     },
     wireBackendSignals() {

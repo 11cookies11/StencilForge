@@ -122,6 +122,42 @@ def _config_to_dict(config: StencilConfig) -> dict:
     }
 
 
+_PREVIEW_I18N = {
+    "zh-CN": {
+        "title": "钢网预览",
+        "fit": "适配",
+        "reset": "重置",
+        "wireframe": "线框",
+        "axes": "坐标轴",
+        "no_preview_path": "预览 STL 路径为空。",
+        "preview_unavailable": "预览窗口未初始化。",
+    },
+    "en": {
+        "title": "Stencil preview",
+        "fit": "Fit",
+        "reset": "Reset",
+        "wireframe": "Wireframe",
+        "axes": "Axes",
+        "no_preview_path": "Preview STL path is empty.",
+        "preview_unavailable": "Preview window is not initialized.",
+    },
+}
+
+
+def _normalize_locale(locale: str | None) -> str:
+    if not locale:
+        return "zh-CN"
+    lowered = locale.lower()
+    if lowered.startswith("en"):
+        return "en"
+    return "zh-CN"
+
+
+def _preview_labels(locale: str) -> dict:
+    key = _normalize_locale(locale)
+    return _PREVIEW_I18N.get(key, _PREVIEW_I18N["zh-CN"])
+
+
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
     matches = []
     for path in input_dir.rglob("*"):
@@ -152,28 +188,52 @@ class BackendBridge(QObject):
         self._temp_dirs: list[Path] = []
         self._preview_dialog: QDialog | None = None
         self._preview_viewer: VtkStlViewer | None = None
+        self._preview_ui: dict | None = None
         self._window: QMainWindow | None = None
         self._last_preview_path: str | None = None
         self._external_preview = sys.platform == "win32"
+        self._locale = "zh-CN"
 
-    def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer) -> None:
+    def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer, ui: dict | None = None) -> None:
         if self._external_preview:
             return
         self._preview_dialog = dialog
         self._preview_viewer = viewer
+        self._preview_ui = ui
+        self._apply_preview_locale()
 
     def attach_window(self, window: QMainWindow) -> None:
         self._window = window
+
+    def _apply_preview_locale(self) -> None:
+        if self._external_preview:
+            return
+        if self._preview_dialog is None or self._preview_ui is None:
+            return
+        labels = _preview_labels(self._locale)
+        self._preview_dialog.setWindowTitle(labels["title"])
+        title_bar = self._preview_ui.get("title_bar")
+        if title_bar is not None and hasattr(title_bar, "_title"):
+            title_bar._title.setText(labels["title"])
+        for key, action_name in (
+            ("fit_action", "fit"),
+            ("reset_action", "reset"),
+            ("wire_action", "wireframe"),
+            ("axes_action", "axes"),
+        ):
+            action = self._preview_ui.get(key)
+            if action is not None:
+                action.setText(labels[action_name])
 
     def _show_preview(self) -> None:
         if self._external_preview:
             if self._last_preview_path:
                 self._launch_external_preview(self._last_preview_path)
             else:
-                self.jobLog.emit("预览 STL 路径为空。")
+                self.jobLog.emit(_preview_labels(self._locale)["no_preview_path"])
             return
         if self._preview_dialog is None:
-            self.jobLog.emit("预览窗口未初始化。")
+            self.jobLog.emit(_preview_labels(self._locale)["preview_unavailable"])
             return
         self._preview_dialog.show()
         self._preview_dialog.raise_()
@@ -203,6 +263,11 @@ class BackendBridge(QObject):
         data.update(partial or {})
         self._config = StencilConfig.from_dict(data)
         self.configChanged.emit(_config_to_dict(self._config))
+
+    @Slot(str)
+    def setLocale(self, locale: str) -> None:
+        self._locale = _normalize_locale(locale)
+        self._apply_preview_locale()
 
     @Slot(str)
     def scanFiles(self, input_dir: str) -> None:
@@ -307,7 +372,9 @@ class BackendBridge(QObject):
             self.jobLog.emit(f"未找到 STL: {path}")
             return
         try:
-            subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path])
+            env = os.environ.copy()
+            env["STENCILFORGE_LOCALE"] = self._locale
+            subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
             self.jobLog.emit(f"启动预览失败: {exc}")
 
@@ -574,8 +641,8 @@ def main() -> int:
     preview_dialog = None
     preview_viewer = None
     if not backend._external_preview:
-        preview_dialog, preview_viewer = _build_preview_dialog()
-        backend.attach_preview(preview_dialog, preview_viewer)
+        preview_dialog, preview_viewer, preview_ui = _build_preview_dialog()
+        backend.attach_preview(preview_dialog, preview_viewer, preview_ui)
     channel.registerObject("backend", backend)
     view.page().setWebChannel(channel)
     view.setUrl(QUrl.fromLocalFile(str(html_path)))
@@ -587,9 +654,9 @@ def main() -> int:
     return app.exec()
 
 
-def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer]:
+def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer, dict]:
     dialog = QDialog()
-    dialog.setWindowTitle("钢网预览")
+    dialog.setWindowTitle(_PREVIEW_I18N["zh-CN"]["title"])
     dialog.setWindowFlag(Qt.FramelessWindowHint, True)
     dialog.setWindowFlag(Qt.Window, True)
     _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
@@ -601,13 +668,13 @@ def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer]:
         "QToolButton:checked { background-color: #e7c8a4; }"
     )
     viewer = VtkStlViewer(dialog)
-    title_bar = TitleBar(dialog, "钢网预览")
+    title_bar = TitleBar(dialog, _PREVIEW_I18N["zh-CN"]["title"])
     toolbar = QToolBar(dialog)
     toolbar.setMovable(False)
-    fit_action = toolbar.addAction("适配")
-    reset_action = toolbar.addAction("重置")
-    wire_action = toolbar.addAction("线框")
-    axes_action = toolbar.addAction("坐标轴")
+    fit_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["fit"])
+    reset_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["reset"])
+    wire_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["wireframe"])
+    axes_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["axes"])
     wire_action.setCheckable(True)
     axes_action.setCheckable(True)
     axes_action.setChecked(True)
@@ -623,7 +690,13 @@ def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer]:
     layout.addWidget(title_bar)
     layout.addWidget(toolbar)
     layout.addWidget(viewer)
-    return dialog, viewer
+    return dialog, viewer, {
+        "title_bar": title_bar,
+        "fit_action": fit_action,
+        "reset_action": reset_action,
+        "wire_action": wire_action,
+        "axes_action": axes_action,
+    }
 
 
 def _fit_to_screen(

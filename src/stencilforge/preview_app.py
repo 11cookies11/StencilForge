@@ -13,6 +13,38 @@ from .title_bar import TitleBar
 from .vtk_viewer import VtkStlViewer
 
 
+_PREVIEW_I18N = {
+    "zh-CN": {
+        "title": "钢网预览",
+        "fit": "适配",
+        "reset": "重置",
+        "wireframe": "线框",
+        "axes": "坐标轴",
+    },
+    "en": {
+        "title": "Stencil preview",
+        "fit": "Fit",
+        "reset": "Reset",
+        "wireframe": "Wireframe",
+        "axes": "Axes",
+    },
+}
+
+
+def _normalize_locale(locale: str | None) -> str:
+    if not locale:
+        return "zh-CN"
+    lowered = locale.lower()
+    if lowered.startswith("en"):
+        return "en"
+    return "zh-CN"
+
+
+def _preview_labels(locale: str | None) -> dict:
+    key = _normalize_locale(locale)
+    return _PREVIEW_I18N.get(key, _PREVIEW_I18N["zh-CN"])
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("Usage: python -m stencilforge.preview_app <stl_path>")
@@ -41,9 +73,10 @@ def main() -> int:
     except Exception:
         pass
 
+    labels = _preview_labels(os.environ.get("STENCILFORGE_LOCALE"))
     app = QApplication(sys.argv)
     window = QMainWindow()
-    window.setWindowTitle("钢网预览")
+    window.setWindowTitle(labels["title"])
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
     _center_window(window, target_size=(980, 760))
@@ -69,13 +102,13 @@ def main() -> int:
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(0)
 
-    title_bar = TitleBar(container, "钢网预览")
+    title_bar = TitleBar(container, labels["title"])
     toolbar = QToolBar(container)
     toolbar.setMovable(False)
-    fit_action = toolbar.addAction("适配")
-    reset_action = toolbar.addAction("重置")
-    wire_action = toolbar.addAction("线框")
-    axes_action = toolbar.addAction("坐标轴")
+    fit_action = toolbar.addAction(labels["fit"])
+    reset_action = toolbar.addAction(labels["reset"])
+    wire_action = toolbar.addAction(labels["wireframe"])
+    axes_action = toolbar.addAction(labels["axes"])
     wire_action.setCheckable(True)
     axes_action.setCheckable(True)
     axes_action.setChecked(True)
