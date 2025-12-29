@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -43,8 +44,8 @@ class StencilConfig:
         user_path = StencilConfig.default_path(project_root)
         if user_path.exists():
             return StencilConfig.from_json(user_path)
-        bundled_path = project_root / "config" / "stencilforge.json"
-        if bundled_path.exists():
+        bundled_path = _find_bundled_config(project_root)
+        if bundled_path is not None:
             config = StencilConfig.from_json(bundled_path)
             try:
                 user_path.parent.mkdir(parents=True, exist_ok=True)
@@ -56,7 +57,14 @@ class StencilConfig:
 
     @staticmethod
     def from_json(path: Path) -> "StencilConfig":
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return StencilConfig.from_dict({})
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return StencilConfig.from_dict({})
         return StencilConfig.from_dict(data)
 
     @staticmethod
@@ -171,3 +179,22 @@ def _user_config_dir() -> Path:
     if base:
         return Path(base) / "stencilforge"
     return Path.home() / ".config" / "stencilforge"
+
+
+def _find_bundled_config(project_root: Path) -> Path | None:
+    candidates = [
+        project_root / "config" / "stencilforge.json",
+    ]
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", project_root))
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                base / "config" / "stencilforge.json",
+                exe_dir / "config" / "stencilforge.json",
+            ]
+        )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None

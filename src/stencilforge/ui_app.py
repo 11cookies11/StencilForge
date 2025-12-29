@@ -309,10 +309,13 @@ class BackendBridge(QObject):
 
     @Slot(result=str)
     def pickConfigFile(self) -> str:
+        user_dir = StencilConfig.default_path(self._project_root).parent
+        fallback_dir = self._project_root / "config"
+        start_dir = user_dir if user_dir.exists() else fallback_dir
         filename, _ = QFileDialog.getOpenFileName(
             None,
             "选择配置文件",
-            str(self._project_root / "config"),
+            str(start_dir),
             "Config (*.json)",
         )
         return filename
@@ -615,11 +618,8 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     project_root = _resolve_project_root()
-    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
-    icon_path = project_root / "assets" / icon_name
-    if not icon_path.exists():
-        icon_path = project_root / "assets" / "icon.svg"
-    if icon_path.exists():
+    icon_path = _resolve_icon_path(project_root)
+    if icon_path is not None:
         icon = QIcon(str(icon_path))
         app.setWindowIcon(icon)
     html_path = _resolve_ui_dist(project_root)
@@ -633,7 +633,7 @@ def main() -> int:
 
     window = MainWindow(drag_height=64, button_margin=190)
     window.setWindowTitle("StencilForge")
-    if icon_path.exists():
+    if icon_path is not None:
         window.setWindowIcon(QIcon(str(icon_path)))
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
@@ -750,6 +750,29 @@ def _ui_dist_candidates(project_root: Path) -> list[Path]:
 
 def _resolve_ui_dist(project_root: Path) -> Path | None:
     for candidate in _ui_dist_candidates(project_root):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _resolve_icon_path(project_root: Path) -> Path | None:
+    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
+    candidates = [
+        project_root / "assets" / icon_name,
+        project_root / "assets" / "icon.svg",
+    ]
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", project_root))
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                base / "assets" / icon_name,
+                base / "assets" / "icon.svg",
+                exe_dir / "assets" / icon_name,
+                exe_dir / "assets" / "icon.svg",
+            ]
+        )
+    for candidate in candidates:
         if candidate.exists():
             return candidate
     return None

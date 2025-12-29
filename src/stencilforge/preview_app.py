@@ -87,11 +87,8 @@ def main() -> int:
     window.setWindowFlag(Qt.Window, True)
     _center_window(window, target_size=(980, 760))
     project_root = Path(__file__).resolve().parents[2]
-    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
-    icon_path = project_root / "assets" / icon_name
-    if not icon_path.exists():
-        icon_path = project_root / "assets" / "icon.svg"
-    if icon_path.exists():
+    icon_path = _resolve_icon_path(project_root)
+    if icon_path is not None:
         icon = QIcon(str(icon_path))
         app.setWindowIcon(icon)
         window.setWindowIcon(icon)
@@ -144,6 +141,29 @@ def _center_window(window: QMainWindow, target_size: tuple[int, int]) -> None:
     x = geometry.x() + max((geometry.width() - target_size[0]) // 2, 0)
     y = geometry.y() + max((geometry.height() - target_size[1]) // 2, 0)
     window.move(x, y)
+
+
+def _resolve_icon_path(project_root: Path) -> Path | None:
+    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
+    candidates = [
+        project_root / "assets" / icon_name,
+        project_root / "assets" / "icon.svg",
+    ]
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", project_root))
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend(
+            [
+                base / "assets" / icon_name,
+                base / "assets" / "icon.svg",
+                exe_dir / "assets" / icon_name,
+                exe_dir / "assets" / "icon.svg",
+            ]
+        )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 if __name__ == "__main__":
