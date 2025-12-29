@@ -9,8 +9,14 @@ from PySide6.QtGui import QGuiApplication, QSurfaceFormat, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
-from .title_bar import TitleBar
-from .vtk_viewer import VtkStlViewer
+try:
+    from .title_bar import TitleBar
+    from .vtk_viewer import VtkStlViewer
+except ImportError:
+    # Allow running as a script when package context is missing.
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from stencilforge.title_bar import TitleBar
+    from stencilforge.vtk_viewer import VtkStlViewer
 
 
 _PREVIEW_I18N = {

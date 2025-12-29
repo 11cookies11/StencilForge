@@ -28,10 +28,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .config import StencilConfig
-from .pipeline import generate_stencil
-from .title_bar import TitleBar
-from .vtk_viewer import VtkStlViewer
+try:
+    from .config import StencilConfig
+    from .pipeline import generate_stencil
+    from .title_bar import TitleBar
+    from .vtk_viewer import VtkStlViewer
+except ImportError:
+    # Allow running as a script when package context is missing.
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from stencilforge.config import StencilConfig
+    from stencilforge.pipeline import generate_stencil
+    from stencilforge.title_bar import TitleBar
+    from stencilforge.vtk_viewer import VtkStlViewer
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 if sys.platform == "win32":
