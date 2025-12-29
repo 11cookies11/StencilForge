@@ -190,7 +190,7 @@ class BackendBridge(QObject):
         super().__init__()
         self._project_root = project_root
         self._config_path = StencilConfig.default_path(project_root)
-        self._config = StencilConfig.from_json(self._config_path)
+        self._config = StencilConfig.load_default(project_root)
         self._job_lock = threading.Lock()
         self._job_running = False
         self._temp_dirs: list[Path] = []

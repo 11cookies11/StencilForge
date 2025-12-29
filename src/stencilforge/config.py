@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -35,7 +36,23 @@ class StencilConfig:
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
-        return project_root / "config" / "stencilforge.json"
+        return _user_config_dir() / "stencilforge.json"
+
+    @staticmethod
+    def load_default(project_root: Path) -> "StencilConfig":
+        user_path = StencilConfig.default_path(project_root)
+        if user_path.exists():
+            return StencilConfig.from_json(user_path)
+        bundled_path = project_root / "config" / "stencilforge.json"
+        if bundled_path.exists():
+            config = StencilConfig.from_json(bundled_path)
+            try:
+                user_path.parent.mkdir(parents=True, exist_ok=True)
+                user_path.write_text(bundled_path.read_text(encoding="utf-8"), encoding="utf-8")
+            except OSError:
+                pass
+            return config
+        return StencilConfig.from_dict({})
 
     @staticmethod
     def from_json(path: Path) -> "StencilConfig":
@@ -143,3 +160,14 @@ def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
     if isinstance(value, str):
         return [value]
     return list(value)
+
+
+def _user_config_dir() -> Path:
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or os.environ.get("USERPROFILE")
+        if base:
+            return Path(base) / "StencilForge"
+    base = os.environ.get("XDG_CONFIG_HOME")
+    if base:
+        return Path(base) / "stencilforge"
+    return Path.home() / ".config" / "stencilforge"
