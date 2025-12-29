@@ -614,7 +614,7 @@ def main() -> int:
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
 
     app = QApplication(sys.argv)
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = _resolve_project_root()
     icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
     icon_path = project_root / "assets" / icon_name
     if not icon_path.exists():
@@ -622,11 +622,13 @@ def main() -> int:
     if icon_path.exists():
         icon = QIcon(str(icon_path))
         app.setWindowIcon(icon)
-    html_path = project_root / "ui-vue" / "dist" / "index.html"
-    if not html_path.exists():
+    html_path = _resolve_ui_dist(project_root)
+    if html_path is None:
+        candidates = _ui_dist_candidates(project_root)
+        joined = "\n".join(str(path) for path in candidates)
         raise FileNotFoundError(
-            "未找到 UI 构建产物: "
-            f"{html_path}。请在 ui-vue 中执行 `npm install` 和 `npm run build`。"
+            "未找到 UI 构建产物，请确认安装包包含前端资源。\n"
+            f"已尝试路径:\n{joined}"
         )
 
     window = MainWindow(drag_height=64, button_margin=190)
@@ -726,6 +728,31 @@ def _fit_to_screen(
     x = available.x() + max((available.width() - width) // 2, 0)
     y = available.y() + max((available.height() - height) // 2, 0)
     widget.move(x, y)
+
+
+def _resolve_project_root() -> Path:
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        return exe_dir
+    return Path(__file__).resolve().parents[2]
+
+
+def _ui_dist_candidates(project_root: Path) -> list[Path]:
+    base = Path(getattr(sys, "_MEIPASS", project_root))
+    exe_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else project_root
+    return [
+        base / "ui-vue" / "dist" / "index.html",
+        exe_dir / "ui-vue" / "dist" / "index.html",
+        project_root / "ui-vue" / "dist" / "index.html",
+        project_root / "dist" / "index.html",
+    ]
+
+
+def _resolve_ui_dist(project_root: Path) -> Path | None:
+    for candidate in _ui_dist_candidates(project_root):
+        if candidate.exists():
+            return candidate
+    return None
 
 
 if __name__ == "__main__":
