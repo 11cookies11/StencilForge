@@ -61,7 +61,11 @@ def make_square(size):
     draw = ImageDraw.Draw(img)
     text = "SF"
     font = ImageFont.load_default()
-    text_w, text_h = draw.textsize(text, font=font)
+    if hasattr(draw, "textbbox"):
+        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+        text_w, text_h = right - left, bottom - top
+    else:
+        text_w, text_h = draw.textsize(text, font=font)
     draw.text(((size - text_w) / 2, (size - text_h) / 2), text, fill=(255, 255, 255, 255), font=font)
     return img
 
@@ -70,7 +74,11 @@ def make_wide(width, height):
     draw = ImageDraw.Draw(img)
     text = "StencilForge"
     font = ImageFont.load_default()
-    text_w, text_h = draw.textsize(text, font=font)
+    if hasattr(draw, "textbbox"):
+        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+        text_w, text_h = right - left, bottom - top
+    else:
+        text_w, text_h = draw.textsize(text, font=font)
     draw.text(((width - text_w) / 2, (height - text_h) / 2), text, fill=(255, 255, 255, 255), font=font)
     return img
 
@@ -81,18 +89,46 @@ make_wide(310, 150).save(assets / "Wide310x150Logo.png")
 make_square(50).save(assets / "StoreLogo.png")
 '@ -replace "__ASSETS__", ($assetsRoot -replace "\\", "\\\\") | .\.venv\Scripts\python -
 
-$makeappx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter makeappx.exe |
-    Where-Object { $_.FullName -match "\\x64\\makeappx.exe$" } |
-    Sort-Object FullName -Descending |
-    Select-Object -First 1
+$makeappxPath = $null
+$makeappxCmd = Get-Command makeappx.exe -ErrorAction SilentlyContinue
+if ($makeappxCmd) {
+    $makeappxPath = $makeappxCmd.Source
+    if (-not $makeappxPath) {
+        $makeappxPath = $makeappxCmd.Path
+    }
+    if (-not $makeappxPath) {
+        $makeappxPath = $makeappxCmd.Definition
+    }
+}
 
-if (-not $makeappx) {
-    throw "makeappx.exe not found. Install Windows SDK to build MSIX."
+$kitRoots = @(
+    "C:\Program Files (x86)\Windows Kits\10\bin",
+    "C:\Program Files\Windows Kits\10\bin"
+)
+
+if (-not $makeappxPath) {
+    foreach ($root in $kitRoots) {
+        if (-not (Test-Path $root)) {
+            continue
+        }
+        $makeappx = Get-ChildItem $root -Recurse -Filter makeappx.exe |
+            Where-Object { $_.FullName -match "\\x64\\makeappx.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+        if ($makeappx) {
+            $makeappxPath = $makeappx.FullName
+            break
+        }
+    }
+}
+
+if (-not $makeappxPath) {
+    throw "makeappx.exe not found. Install Windows SDK (Windows 10/11) to build MSIX."
 }
 
 if (Test-Path $outputMsix) {
     Remove-Item $outputMsix -Force
 }
 
-& $makeappx.FullName pack /d $stageRoot /p $outputMsix /o | Out-Host
+& $makeappxPath pack /d $stageRoot /p $outputMsix /o | Out-Host
 Write-Host "MSIX output: $outputMsix"

@@ -32,6 +32,18 @@ jobs:
       - name: Build app (onedir)
         run: .\scripts\build_windows.ps1
 
+      - name: Install Windows SDK (MakeAppx)
+        run: choco install windows-sdk-10-version-19041.0 -y
+
+      - name: Add MakeAppx to PATH
+        run: |
+          $sdkBin = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter makeappx.exe |
+            Where-Object { $_.FullName -match "\\x64\\makeappx.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $sdkBin) { throw "makeappx.exe not found after SDK install" }
+          Add-Content $env:GITHUB_PATH (Split-Path $sdkBin.FullName)
+
       - name: Build MSIX package
         run: .\scripts\build_msix.ps1 -Version ${{ github.ref_name }}
 
