@@ -520,7 +520,7 @@
 
 <script>
 import AppIcon from "./components/AppIcon.vue";
-const DEFAULT_LOCALE = "zh-CN";
+const DEFAULT_LOCALE = "en";
 const MESSAGES = {
   "zh-CN": {
     "app.tagline": "PCB 钢网与治具生成",
