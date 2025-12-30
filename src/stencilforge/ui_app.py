@@ -200,7 +200,7 @@ class BackendBridge(QObject):
         self._preview_ui: dict | None = None
         self._window: QMainWindow | None = None
         self._last_preview_path: str | None = None
-        self._external_preview = sys.platform == "win32"
+        self._external_preview = sys.platform == "win32" and not getattr(sys, "frozen", False)
         self._locale = "zh-CN"
         self._log_path = _resolve_log_path(project_root)
         self._log_line("Backend initialized.")
@@ -688,15 +688,14 @@ def main() -> int:
 def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer, dict]:
     dialog = QDialog()
     dialog.setWindowTitle(_PREVIEW_I18N["zh-CN"]["title"])
-    dialog.setWindowFlag(Qt.FramelessWindowHint, True)
-    dialog.setWindowFlag(Qt.Window, True)
+    dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
     _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
     dialog.setStyleSheet(
-        "QDialog { background-color: #f3e6d8; }"
-        "QToolBar { background-color: rgba(246, 232, 214, 0.95); "
-        "border: 1px solid #e2c7a6; color: #5b3a1e; }"
-        "QToolButton { color: #5b3a1e; padding: 4px 10px; }"
-        "QToolButton:checked { background-color: #e7c8a4; }"
+        "QDialog { background-color: #f8fafc; }"
+        "QToolBar { background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }"
+        "QToolButton { color: #0f172a; padding: 6px 12px; border-radius: 6px; }"
+        "QToolButton:hover { background-color: #f1f5f9; }"
+        "QToolButton:checked { background-color: #e2e8f0; }"
     )
     viewer = VtkStlViewer(dialog)
     title_bar = TitleBar(dialog, _PREVIEW_I18N["zh-CN"]["title"])

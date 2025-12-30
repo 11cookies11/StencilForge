@@ -29,3 +29,5 @@ out/
 # Generated stencil outputs
 stencil.stl
 stencil_debug_*.svg
+dist-installer/
+build-logs/

@@ -28,7 +28,6 @@ jobs:
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt pyinstaller
 
       - name: Build app (onedir)
         run: .\scripts\build_windows.ps1
