@@ -25,6 +25,7 @@ ui-vue/dist/
 dist/
 build/
 out/
+dist-msix/
 
 # Generated stencil outputs
 stencil.stl

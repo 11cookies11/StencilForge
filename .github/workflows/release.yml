@@ -32,6 +32,9 @@ jobs:
       - name: Build app (onedir)
         run: .\scripts\build_windows.ps1
 
+      - name: Build MSIX package
+        run: .\scripts\build_msix.ps1 -Version ${{ github.ref_name }}
+
       - name: Install Inno Setup
         run: choco install innosetup -y
 
@@ -44,3 +47,4 @@ jobs:
           generate_release_notes: true
           files: |
             dist-installer/StencilForge-Setup.exe
+            dist-msix/*.msix
