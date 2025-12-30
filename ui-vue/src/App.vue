@@ -421,8 +421,8 @@
             {{ t("preview.currentStl", { value: outputPath || t("preview.notSet") }) }}
           </div>
           <div class="flex flex-wrap gap-3">
-            <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="runJob">
-              {{ t("preview.generate") }}
+            <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="pickStlForPreview">
+              {{ t("preview.pickStl") }}
             </button>
             <button
               class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600"
@@ -430,13 +430,6 @@
             >
               {{ t("preview.open") }}
             </button>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="text-xs font-semibold text-slate-500 uppercase">{{ t("preview.status") }}</div>
-            <div class="text-sm font-bold text-primary">{{ statusLabel }}</div>
-          </div>
-          <div class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-            {{ log.split("\n").slice(-1)[0] || log }}
           </div>
         </div>
       </section>
@@ -579,13 +572,12 @@ const MESSAGES = {
     "config.outlineRules": "外形层规则",
     "config.addRule": "添加规则",
     "preview.title": "预览",
-    "preview.subtitle": "查看生成进度与日志。",
+    "preview.subtitle": "选择 STL 文件并打开 3D 预览。",
     "preview.popupNote": "3D 预览在独立的 VTK 弹窗中打开。",
     "preview.currentStl": "当前 STL: {value}",
     "preview.notSet": "未设置",
-    "preview.generate": "生成",
+    "preview.pickStl": "选择 STL 预览",
     "preview.open": "打开预览",
-    "preview.status": "状态",
     "export.title": "导出",
     "export.subtitle": "下载生成的 STL 文件。",
     "export.output": "输出: {value}",
@@ -665,13 +657,12 @@ const MESSAGES = {
     "config.outlineRules": "Outline layer rules",
     "config.addRule": "Add rule",
     "preview.title": "Preview",
-    "preview.subtitle": "View generation progress and logs.",
+    "preview.subtitle": "Pick an STL file and open the 3D preview.",
     "preview.popupNote": "3D preview opens in a separate VTK window.",
     "preview.currentStl": "Current STL: {value}",
     "preview.notSet": "Not set",
-    "preview.generate": "Generate",
+    "preview.pickStl": "Pick STL to preview",
     "preview.open": "Open preview",
-    "preview.status": "Status",
     "export.title": "Export",
     "export.subtitle": "Download the generated STL file.",
     "export.output": "Output: {value}",
