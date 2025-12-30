@@ -691,7 +691,10 @@ def main() -> int:
 
 def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
     from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
-    from .vtk_viewer import VtkStlViewer
+    try:
+        from .vtk_viewer import VtkStlViewer
+    except ImportError:
+        from stencilforge.vtk_viewer import VtkStlViewer
 
     try:
         QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
