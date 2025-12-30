@@ -36,7 +36,7 @@ jobs:
         run: |
           winget source reset --force
           winget source update
-          winget install --id Microsoft.WindowsSDK.10.0 --source winget --silent --accept-package-agreements --accept-source-agreements
+          winget install --id Microsoft.WindowsSDK.10.0.18362 --source winget --silent --accept-package-agreements --accept-source-agreements
 
       - name: Add MakeAppx to PATH
         run: |
