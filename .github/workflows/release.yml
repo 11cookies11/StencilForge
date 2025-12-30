@@ -33,7 +33,7 @@ jobs:
         run: .\scripts\build_windows.ps1
 
       - name: Install Windows SDK (MakeAppx)
-        run: choco install windows-sdk-10-version-19041.0 -y
+        run: winget install --id Microsoft.WindowsSDK.10.0 --silent --accept-package-agreements --accept-source-agreements
 
       - name: Add MakeAppx to PATH
         run: |
