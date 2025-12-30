@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import zipfile
+from datetime import datetime
 from ctypes import Structure
 from ctypes import wintypes
 from fnmatch import fnmatch
@@ -201,6 +202,8 @@ class BackendBridge(QObject):
         self._last_preview_path: str | None = None
         self._external_preview = sys.platform == "win32"
         self._locale = "zh-CN"
+        self._log_path = _resolve_log_path(project_root)
+        self._log_line("Backend initialized.")
 
     def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer, ui: dict | None = None) -> None:
         if self._external_preview:
@@ -233,6 +236,16 @@ class BackendBridge(QObject):
             if action is not None:
                 action.setText(labels[action_name])
 
+    def _log_line(self, message: str) -> None:
+        if not self._log_path:
+            return
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            self._log_path.parent.mkdir(parents=True, exist_ok=True)
+            self._log_path.open("a", encoding="utf-8").write(f"[{timestamp}] {message}\n")
+        except OSError:
+            pass
+
     def _show_preview(self) -> None:
         if self._external_preview:
             if self._last_preview_path:
@@ -260,9 +273,11 @@ class BackendBridge(QObject):
         path_obj = Path(path)
         if not path_obj.exists():
             self.jobLog.emit(f"未找到配置文件: {path}")
+            self._log_line(f"Config not found: {path}")
             return
         self._config_path = path_obj
         self._config = StencilConfig.from_json(path_obj)
+        self._log_line(f"Config loaded: {path_obj}")
         self.configChanged.emit(_config_to_dict(self._config))
 
     @Slot(dict)
@@ -415,6 +430,9 @@ class BackendBridge(QObject):
 
         def worker():
             try:
+                self._log_line(
+                    f"Run job: input={input_dir} output={output_stl} config={config_path or '(default)'}"
+                )
                 self.jobStatus.emit("running")
                 self.jobProgress.emit(0)
                 resolved_input = self._resolve_input_dir(input_dir)
@@ -423,6 +441,7 @@ class BackendBridge(QObject):
                 config = self._config
                 if config_path:
                     config = StencilConfig.from_json(Path(config_path))
+                self._log_line(f"Resolved input: {resolved_input}")
                 generate_stencil(Path(resolved_input), Path(output_stl), config)
                 self.jobProgress.emit(100)
                 self.jobStatus.emit("success")
@@ -431,6 +450,8 @@ class BackendBridge(QObject):
                 import traceback
 
                 traceback.print_exc()
+                self._log_line(f"Job error: {exc}")
+                self._log_line(traceback.format_exc().strip())
                 self.jobStatus.emit("error")
                 self.jobError.emit(str(exc))
             finally:
@@ -752,6 +773,22 @@ def _resolve_ui_dist(project_root: Path) -> Path | None:
     for candidate in _ui_dist_candidates(project_root):
         if candidate.exists():
             return candidate
+    return None
+
+
+def _resolve_log_path(project_root: Path) -> Path | None:
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        candidate = exe_dir / "stencilforge.log"
+        try:
+            candidate.parent.mkdir(parents=True, exist_ok=True)
+            candidate.touch(exist_ok=True)
+            return candidate
+        except OSError:
+            pass
+    user_dir = StencilConfig.default_path(project_root).parent
+    if user_dir:
+        return user_dir / "stencilforge.log"
     return None
 
 
