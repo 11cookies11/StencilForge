@@ -33,15 +33,16 @@ try:
     from .config import StencilConfig
     from .pipeline import generate_stencil
     from .title_bar import TitleBar
-    from .vtk_viewer import VtkStlViewer
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from stencilforge.config import StencilConfig
     from stencilforge.pipeline import generate_stencil
     from stencilforge.title_bar import TitleBar
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
     from stencilforge.vtk_viewer import VtkStlViewer
-from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 if sys.platform == "win32":
     WM_NCHITTEST = 0x0084
@@ -196,7 +197,7 @@ class BackendBridge(QObject):
         self._job_running = False
         self._temp_dirs: list[Path] = []
         self._preview_dialog: QDialog | None = None
-        self._preview_viewer: VtkStlViewer | None = None
+        self._preview_viewer: "VtkStlViewer" | None = None
         self._preview_ui: dict | None = None
         self._window: QMainWindow | None = None
         self._last_preview_path: str | None = None
@@ -205,7 +206,7 @@ class BackendBridge(QObject):
         self._log_path = _resolve_log_path(project_root)
         self._log_line("Backend initialized.")
 
-    def attach_preview(self, dialog: QDialog, viewer: VtkStlViewer, ui: dict | None = None) -> None:
+    def attach_preview(self, dialog: QDialog, viewer: "VtkStlViewer", ui: dict | None = None) -> None:
         if self._external_preview:
             return
         self._preview_dialog = dialog
@@ -253,6 +254,7 @@ class BackendBridge(QObject):
             else:
                 self.jobLog.emit(_preview_labels(self._locale)["no_preview_path"])
             return
+        self._ensure_preview_ready()
         if self._preview_dialog is None:
             self.jobLog.emit(_preview_labels(self._locale)["preview_unavailable"])
             return
@@ -384,6 +386,7 @@ class BackendBridge(QObject):
         if self._external_preview:
             self._launch_external_preview(path)
             return
+        self._ensure_preview_ready()
         if self._preview_viewer is None:
             self.jobLog.emit("预览视图未初始化。")
             return
@@ -403,6 +406,16 @@ class BackendBridge(QObject):
             subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
             self.jobLog.emit(f"启动预览失败: {exc}")
+
+    def _ensure_preview_ready(self) -> None:
+        if self._external_preview or self._preview_dialog is not None:
+            return
+        try:
+            preview_dialog, preview_viewer, preview_ui = _build_preview_dialog()
+        except Exception as exc:
+            self._log_line(f"Preview init failed: {exc}")
+            return
+        self.attach_preview(preview_dialog, preview_viewer, preview_ui)
 
     @Slot(str, result=str)
     def importZip(self, zip_path: str) -> str:
@@ -627,10 +640,6 @@ def main() -> int:
         QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
     except Exception:
         pass
-    try:
-        QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
-    except Exception:
-        pass
     flags = "--ignore-gpu-blocklist --use-angle=d3d11"
     existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
     if flags not in existing:
@@ -669,11 +678,6 @@ def main() -> int:
 
     channel = QWebChannel()
     backend = BackendBridge(project_root)
-    preview_dialog = None
-    preview_viewer = None
-    if not backend._external_preview:
-        preview_dialog, preview_viewer, preview_ui = _build_preview_dialog()
-        backend.attach_preview(preview_dialog, preview_viewer, preview_ui)
     channel.registerObject("backend", backend)
     view.page().setWebChannel(channel)
     view.setUrl(QUrl.fromLocalFile(str(html_path)))
@@ -685,7 +689,14 @@ def main() -> int:
     return app.exec()
 
 
-def _build_preview_dialog() -> tuple[QDialog, VtkStlViewer, dict]:
+def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
+    from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
+    from .vtk_viewer import VtkStlViewer
+
+    try:
+        QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
+    except Exception:
+        pass
     dialog = QDialog()
     dialog.setWindowTitle(_PREVIEW_I18N["zh-CN"]["title"])
     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)

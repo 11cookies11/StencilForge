@@ -11,8 +11,8 @@ module.exports = {
         "surface-muted": "#f1f5f9",
       },
       fontFamily: {
-        display: ["Space Grotesk", "sans-serif"],
-        body: ["Noto Sans", "sans-serif"],
+        display: ["Segoe UI", "Microsoft YaHei", "PingFang SC", "Arial", "sans-serif"],
+        body: ["Segoe UI", "Microsoft YaHei", "PingFang SC", "Arial", "sans-serif"],
         mono: [
           "ui-monospace",
           "SFMono-Regular",

@@ -8,7 +8,7 @@
       <div class="w-full h-full flex items-center justify-between px-4 sm:px-6">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <span class="material-symbols-outlined text-white text-[20px]">view_in_ar</span>
+            <AppIcon name="view_in_ar" class="text-white" :size="20" />
           </div>
           <span class="text-xl font-bold tracking-tight text-slate-900">StencilForge</span>
         </div>
@@ -30,14 +30,14 @@
               @dblclick.stop
               @click="toggleLanguageMenu"
             >
-              <span class="material-symbols-outlined text-[20px] text-slate-500">language</span>
+              <AppIcon name="language" class="text-slate-500" :size="20" />
               <span>{{ currentLocaleLabel }}</span>
-              <span
-                class="material-symbols-outlined text-[18px] text-slate-400 transition-transform"
+              <AppIcon
+                name="expand_more"
+                class="text-slate-400 transition-transform"
                 :class="languageMenuOpen ? 'rotate-180' : ''"
-              >
-                expand_more
-              </span>
+                :size="18"
+              />
             </button>
             <div
               v-if="languageMenuOpen"
@@ -58,7 +58,7 @@
                   @click="setLocaleFromMenu('zh-CN')"
                 >
                   <span>{{ t("language.zh") }}</span>
-                  <span v-if="locale === 'zh-CN'" class="material-symbols-outlined text-[18px]">check</span>
+                  <AppIcon v-if="locale === 'zh-CN'" name="check" :size="18" />
                 </button>
                 <button
                   class="w-full text-left flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors"
@@ -72,20 +72,20 @@
                   @click="setLocaleFromMenu('en')"
                 >
                   <span>{{ t("language.en") }}</span>
-                  <span v-if="locale === 'en'" class="material-symbols-outlined text-[18px]">check</span>
+                  <AppIcon v-if="locale === 'en'" name="check" :size="18" />
                 </button>
               </div>
             </div>
           </div>
           <div class="flex items-center gap-2 window-controls">
             <button class="window-btn" @click="windowMinimize" @dblclick.stop :title="t('window.minimize')">
-              <span class="material-symbols-outlined text-[18px]">remove</span>
+              <AppIcon name="remove" :size="18" />
             </button>
             <button class="window-btn" @click="windowMaximizeRestore" @dblclick.stop :title="t('window.maximizeRestore')">
-              <span class="material-symbols-outlined text-[18px]">crop_square</span>
+              <AppIcon name="crop_square" :size="18" />
             </button>
             <button class="window-btn window-btn-close" @click="windowClose" @dblclick.stop :title="t('window.close')">
-              <span class="material-symbols-outlined text-[18px]">close</span>
+              <AppIcon name="close" :size="18" />
             </button>
           </div>
         </div>
@@ -178,7 +178,7 @@
             >
               <div class="space-y-3">
                 <div class="mx-auto w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
-                  <span class="material-symbols-outlined text-slate-400 text-[24px]">description</span>
+                  <AppIcon name="description" class="text-slate-400" :size="24" />
                 </div>
                 <p class="text-sm text-slate-500">
                   {{ files.length ? t("upload.detectedSome") : t("upload.detectedEmpty") }}
@@ -368,7 +368,7 @@
                     class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
                     @click="removePattern('paste', index)"
                   >
-                    <span class="material-symbols-outlined text-[18px]">close</span>
+                    <AppIcon name="close" :size="18" />
                   </button>
                 </div>
               </div>
@@ -376,7 +376,7 @@
                 class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 @click="addPattern('paste')"
               >
-                <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                <AppIcon name="add_circle" :size="16" />
                 {{ t("config.addRule") }}
               </button>
             </div>
@@ -394,7 +394,7 @@
                     class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
                     @click="removePattern('outline', index)"
                   >
-                    <span class="material-symbols-outlined text-[18px]">close</span>
+                    <AppIcon name="close" :size="18" />
                   </button>
                 </div>
               </div>
@@ -402,7 +402,7 @@
                 class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
                 @click="addPattern('outline')"
               >
-                <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                <AppIcon name="add_circle" :size="16" />
                 {{ t("config.addRule") }}
               </button>
             </div>
@@ -460,7 +460,7 @@
           <div :class="['progress-card', { 'is-visible': progressVisible }]">
             <div class="sm:flex sm:items-start">
               <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 sm:mx-0 sm:h-10 sm:w-10">
-                <span class="material-symbols-outlined text-primary animate-spin">autorenew</span>
+                <AppIcon name="autorenew" class="text-primary animate-spin" :size="20" />
               </div>
               <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
                 <h3 id="progress-title" class="text-lg font-semibold leading-6 text-slate-900">{{ t("progress.title") }}</h3>
@@ -498,19 +498,19 @@
     <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 taskbar">
       <div class="flex items-center px-2 py-2 bg-white border border-slate-200/60 rounded-2xl shadow-taskbar ring-1 ring-white/20 taskbar-shell">
         <button :class="navClass('upload')" @click="setTab('upload')">
-          <span class="material-symbols-outlined text-2xl mb-0.5">cloud_upload</span>
+          <AppIcon name="cloud_upload" class="text-2xl mb-0.5" :size="24" />
           <span class="nav-label">{{ t("tabs.upload") }}</span>
         </button>
         <button :class="navClass('config')" @click="setTab('config')">
-          <span class="material-symbols-outlined text-2xl mb-0.5">settings</span>
+          <AppIcon name="settings" class="text-2xl mb-0.5" :size="24" />
           <span class="nav-label">{{ t("tabs.config") }}</span>
         </button>
         <button :class="navClass('preview')" @click="setTab('preview')">
-          <span class="material-symbols-outlined text-2xl mb-0.5">visibility</span>
+          <AppIcon name="visibility" class="text-2xl mb-0.5" :size="24" />
           <span class="nav-label">{{ t("tabs.preview") }}</span>
         </button>
         <button :class="navClass('export')" @click="setTab('export')">
-          <span class="material-symbols-outlined text-2xl mb-0.5">download</span>
+          <AppIcon name="download" class="text-2xl mb-0.5" :size="24" />
           <span class="nav-label">{{ t("tabs.export") }}</span>
         </button>
       </div>
@@ -519,6 +519,7 @@
 </template>
 
 <script>
+import AppIcon from "./components/AppIcon.vue";
 const DEFAULT_LOCALE = "zh-CN";
 const MESSAGES = {
   "zh-CN": {
@@ -710,6 +711,9 @@ function getInitialLocale() {
 }
 
 export default {
+  components: {
+    AppIcon,
+  },
   data() {
     const locale = getInitialLocale();
     return {
