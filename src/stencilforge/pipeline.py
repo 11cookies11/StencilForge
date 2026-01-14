@@ -7,20 +7,15 @@ import math
 import shutil
 
 from shapely import affinity
-from shapely.geometry import box, Polygon, MultiPoint
+from shapely.geometry import box, Polygon, MultiPoint, LineString
 from shapely.geometry.polygon import orient
-from shapely.ops import unary_union, triangulate
+from shapely.ops import unary_union, triangulate, linemerge
 from shapely.validation import explain_validity
 import trimesh
 from PIL import Image, ImageDraw
 
 from .config import StencilConfig
-from .gerber_adapter import (
-    load_outline_geometry,
-    load_outline_geometry_debug,
-    load_outline_segments,
-    load_paste_geometry,
-)
+from .gerber_adapter import GerberGeometryService
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +24,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     config.validate()
+    geometry_service = GerberGeometryService(config)
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
     if config.debug_enabled and config.debug_log_detail:
@@ -49,7 +45,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     if config.debug_enabled and config.debug_log_detail:
         logger.info("Paste files: %s", ", ".join(p.name for p in paste_files))
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
-    paste_geom = load_paste_geometry(paste_files, config)
+    paste_geom = geometry_service.load_paste_geometry(paste_files)
     if paste_geom is None or paste_geom.is_empty:
         raise ValueError("Paste layer produced empty geometry.")
     _log_geometry("paste", paste_geom, config.debug_enabled and config.debug_log_detail)
@@ -78,17 +74,23 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             except OSError:
                 logger.warning("Failed to copy outline source to debug dir.")
             try:
+                # 调试：按 GKO 指令路径输出彩色线段图。
+                # ???? GKO ????????????
                 _dump_gko_paths_png(outline_files[0], debug_dir)
             except Exception as exc:
                 logger.warning("Failed to render GKO paths: %s", exc)
         if debug_dir is not None and config.debug_enabled:
             try:
-                outline_geom, outline_debug = load_outline_geometry_debug(outline_files[0], config)
+                outline_geom, outline_debug = geometry_service.load_outline_geometry_debug(outline_files[0])
                 outline_segments = outline_debug.get("segments_geom")
                 if outline_segments is not None:
+                    # 调试：外形原始线段。
+                    # ??????????
                     _dump_geometry(debug_dir, "step2_outline_segments", outline_segments)
                 outline_loops = outline_debug.get("loops_geom")
                 if outline_loops is not None:
+                    # 调试：闭合后的线段环。
+                    # ???????????
                     _dump_geometry(debug_dir, "step2_outline_segments_closed", outline_loops)
                 max_gap = outline_debug.get("max_gap_pair")
                 if outline_segments is not None and max_gap is not None:
@@ -100,6 +102,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                         marker="#dc2626",
                     )
                     if image is not None:
+                        # 调试：最大缺口端点标注。
+                        # ????????????
                         image.save(debug_dir / "step2_outline_segments_gap.png")
                 snapped_segments = outline_debug.get("snapped_geom")
                 if snapped_segments is not None:
@@ -109,12 +113,14 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                     logger.info("Outline snap tol used: %s", snap_tol)
             except Exception as exc:
                 logger.warning("Failed to dump outline debug: %s", exc)
-                outline_geom = load_outline_geometry(outline_files[0], config)
+                outline_geom = geometry_service.load_outline_geometry(outline_files[0])
         else:
-            outline_geom = load_outline_geometry(outline_files[0], config)
+            outline_geom = geometry_service.load_outline_geometry(outline_files[0])
         logger.info("Outline layer: %s", outline_files[0].name)
 
     if outline_geom is None or outline_geom.is_empty:
+        # 外形层缺失时，用 paste 外包做兜底。
+        # ???????? paste ??????
         outline_geom = _outline_from_paste(paste_geom, config.outline_margin_mm)
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
     else:
@@ -1329,9 +1335,6 @@ def _dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> N
     if not segments:
         return
     segments = _merge_colinear_segments(segments, tol=1e-6)
-    segments, removed = _dedupe_segments(segments, tol=1e-6)
-    if removed:
-        logger.info("Outline path segments deduped: %s removed", removed)
     points = []
     for segment, _ in segments:
         points.extend(segment)
@@ -1368,11 +1371,9 @@ def _dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> N
         coords = [map_point(p) for p in segment]
         if len(coords) >= 2:
             draw.line(coords, fill=colors[color_idx % len(colors)], width=2)
-            # Mark segment start/end with the same color for path continuity inspection.
             sx, sy = coords[0]
             ex, ey = coords[-1]
             color = colors[color_idx % len(colors)]
-            # Apply a tiny deterministic offset to avoid fully overlapping markers.
             jitter = 4.0
             angle = (seg_idx * 0.61803398875) % (2 * math.pi)
             ox = math.cos(angle) * jitter
@@ -1381,11 +1382,12 @@ def _dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> N
             draw.ellipse((ex - ox - 3, ey - oy - 3, ex - ox + 3, ey - oy + 3), fill=color, outline=color)
     gap = _max_gap_pair_from_segments(segments)
     if gap is not None:
-        p1, p2, dist = gap
+        p1, p2, _ = gap
         for point in (p1, p2):
             px, py = map_point(point)
             draw.ellipse((px - 6, py - 6, px + 6, py + 6), outline="#dc2626", width=2)
     image.save(out_dir / "step2_outline_segments_paths.png")
+    image.save(out_dir / "step2_outline_segments_paths_deduped.png")
 
 
 def _parse_gko_paths(path: Path):
@@ -1459,6 +1461,27 @@ def _parse_gko_paths(path: Path):
                 segments.append(([current, next_point], path_index))
         current = next_point
     return segments
+
+
+def _merge_intersections(segments):
+    if not segments:
+        return segments
+    lines = []
+    for seg, _ in segments:
+        if len(seg) >= 2:
+            lines.append(LineString(seg))
+    if not lines:
+        return segments
+    merged = unary_union(lines)
+    merged = linemerge(merged)
+    flat = []
+    if isinstance(merged, LineString):
+        flat = [merged]
+    elif hasattr(merged, "geoms"):
+        flat = list(merged.geoms)
+    merged_segments = [(list(line.coords), idx) for idx, line in enumerate(flat) if len(line.coords) >= 2]
+    logger.info("Outline segments merged: %s -> %s", len(segments), len(merged_segments))
+    return merged_segments
 
 
 def _points_close(p1, p2, tol: float) -> bool:
