@@ -15,7 +15,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QCoreApplication
-from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat, QIcon
+from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat, QIcon, QDesktopServices
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QMainWindow,
+    QMessageBox,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -152,6 +153,22 @@ _PREVIEW_I18N = {
         "preview_unavailable": "Preview window is not initialized.",
     },
 }
+_DIALOG_I18N = {
+    "zh-CN": {
+        "error_title": "运行失败",
+        "error_body": "发生错误，任务已停止。",
+        "error_detail": "错误原因: {message}",
+        "error_log": "日志已保存到: {path}",
+        "error_open_log": "查看日志",
+    },
+    "en": {
+        "error_title": "Job Failed",
+        "error_body": "An error occurred and the job was stopped.",
+        "error_detail": "Error: {message}",
+        "error_log": "Log saved to: {path}",
+        "error_open_log": "Open Log",
+    },
+}
 
 
 def _normalize_locale(locale: str | None) -> str:
@@ -166,6 +183,11 @@ def _normalize_locale(locale: str | None) -> str:
 def _preview_labels(locale: str) -> dict:
     key = _normalize_locale(locale)
     return _PREVIEW_I18N.get(key, _PREVIEW_I18N["zh-CN"])
+
+
+def _dialog_labels(locale: str) -> dict:
+    key = _normalize_locale(locale)
+    return _DIALOG_I18N.get(key, _DIALOG_I18N["zh-CN"])
 
 
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
@@ -204,6 +226,7 @@ class BackendBridge(QObject):
         self._external_preview = sys.platform == "win32" and not getattr(sys, "frozen", False)
         self._locale = "zh-CN"
         self._log_path = _resolve_log_path(project_root)
+        self.jobError.connect(self._on_job_error)
         self._log_line("Backend initialized.")
 
     def attach_preview(self, dialog: QDialog, viewer: "VtkStlViewer", ui: dict | None = None) -> None:
@@ -247,16 +270,38 @@ class BackendBridge(QObject):
         except OSError:
             pass
 
+    def _emit_log(self, message: str) -> None:
+        self._log_line(message)
+        self.jobLog.emit(message)
+
+    def _on_job_error(self, message: str) -> None:
+        labels = _dialog_labels(self._locale)
+        details = [labels["error_detail"].format(message=message)]
+        open_button = None
+        if self._log_path:
+            details.append(labels["error_log"].format(path=self._log_path))
+        dialog = QMessageBox(self._window)
+        dialog.setIcon(QMessageBox.Critical)
+        dialog.setWindowTitle(labels["error_title"])
+        dialog.setText(labels["error_body"])
+        dialog.setInformativeText("\n".join(details))
+        dialog.setStandardButtons(QMessageBox.Ok)
+        if self._log_path:
+            open_button = dialog.addButton(labels["error_open_log"], QMessageBox.ActionRole)
+        dialog.exec()
+        if open_button is not None and dialog.clickedButton() == open_button:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._log_path)))
+
     def _show_preview(self) -> None:
         if self._external_preview:
             if self._last_preview_path:
                 self._launch_external_preview(self._last_preview_path)
             else:
-                self.jobLog.emit(_preview_labels(self._locale)["no_preview_path"])
+                self._emit_log(_preview_labels(self._locale)["no_preview_path"])
             return
         self._ensure_preview_ready()
         if self._preview_dialog is None:
-            self.jobLog.emit(_preview_labels(self._locale)["preview_unavailable"])
+            self._emit_log(_preview_labels(self._locale)["preview_unavailable"])
             return
         self._preview_dialog.show()
         self._preview_dialog.raise_()
@@ -274,7 +319,7 @@ class BackendBridge(QObject):
     def loadConfig(self, path: str) -> None:
         path_obj = Path(path)
         if not path_obj.exists():
-            self.jobLog.emit(f"未找到配置文件: {path}")
+            self._emit_log(f"未找到配置文件: {path}")
             self._log_line(f"Config not found: {path}")
             return
         self._config_path = path_obj
@@ -298,13 +343,18 @@ class BackendBridge(QObject):
     def scanFiles(self, input_dir: str) -> None:
         resolved = self._resolve_input_dir(input_dir)
         if not resolved:
+            self._log_line("Scan files: input empty or invalid.")
             self.filesScanned.emit({"files": []})
             return
         path = Path(resolved)
         if not path.exists():
+            self._log_line(f"Scan files: input path not found: {resolved}")
             self.filesScanned.emit({"files": []})
             return
         files = _find_files(path, self._config.paste_patterns + self._config.outline_patterns)
+        self._log_line(f"Scan files: {len(files)} matched in {resolved}")
+        for file_path in files:
+            self._log_line(f"  - {file_path.name}")
         self.filesScanned.emit({"files": [p.name for p in files]})
 
     @Slot(str, result=str)
@@ -366,10 +416,10 @@ class BackendBridge(QObject):
         try:
             data = Path(path).read_bytes()
         except FileNotFoundError:
-            self.jobLog.emit(f"文件不存在: {path}")
+            self._emit_log(f"文件不存在: {path}")
             return ""
         except OSError as exc:
-            self.jobLog.emit(f"读取文件失败: {exc}")
+            self._emit_log(f"读取文件失败: {exc}")
             return ""
         return base64.b64encode(data).decode("ascii")
 
@@ -380,7 +430,7 @@ class BackendBridge(QObject):
     @Slot(str)
     def loadPreviewStl(self, path: str) -> None:
         if not path:
-            self.jobLog.emit("预览 STL 路径为空。")
+            self._emit_log("预览 STL 路径为空。")
             return
         self._last_preview_path = path
         if self._external_preview:
@@ -388,24 +438,24 @@ class BackendBridge(QObject):
             return
         self._ensure_preview_ready()
         if self._preview_viewer is None:
-            self.jobLog.emit("预览视图未初始化。")
+            self._emit_log("预览视图未初始化。")
             return
         if not Path(path).exists():
-            self.jobLog.emit(f"未找到 STL: {path}")
+            self._emit_log(f"未找到 STL: {path}")
             return
         self._preview_viewer.load_stl(path)
         self._show_preview()
 
     def _launch_external_preview(self, path: str) -> None:
         if not Path(path).exists():
-            self.jobLog.emit(f"未找到 STL: {path}")
+            self._emit_log(f"未找到 STL: {path}")
             return
         try:
             env = os.environ.copy()
             env["STENCILFORGE_LOCALE"] = self._locale
             subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
-            self.jobLog.emit(f"启动预览失败: {exc}")
+            self._emit_log(f"启动预览失败: {exc}")
 
     def _ensure_preview_ready(self) -> None:
         if self._external_preview or self._preview_dialog is not None:
@@ -421,7 +471,7 @@ class BackendBridge(QObject):
     def importZip(self, zip_path: str) -> str:
         path = Path(zip_path)
         if not path.exists():
-            self.jobLog.emit(f"未找到 ZIP: {zip_path}")
+            self._emit_log(f"未找到 ZIP: {zip_path}")
             return ""
         temp_dir = Path(tempfile.mkdtemp(prefix="stencilforge_"))
         try:
@@ -430,14 +480,14 @@ class BackendBridge(QObject):
             self._temp_dirs.append(temp_dir)
             return str(temp_dir)
         except zipfile.BadZipFile:
-            self.jobLog.emit("无效的 ZIP 文件。")
+            self._emit_log("无效的 ZIP 文件。")
             return ""
 
     @Slot(str, str, str)
     def runJob(self, input_dir: str, output_stl: str, config_path: str) -> None:
         with self._job_lock:
             if self._job_running:
-                self.jobLog.emit("任务已在运行。")
+                self._emit_log("任务已在运行。")
                 return
             self._job_running = True
 
@@ -447,6 +497,7 @@ class BackendBridge(QObject):
                     f"Run job: input={input_dir} output={output_stl} config={config_path or '(default)'}"
                 )
                 self.jobStatus.emit("running")
+                self._log_line("Job status: running")
                 self.jobProgress.emit(0)
                 resolved_input = self._resolve_input_dir(input_dir)
                 if not resolved_input:
@@ -458,6 +509,7 @@ class BackendBridge(QObject):
                 generate_stencil(Path(resolved_input), Path(output_stl), config)
                 self.jobProgress.emit(100)
                 self.jobStatus.emit("success")
+                self._log_line("Job status: success")
                 self.jobDone.emit({"output_stl": output_stl})
             except Exception as exc:
                 import traceback
@@ -466,6 +518,7 @@ class BackendBridge(QObject):
                 self._log_line(f"Job error: {exc}")
                 self._log_line(traceback.format_exc().strip())
                 self.jobStatus.emit("error")
+                self._log_line("Job status: error")
                 self.jobError.emit(str(exc))
             finally:
                 with self._job_lock:
@@ -480,13 +533,13 @@ class BackendBridge(QObject):
         if path.is_file() and path.suffix.lower() == ".zip":
             extracted = self.importZip(str(path))
             if extracted:
-                self.jobLog.emit(f"已解压 ZIP: {path.name}")
+                self._emit_log(f"已解压 ZIP: {path.name}")
             return extracted or ""
         return str(path)
 
     @Slot()
     def stopJob(self) -> None:
-        self.jobLog.emit("已请求停止，当前任务暂不支持取消。")
+        self._emit_log("已请求停止，当前任务暂不支持取消。")
 
     @Slot()
     def windowMinimize(self) -> None:
