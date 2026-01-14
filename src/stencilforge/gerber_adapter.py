@@ -220,6 +220,7 @@ def _outline_from_primitives(primitives, config: StencilConfig):
         "polygonize_polygons": 0,
         "loops_count": 0,
         "loops_geom": None,
+        "max_gap_pair": None,
     }
     for prim in primitives:
         if isinstance(prim, gprim.Region):
@@ -234,7 +235,10 @@ def _outline_from_primitives(primitives, config: StencilConfig):
         merged = unary_union(segments)
         debug["source"] = "segments"
         debug["segments_geom"] = merged
-        loops = _build_closed_loops(segments, config.outline_snap_mm)
+        debug["max_gap_pair"] = _find_max_gap_pair(segments)
+        loops = _build_loops_in_order(segments, config.outline_snap_mm)
+        if not loops:
+            loops = _build_closed_loops(segments, config.outline_snap_mm)
         if loops:
             debug["loops_count"] = len(loops)
             debug["loops_geom"] = MultiLineString(loops) if len(loops) > 1 else loops[0]
@@ -288,27 +292,79 @@ def _outline_segments_from_primitives(primitives, config: StencilConfig):
     return segments
 
 
-def _snap_point(point, tol: float):
+def _build_loops_in_order(segments, tol: float):
+    loops = []
+    current = []
+    start_point = None
+    for seg in segments:
+        coords = list(seg.coords)
+        if len(coords) < 2:
+            continue
+        if not current:
+            current = coords[:]
+            start_point = current[0]
+            continue
+        last = current[-1]
+        if _points_close(last, coords[0], tol):
+            current.extend(coords[1:])
+        elif _points_close(last, coords[-1], tol):
+            current.extend(list(reversed(coords))[:-1])
+        else:
+            loops.extend(_finalize_path_loop(current, start_point, tol))
+            current = coords[:]
+            start_point = current[0]
+    if current:
+        loops.extend(_finalize_path_loop(current, start_point, tol))
+    logger.info("Outline loops ordered: %s", len(loops))
+    return loops
+
+
+def _finalize_path_loop(path, start_point, tol: float):
+    if not path:
+        return []
+    if start_point is None:
+        start_point = path[0]
+    if _points_close(path[-1], start_point, tol):
+        if path[-1] != path[0]:
+            path.append(path[0])
+        if len(path) >= 4:
+            return [LineString(path)]
+    return []
+
+
+def _points_close(p1, p2, tol: float) -> bool:
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    dist = (dx * dx + dy * dy) ** 0.5
     if tol <= 0:
-        return (float(point[0]), float(point[1]))
-    return (round(point[0] / tol) * tol, round(point[1] / tol) * tol)
+        return dist == 0
+    return dist <= tol
 
 
 def _build_closed_loops(segments, tol: float):
     _log_endpoint_gaps(segments, tol)
     edges = []
     adjacency = {}
+    nodes = []
+    def _node_for(point):
+        return _cluster_point(nodes, point, tol)
+
     for line in segments:
         coords = list(line.coords)
         if len(coords) < 2:
             continue
-        start = _snap_point(coords[0], tol)
-        end = _snap_point(coords[-1], tol)
-        edge = {"coords": coords, "start": start, "end": end, "used": False}
+        start_node = _node_for(coords[0])
+        end_node = _node_for(coords[-1])
+        edge = {
+            "coords": coords,
+            "start": start_node,
+            "end": end_node,
+            "used": False,
+        }
         idx = len(edges)
         edges.append(edge)
-        adjacency.setdefault(start, []).append(idx)
-        adjacency.setdefault(end, []).append(idx)
+        adjacency.setdefault(start_node, []).append(idx)
+        adjacency.setdefault(end_node, []).append(idx)
     loops = []
     for idx, edge in enumerate(edges):
         if edge["used"]:
@@ -318,15 +374,12 @@ def _build_closed_loops(segments, tol: float):
         edge["used"] = True
         path = list(edge["coords"])
         current = edge["end"]
+        prev_dir = _edge_dir(edge, start, nodes)
         steps = 0
         while True:
             if current == start:
                 break
-            next_idx = None
-            for candidate in adjacency.get(current, []):
-                if not edges[candidate]["used"]:
-                    next_idx = candidate
-                    break
+            next_idx = _pick_next_edge(edges, adjacency, current, prev_dir, nodes)
             if next_idx is None:
                 path = []
                 break
@@ -335,9 +388,11 @@ def _build_closed_loops(segments, tol: float):
             if current == next_edge["start"]:
                 coords = next_edge["coords"]
                 current = next_edge["end"]
+                prev_dir = _edge_dir(next_edge, next_edge["start"], nodes)
             else:
                 coords = list(reversed(next_edge["coords"]))
                 current = next_edge["start"]
+                prev_dir = _edge_dir(next_edge, next_edge["end"], nodes)
             path.extend(coords[1:])
             steps += 1
             if steps > len(edges):
@@ -350,6 +405,71 @@ def _build_closed_loops(segments, tol: float):
                 loops.append(LineString(path))
     logger.info("Outline loops built: %s", len(loops))
     return loops
+
+
+def _cluster_point(nodes, point, tol: float):
+    px, py = float(point[0]), float(point[1])
+    if tol <= 0:
+        nodes.append((px, py))
+        return len(nodes) - 1
+    best = None
+    for idx, (nx, ny) in enumerate(nodes):
+        dx = px - nx
+        dy = py - ny
+        if (dx * dx + dy * dy) ** 0.5 <= tol:
+            best = idx
+            break
+    if best is None:
+        nodes.append((px, py))
+        return len(nodes) - 1
+    # Update node position by averaging to stabilize clustering.
+    nx, ny = nodes[best]
+    nodes[best] = ((nx + px) / 2.0, (ny + py) / 2.0)
+    return best
+
+
+def _edge_dir(edge, node_idx, nodes):
+    coords = edge["coords"]
+    if len(coords) < 2:
+        return (0.0, 0.0)
+    if node_idx == edge["start"]:
+        p1 = coords[0]
+        p2 = coords[1]
+    else:
+        p1 = coords[-1]
+        p2 = coords[-2]
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
+    length = (dx * dx + dy * dy) ** 0.5
+    if length == 0:
+        return (0.0, 0.0)
+    return (dx / length, dy / length)
+
+
+def _pick_next_edge(edges, adjacency, node_idx, prev_dir, nodes):
+    candidates = []
+    for candidate in adjacency.get(node_idx, []):
+        if edges[candidate]["used"]:
+            continue
+        edge = edges[candidate]
+        if node_idx == edge["start"]:
+            direction = _edge_dir(edge, edge["start"], nodes)
+        else:
+            direction = _edge_dir(edge, edge["end"], nodes)
+        candidates.append((candidate, direction))
+    if not candidates:
+        return None
+    if prev_dir == (0.0, 0.0):
+        return candidates[0][0]
+    best = None
+    best_angle = None
+    for idx, direction in candidates:
+        dot = prev_dir[0] * direction[0] + prev_dir[1] * direction[1]
+        angle = 1.0 - dot
+        if best is None or angle < best_angle:
+            best = idx
+            best_angle = angle
+    return best
 
 
 def _log_endpoint_gaps(segments, tol: float) -> None:
@@ -392,6 +512,47 @@ def _log_endpoint_gaps(segments, tol: float) -> None:
         max_gap,
         tol,
     )
+    max_info = _find_max_gap_pair(segments)
+    if max_info is not None:
+        (p1, p2, dist) = max_info
+        logger.info(
+            "Outline max gap pair: dist=%.6f p1=(%.6f, %.6f) p2=(%.6f, %.6f)",
+            dist,
+            p1[0],
+            p1[1],
+            p2[0],
+            p2[1],
+        )
+
+
+def _find_max_gap_pair(segments):
+    endpoints = []
+    for line in segments:
+        coords = list(line.coords)
+        if len(coords) < 2:
+            continue
+        endpoints.append(coords[0])
+        endpoints.append(coords[-1])
+    if len(endpoints) < 2:
+        return None
+    max_dist = -1.0
+    max_pair = None
+    for i, p1 in enumerate(endpoints):
+        min_dist = None
+        min_point = None
+        for j, p2 in enumerate(endpoints):
+            if i == j:
+                continue
+            dx = p1[0] - p2[0]
+            dy = p1[1] - p2[1]
+            dist = (dx * dx + dy * dy) ** 0.5
+            if min_dist is None or dist < min_dist:
+                min_dist = dist
+                min_point = p2
+        if min_dist is not None and min_dist > max_dist:
+            max_dist = min_dist
+            max_pair = (p1, min_point, min_dist)
+    return max_pair
 
 
 def _loops_to_polygons(loops):
