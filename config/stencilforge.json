@@ -34,5 +34,5 @@
   "debug_log_detail": false,
   "debug_dump_dir": "debug-dumps",
   "outline_fill_rule": "evenodd",
-  "outline_snap_mm": 0.02
+  "outline_snap_mm": 0.1
 }

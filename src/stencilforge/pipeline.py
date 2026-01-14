@@ -83,6 +83,9 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                 outline_segments = outline_debug.get("segments_geom")
                 if outline_segments is not None:
                     _dump_geometry(debug_dir, "step2_outline_segments", outline_segments)
+                outline_loops = outline_debug.get("loops_geom")
+                if outline_loops is not None:
+                    _dump_geometry(debug_dir, "step2_outline_segments_closed", outline_loops)
                 snapped_segments = outline_debug.get("snapped_geom")
                 if snapped_segments is not None:
                     _dump_geometry(debug_dir, "step2_outline_segments_snapped", snapped_segments)

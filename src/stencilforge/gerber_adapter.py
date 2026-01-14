@@ -8,7 +8,7 @@ from typing import Iterable
 from gerber import load_layer
 from gerber import primitives as gprim
 from shapely import affinity
-from shapely.geometry import LineString, Point, Polygon, MultiPoint
+from shapely.geometry import LineString, Point, Polygon, MultiPoint, MultiLineString
 from shapely.ops import unary_union, polygonize, linemerge, snap
 
 from .config import StencilConfig
@@ -218,6 +218,8 @@ def _outline_from_primitives(primitives, config: StencilConfig):
         "snapped_geom": None,
         "snap_tol": None,
         "polygonize_polygons": 0,
+        "loops_count": 0,
+        "loops_geom": None,
     }
     for prim in primitives:
         if isinstance(prim, gprim.Region):
@@ -232,13 +234,21 @@ def _outline_from_primitives(primitives, config: StencilConfig):
         merged = unary_union(segments)
         debug["source"] = "segments"
         debug["segments_geom"] = merged
-        polygons = list(polygonize(merged))
-        polygons, snapped_geom, snap_tol = _maybe_snap_polygonize(merged, polygons, config)
-        debug["snapped_geom"] = snapped_geom
-        debug["snap_tol"] = snap_tol
-        debug["polygonize_polygons"] = len(polygons)
+        loops = _build_closed_loops(segments, config.outline_snap_mm)
+        if loops:
+            debug["loops_count"] = len(loops)
+            debug["loops_geom"] = MultiLineString(loops) if len(loops) > 1 else loops[0]
+            polygons = _loops_to_polygons(loops)
+        else:
+            polygons = []
+        if not polygons:
+            polygons = list(polygonize(merged))
+            polygons, snapped_geom, snap_tol = _maybe_snap_polygonize(merged, polygons, config)
+            debug["snapped_geom"] = snapped_geom
+            debug["snap_tol"] = snap_tol
+            debug["polygonize_polygons"] = len(polygons)
         if polygons:
-            logger.info("Outline polygonize: polygons=%s", len(polygons))
+            logger.info("Outline loops: polygons=%s", len(polygons))
             if config.outline_fill_rule == "legacy":
                 poly = max(polygons, key=lambda p: p.area)
                 if not poly.is_valid:
@@ -276,6 +286,126 @@ def _outline_segments_from_primitives(primitives, config: StencilConfig):
             if len(arc_pts) >= 2:
                 segments.append(LineString(arc_pts))
     return segments
+
+
+def _snap_point(point, tol: float):
+    if tol <= 0:
+        return (float(point[0]), float(point[1]))
+    return (round(point[0] / tol) * tol, round(point[1] / tol) * tol)
+
+
+def _build_closed_loops(segments, tol: float):
+    _log_endpoint_gaps(segments, tol)
+    edges = []
+    adjacency = {}
+    for line in segments:
+        coords = list(line.coords)
+        if len(coords) < 2:
+            continue
+        start = _snap_point(coords[0], tol)
+        end = _snap_point(coords[-1], tol)
+        edge = {"coords": coords, "start": start, "end": end, "used": False}
+        idx = len(edges)
+        edges.append(edge)
+        adjacency.setdefault(start, []).append(idx)
+        adjacency.setdefault(end, []).append(idx)
+    loops = []
+    for idx, edge in enumerate(edges):
+        if edge["used"]:
+            continue
+        start = edge["start"]
+        path = []
+        edge["used"] = True
+        path = list(edge["coords"])
+        current = edge["end"]
+        steps = 0
+        while True:
+            if current == start:
+                break
+            next_idx = None
+            for candidate in adjacency.get(current, []):
+                if not edges[candidate]["used"]:
+                    next_idx = candidate
+                    break
+            if next_idx is None:
+                path = []
+                break
+            next_edge = edges[next_idx]
+            next_edge["used"] = True
+            if current == next_edge["start"]:
+                coords = next_edge["coords"]
+                current = next_edge["end"]
+            else:
+                coords = list(reversed(next_edge["coords"]))
+                current = next_edge["start"]
+            path.extend(coords[1:])
+            steps += 1
+            if steps > len(edges):
+                path = []
+                break
+        if path:
+            if path[0] != path[-1]:
+                path.append(path[0])
+            if len(path) >= 4:
+                loops.append(LineString(path))
+    logger.info("Outline loops built: %s", len(loops))
+    return loops
+
+
+def _log_endpoint_gaps(segments, tol: float) -> None:
+    endpoints = []
+    for line in segments:
+        coords = list(line.coords)
+        if len(coords) < 2:
+            continue
+        endpoints.append(coords[0])
+        endpoints.append(coords[-1])
+    if not endpoints:
+        return
+    gaps = []
+    for i, point in enumerate(endpoints):
+        min_dist = None
+        for j, other in enumerate(endpoints):
+            if i == j:
+                continue
+            dx = point[0] - other[0]
+            dy = point[1] - other[1]
+            dist = (dx * dx + dy * dy) ** 0.5
+            if min_dist is None or dist < min_dist:
+                min_dist = dist
+        if min_dist is not None:
+            gaps.append(min_dist)
+    if not gaps:
+        return
+    gaps.sort()
+    count = len(gaps)
+    avg = sum(gaps) / count
+    p50 = gaps[int(count * 0.5)]
+    p90 = gaps[int(count * 0.9)]
+    max_gap = gaps[-1]
+    logger.info(
+        "Outline endpoint gaps: count=%s avg=%.6f p50=%.6f p90=%.6f max=%.6f snap_tol=%.6f",
+        count,
+        avg,
+        p50,
+        p90,
+        max_gap,
+        tol,
+    )
+
+
+def _loops_to_polygons(loops):
+    polygons = []
+    for loop in loops:
+        coords = list(loop.coords)
+        if len(coords) < 4:
+            continue
+        poly = Polygon(coords)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if not poly.is_empty and poly.area > 0:
+            polygons.append(poly)
+    return polygons
 
 
 def _outline_evenodd(polygons):
