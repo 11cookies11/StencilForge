@@ -26,6 +26,7 @@ dist/
 build/
 out/
 dist-msix/
+debug-dumps/
 
 # Generated stencil outputs
 stencil.stl

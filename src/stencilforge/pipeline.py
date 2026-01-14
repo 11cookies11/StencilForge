@@ -24,7 +24,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     config.validate()
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
-    if config.debug_log_detail:
+    if config.debug_enabled and config.debug_log_detail:
         logger.info(
             "Config: mode=%s backend=%s thickness=%s offset=%s outline_margin=%s arc_steps=%s curve_resolution=%s",
             config.output_mode,
@@ -39,14 +39,14 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     paste_files = _find_files(input_dir, config.paste_patterns)
     if not paste_files:
         raise FileNotFoundError("No paste layer files found in input directory.")
-    if config.debug_log_detail:
+    if config.debug_enabled and config.debug_log_detail:
         logger.info("Paste files: %s", ", ".join(p.name for p in paste_files))
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
     paste_geom = load_paste_geometry(paste_files, config)
     if paste_geom is None or paste_geom.is_empty:
         raise ValueError("Paste layer produced empty geometry.")
-    _log_geometry("paste", paste_geom, config.debug_log_detail)
-    _dump_geometry(debug_dir, "paste_raw", paste_geom)
+    _log_geometry("paste", paste_geom, config.debug_enabled and config.debug_log_detail)
+    _dump_geometry(debug_dir, "step2_paste", paste_geom)
     if config.qfn_regen_enabled:
         try:
             paste_geom = _regenerate_qfn_paste(paste_geom, config)
@@ -59,8 +59,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     if paste_geom.is_empty:
         raise ValueError("Paste offset produced empty geometry.")
     logger.info("Paste offset: %s mm", config.paste_offset_mm)
-    _log_geometry("paste_offset", paste_geom, config.debug_log_detail)
-    _dump_geometry(debug_dir, "paste_offset", paste_geom)
+    _log_geometry("paste_offset", paste_geom, config.debug_enabled and config.debug_log_detail)
+    _dump_geometry(debug_dir, "step2_paste_offset", paste_geom)
 
     outline_geom = None
     outline_files = _find_files(input_dir, config.outline_patterns)
@@ -72,8 +72,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         outline_geom = _outline_from_paste(paste_geom, config.outline_margin_mm)
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
     else:
-        _log_geometry("outline", outline_geom, config.debug_log_detail)
-    _dump_geometry(debug_dir, "outline", outline_geom)
+        _log_geometry("outline", outline_geom, config.debug_enabled and config.debug_log_detail)
+    _dump_geometry(debug_dir, "step5_outline", outline_geom)
 
     logger.info("Output mode: %s", config.output_mode)
     if config.output_mode == "holes_only":
@@ -89,8 +89,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             hole_count,
         )
         _write_debug_svg(output_path, outline_geom, paste_geom, stencil_2d)
-        _log_geometry("stencil_2d", stencil_2d, config.debug_log_detail)
-        _dump_geometry(debug_dir, "stencil_2d", stencil_2d)
+        _log_geometry("stencil_2d", stencil_2d, config.debug_enabled and config.debug_log_detail)
+        _dump_geometry(debug_dir, "step6_stencil_2d", stencil_2d)
     locator_bridge_geom = None
     if (
         config.locator_enabled
@@ -1093,11 +1093,13 @@ def _translate_to_origin(mesh: trimesh.Trimesh) -> None:
 
 
 def _resolve_debug_dir(output_path: Path, config: StencilConfig) -> Path | None:
+    if not config.debug_enabled:
+        return None
     if not config.debug_dump_dir:
         return None
     base = Path(config.debug_dump_dir)
     if not base.is_absolute():
-        base = output_path.parent / base
+        base = Path.cwd() / base
     try:
         base.mkdir(parents=True, exist_ok=True)
         return base
