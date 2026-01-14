@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Iterable
+
+from gerber import load_layer
+from shapely import affinity
+from shapely.ops import unary_union
+
+from ..config import StencilConfig
+from .outline import OutlineBuilder
+from .primitives import PrimitiveGeometryBuilder
+
+logger = logging.getLogger(__name__)
+
+
+class GerberGeometryService:
+    def __init__(self, config: StencilConfig) -> None:
+        self._config = config
+        self._primitive_builder = PrimitiveGeometryBuilder(config)
+        self._outline_builder = OutlineBuilder(config)
+
+    def load_paste_geometry(self, paths: Iterable[Path]):
+        geometries = []
+        for path in paths:
+            layer = self._load_layer(path, "paste")
+            geom = self._primitive_builder.build(layer.primitives)
+            geom = self._scale_to_mm(geom, layer.cam_source.units)
+            geometries.append(geom)
+        return self._merge_geometries(geometries)
+
+    def load_outline_geometry(self, path: Path):
+        layer = self._load_layer(path, "outline")
+        geom, _ = self._outline_builder.build(layer.primitives)
+        geom = self._scale_to_mm(geom, layer.cam_source.units)
+        return geom
+
+    def load_outline_geometry_debug(self, path: Path):
+        layer = self._load_layer(path, "outline")
+        geom, debug = self._outline_builder.build(layer.primitives)
+        geom = self._scale_to_mm(geom, layer.cam_source.units)
+        debug_geom = debug.get("segments_geom")
+        if debug_geom is not None:
+            debug["segments_geom"] = self._scale_to_mm(debug_geom, layer.cam_source.units)
+        snapped_geom = debug.get("snapped_geom")
+        if snapped_geom is not None:
+            debug["snapped_geom"] = self._scale_to_mm(snapped_geom, layer.cam_source.units)
+        return geom, debug
+
+    def load_outline_segments(self, path: Path):
+        layer = self._load_layer(path, "outline")
+        segments = self._outline_builder.build_segments(layer.primitives)
+        merged = unary_union(segments) if segments else None
+        geom = merged
+        if geom is not None:
+            geom = self._scale_to_mm(geom, layer.cam_source.units)
+        return geom
+
+    @staticmethod
+    def _load_layer(path: Path, label: str):
+        logger.info("Loading %s layer: %s", label, path.name)
+        layer = load_layer(str(path))
+        logger.info("Units: %s, primitives: %s", layer.cam_source.units, len(layer.primitives))
+        return layer
+
+    @staticmethod
+    def _scale_to_mm(geom, units: str):
+        if geom is None or geom.is_empty:
+            return geom
+        if units == "inch":
+            return affinity.scale(geom, xfact=25.4, yfact=25.4, origin=(0, 0))
+        return geom
+
+    @staticmethod
+    def _merge_geometries(geometries):
+        if not geometries:
+            return None
+        return unary_union([g for g in geometries if g is not None and not g.is_empty])
