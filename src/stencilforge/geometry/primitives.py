@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Gerber primitive -> Shapely 几何的转换逻辑。"""
+
 import math
 import logging
 
@@ -13,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _merge_geometries(geometries):
+    # 合并多个几何，自动忽略空/None
     if not geometries:
         return None
     return unary_union([g for g in geometries if g is not None and not g.is_empty])
@@ -26,6 +29,7 @@ class PrimitiveGeometryBuilder:
         return self._primitives_to_geometry(primitives)
 
     def _primitives_to_geometry(self, primitives):
+        # 根据极性（dark/clear）构建最终几何
         dark = []
         clear = []
         for prim in primitives:
@@ -42,6 +46,7 @@ class PrimitiveGeometryBuilder:
         return merged
 
     def _primitive_to_shape(self, prim):
+        # 将单个 Gerber 原语转换为 Shapely 几何
         if isinstance(prim, gprim.Circle):
             geom = Point(prim.position).buffer(
                 prim.radius, resolution=self._config.curve_resolution
@@ -70,6 +75,7 @@ class PrimitiveGeometryBuilder:
 
     @staticmethod
     def _subtract_hole(geom, prim):
+        # 若原语带孔，则从几何上减去
         hole_diameter = getattr(prim, "hole_diameter", 0) or 0
         if hole_diameter <= 0:
             return geom
@@ -77,6 +83,7 @@ class PrimitiveGeometryBuilder:
         return geom.difference(hole)
 
     def _line_to_shape(self, line: gprim.Line):
+        # 线段按口径（aperture）转换为缓冲形状
         if isinstance(line.aperture, gprim.Circle):
             radius = line.aperture.radius
             return LineString([line.start, line.end]).buffer(
@@ -100,6 +107,7 @@ class PrimitiveGeometryBuilder:
         return None
 
     def _arc_to_shape(self, arc: gprim.Arc):
+        # 圆弧离散成线段后缓冲成面
         points = self._arc_points(arc, self._config.arc_steps)
         radius = None
         if isinstance(arc.aperture, gprim.Circle):
@@ -120,6 +128,7 @@ class PrimitiveGeometryBuilder:
 
     @staticmethod
     def _arc_points(arc: gprim.Arc, steps: int):
+        # 生成圆弧采样点，顺/逆时针处理不同
         steps = max(8, steps)
         start = arc.start_angle
         end = arc.end_angle
@@ -135,6 +144,7 @@ class PrimitiveGeometryBuilder:
         return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
 
     def _region_to_shape(self, region: gprim.Region):
+        # Region 由线段/圆弧闭合而成，拼成多边形
         points = []
         for prim in region.primitives:
             if isinstance(prim, gprim.Line):

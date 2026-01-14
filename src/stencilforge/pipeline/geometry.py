@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""2D -> 3D 几何处理：面片校正、孔洞处理、挤出与基本统计。"""
+
 import logging
 
 from shapely.geometry import Polygon
@@ -11,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def extrude_geometry(geometry, thickness_mm: float):
+    # 统一处理几何：合法性修复、方向一致化、孔洞固化
     geometry = ensure_valid(geometry)
     geometry = orient_geometry(geometry)
     geometry = solidify_geometry(geometry)
@@ -45,12 +48,14 @@ def extrude_geometry(geometry, thickness_mm: float):
 
 
 def ensure_valid(geometry):
+    # Shapely buffer(0) 是常用的自交修复手段
     if geometry.is_valid:
         return geometry
     return geometry.buffer(0)
 
 
 def orient_geometry(geometry):
+    # 统一多边形方向，避免挤出法向混乱
     if geometry.is_empty:
         return geometry
     if geometry.geom_type == "Polygon":
@@ -61,6 +66,7 @@ def orient_geometry(geometry):
 
 
 def count_holes(geometry) -> int:
+    # 统计孔洞数量，便于 debug 输出
     if geometry.is_empty:
         return 0
     if geometry.geom_type == "Polygon":
@@ -71,6 +77,7 @@ def count_holes(geometry) -> int:
 
 
 def count_polygons(geometry) -> int:
+    # 统计 polygon 数量，便于 debug 输出
     if geometry.is_empty:
         return 0
     if geometry.geom_type == "Polygon":
@@ -81,6 +88,7 @@ def count_polygons(geometry) -> int:
 
 
 def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
+    # 通过三角剖分生成上下表面，再补齐侧壁
     triangles = []
     kept_area = 0.0
     for tri in triangulate(poly):
@@ -90,6 +98,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
         kept_area += tri.area
     coverage = kept_area / poly.area if poly.area > 0 else 0
     if coverage < 0.98:
+        # 对复杂轮廓，尝试 buffer(0) 以恢复边界三角形
         fallback = poly.buffer(0)
         triangles = []
         kept_area = 0.0
@@ -119,6 +128,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
     vertex_index = {}
 
     def add_vertex(x, y, z):
+        # 顶点去重，避免重复点导致的面异常
         key = (float(x), float(y), float(z))
         idx = vertex_index.get(key)
         if idx is None:
@@ -127,6 +137,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
             vertex_index[key] = idx
         return idx
 
+    # 上下表面：同一三角形分别放到 z=0 和 z=thickness
     for tri in triangles:
         coords = list(tri.exterior.coords)[:3]
         top = [add_vertex(x, y, thickness_mm) for x, y in coords]
@@ -135,6 +146,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
         faces.append(bottom[::-1])
 
     rings = [poly.exterior]
+    # 侧壁：沿外轮廓逐段生成四边形（拆成两个三角形）
     for ring in rings:
         coords = list(ring.coords)
         if len(coords) < 2:
@@ -155,6 +167,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
 
 
 def solidify_geometry(geometry):
+    # 将孔洞显式差分，避免后续挤出错误
     if geometry.is_empty:
         return geometry
     if geometry.geom_type == "Polygon" and geometry.interiors:

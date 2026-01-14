@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""CadQuery 导出：将 2D 几何挤出为 3D 并导出 STL。"""
+
 import logging
 from pathlib import Path
 
@@ -18,12 +20,14 @@ def export_cadquery_stl(
     output_path: Path,
     config: StencilConfig,
 ) -> None:
+    # CadQuery 在处理复杂孔洞时更稳，但依赖安装
     try:
         import cadquery as cq
     except ImportError as exc:
         raise ImportError("CadQuery is required for model_backend=cadquery") from exc
 
     solids = cadquery_extrude_geometry(stencil_2d, config.thickness_mm, cq)
+    # 定位结构分别挤出并叠加
     if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
         locator_solids = cadquery_extrude_geometry(locator_geom, config.locator_height_mm, cq)
         for solid in locator_solids:
@@ -59,6 +63,7 @@ def export_cadquery_stl(
 
 
 def cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
+    # 统一几何处理后挤出
     geometry = ensure_valid(geometry)
     geometry = orient_geometry(geometry)
     geometry = solidify_geometry(geometry)
@@ -87,6 +92,7 @@ def cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
 
 
 def cadquery_extrude_polygon(poly, thickness_mm: float, cq):
+    # 外轮廓挤出为实体，再逐个孔洞切割
     outer = ring_to_cadquery_wire(poly.exterior, cq)
     if outer is None:
         return None
@@ -108,6 +114,7 @@ def cadquery_extrude_polygon(poly, thickness_mm: float, cq):
 
 
 def ring_to_cadquery_wire(ring, cq):
+    # CadQuery 需要闭合线段作为 Wire
     coords = list(ring.coords)
     if len(coords) < 3:
         return None
@@ -117,6 +124,7 @@ def ring_to_cadquery_wire(ring, cq):
 
 
 def combine_cadquery_solids(solids, cq):
+    # 尝试 fuse；失败则退回 Compound
     if len(solids) == 1:
         return solids[0]
     result = solids[0]
@@ -129,6 +137,7 @@ def combine_cadquery_solids(solids, cq):
 
 
 def translate_cadquery_to_origin(solid):
+    # 将模型移动到原点，便于后续切片/对齐
     bbox = solid.BoundingBox()
     offset = (-bbox.xmin, -bbox.ymin, -bbox.zmin)
     return solid.translate(offset)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""调试输出：几何统计、PNG/SVG 渲染、GKO 路径可视化。"""
+
 import logging
 import math
 from pathlib import Path
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_debug_dir(output_path: Path, config: StencilConfig) -> Path | None:
+    # 根据配置解析调试输出目录（支持相对路径）
     if not config.debug_enabled:
         return None
     if not config.debug_dump_dir:
@@ -32,6 +35,7 @@ def resolve_debug_dir(output_path: Path, config: StencilConfig) -> Path | None:
 
 
 def log_geometry(label: str, geom, detail: bool) -> None:
+    # 统一输出几何统计信息，便于诊断异常
     if geom is None:
         logger.info("%s geometry: None", label)
         return
@@ -65,6 +69,7 @@ def log_geometry(label: str, geom, detail: bool) -> None:
 
 
 def dump_geometry(out_dir: Path | None, name: str, geom) -> None:
+    # 同时输出 WKT/SVG/PNG，便于对比中间产物
     if out_dir is None or geom is None or geom.is_empty:
         return
     safe = name.replace(" ", "_").lower()
@@ -87,6 +92,7 @@ def dump_geometry(out_dir: Path | None, name: str, geom) -> None:
 
 
 def geometry_svg(geom, stroke: str) -> str:
+    # 使用 shapely.svg 生成基础 SVG，并重设 viewBox
     if geom is None or geom.is_empty:
         return ""
     bounds = geom.bounds
@@ -114,6 +120,7 @@ def geometry_svg(geom, stroke: str) -> str:
 
 
 def geometry_png(geom, stroke: str, target_size: int = 1024) -> Image.Image | None:
+    # 将几何按比例映射到画布，并绘制边线
     if geom is None or geom.is_empty:
         return None
     bounds = geom.bounds
@@ -170,6 +177,7 @@ def geometry_png(geom, stroke: str, target_size: int = 1024) -> Image.Image | No
 
 
 def geometry_png_with_markers(geom, points, stroke: str, marker: str) -> Image.Image | None:
+    # 在几何渲染图上额外标注端点或断点
     if geom is None or geom.is_empty:
         return None
     image = geometry_png(geom, stroke=stroke)
@@ -197,6 +205,7 @@ def geometry_png_with_markers(geom, points, stroke: str, marker: str) -> Image.I
 
 
 def dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> None:
+    # 将 GKO 线段按“路径索引”上色，便于检查路径连续性
     segments = _parse_gko_paths(path)
     if not segments:
         return
@@ -257,6 +266,7 @@ def dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> No
 
 
 def _parse_gko_paths(path: Path):
+    # 只解析常见的 G01/G02/G03 + D01/D02 指令，足够用于调试
     text = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     scale = 1e5
     for line in text:
@@ -330,6 +340,7 @@ def _parse_gko_paths(path: Path):
 
 
 def _merge_intersections(segments):
+    # 利用 shapely 处理线段交叉与合并（调试备用）
     if not segments:
         return segments
     lines = []
@@ -366,6 +377,7 @@ def _colinear(p1, p2, p3, tol: float) -> bool:
 
 
 def _merge_colinear_segments(segments, tol: float):
+    # 同路径相邻共线线段合并，减少视觉杂线
     merged = []
     for seg, path_idx in segments:
         if not merged:
@@ -416,6 +428,7 @@ def _dedupe_segments(segments, tol: float):
 
 
 def _max_gap_pair_from_segments(segments):
+    # 找到距离最近端点最大的一对，作为“最明显断点”
     endpoints = []
     for segment, _ in segments:
         if len(segment) < 2:
@@ -445,6 +458,7 @@ def _max_gap_pair_from_segments(segments):
 
 
 def _arc_points_raw(start, end, center, ccw: bool, steps: int = 64):
+    # 将圆弧离散成线段点序列
     sx, sy = start
     ex, ey = end
     cx, cy = center
@@ -463,6 +477,7 @@ def _arc_points_raw(start, end, center, ccw: bool, steps: int = 64):
 
 
 def write_debug_svg(output_path: Path, outline, paste, stencil) -> None:
+    # 输出三层叠加的 SVG 便于快速比对
     if output_path is None:
         return
     out_dir = output_path.parent

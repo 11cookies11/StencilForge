@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""板框解析：从 Gerber 线段/圆弧构建闭合轮廓并填充。"""
+
 import math
 import logging
 
@@ -25,6 +27,7 @@ class OutlineBuilder:
         return self._outline_segments_from_primitives(primitives)
 
     def _outline_from_primitives(self, primitives):
+        # 优先使用 Region；否则用线段集合闭合为轮廓
         debug = {
             "source": None,
             "segments_geom": None,
@@ -43,6 +46,7 @@ class OutlineBuilder:
                     return geom, debug
         segments = self._outline_segments_from_primitives(primitives)
         if segments:
+            # 先尝试按路径顺序闭合，再退回基于图的闭合
             logger.info("Outline segments: %s", len(segments))
             merged = unary_union(segments)
             debug["source"] = "segments"
@@ -60,12 +64,14 @@ class OutlineBuilder:
             if polygons:
                 logger.info("Outline loops: polygons=%s", len(polygons))
                 if self._config.outline_fill_rule == "legacy":
+                    # 旧逻辑：取最大面积多边形作为板框
                     poly = max(polygons, key=lambda p: p.area)
                     if not poly.is_valid:
                         poly = poly.buffer(0)
                     return poly, debug
                 filled = self._outline_evenodd(polygons)
                 if filled is not None and not filled.is_empty:
+                    # 奇偶规则填充：适用于套娃轮廓
                     logger.info("Outline fill rule: evenodd")
                     return filled, debug
         logger.info("Outline fallback: primitives_to_geometry")
@@ -73,6 +79,7 @@ class OutlineBuilder:
         return self._primitive_builder._primitives_to_geometry(primitives), debug
 
     def _outline_segments_from_primitives(self, primitives):
+        # 仅从线段/圆弧提取轮廓线
         segments = []
         for prim in primitives:
             if isinstance(prim, gprim.Line):
@@ -84,6 +91,7 @@ class OutlineBuilder:
         return segments
 
     def _build_loops_in_order(self, segments, tol: float):
+        # 按原始顺序拼接，若端点接近则延续
         loops = []
         current = []
         start_point = None
@@ -122,6 +130,7 @@ class OutlineBuilder:
         return []
 
     def _build_closed_loops(self, segments, tol: float):
+        # 构建端点邻接图，尝试遍历成闭合环
         self._log_endpoint_gaps(segments, tol)
         edges = []
         adjacency = {}
@@ -187,6 +196,7 @@ class OutlineBuilder:
         return loops
 
     def _cluster_point(self, nodes, point, tol: float):
+        # 端点吸附：将近邻点聚成同一节点
         px, py = float(point[0]), float(point[1])
         if tol <= 0:
             nodes.append((px, py))
@@ -223,6 +233,7 @@ class OutlineBuilder:
         return (dx / length, dy / length)
 
     def _pick_next_edge(self, edges, adjacency, node_idx, prev_dir):
+        # 选择与当前方向夹角最小的边，减少交叉
         candidates = []
         for candidate in adjacency.get(node_idx, []):
             if edges[candidate]["used"]:
@@ -256,6 +267,7 @@ class OutlineBuilder:
         return dist <= tol
 
     def _log_endpoint_gaps(self, segments, tol: float) -> None:
+        # 输出端点间距离统计，辅助判断断点问题
         endpoints = []
         for line in segments:
             coords = list(line.coords)
@@ -350,6 +362,7 @@ class OutlineBuilder:
         return polygons
 
     def _outline_evenodd(self, polygons):
+        # 使用包含层级的奇偶规则填充多边形
         cleaned = []
         for poly in polygons:
             if poly is None or poly.is_empty:
@@ -388,6 +401,7 @@ class OutlineBuilder:
 
 
 def _arc_points(arc: gprim.Arc, steps: int):
+    # 与 primitives 中类似的圆弧采样
     steps = max(8, steps)
     start = arc.start_angle
     end = arc.end_angle

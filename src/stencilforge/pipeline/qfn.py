@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""QFN 再生成：识别 QFN 引脚阵列并重建锡膏开窗。"""
+
 import logging
 import math
 
@@ -13,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def regenerate_qfn_paste(geometry, config: StencilConfig):
+    # 主入口：识别 QFN、重建开窗；失败则回退原几何
     polys = _flatten_polygons(geometry)
     if not polys:
         return geometry
@@ -47,6 +50,7 @@ def _flatten_polygons(geometry):
 
 
 def _detect_qfn_pads(polys, config: StencilConfig):
+    # 通过矩形度/长宽比筛选焊盘候选
     pads = []
     for poly in polys:
         metrics = _polygon_rect_metrics(poly)
@@ -78,6 +82,7 @@ def _detect_qfn_pads(polys, config: StencilConfig):
 
 
 def _polygon_rect_metrics(poly):
+    # 计算最小外接矩形的长宽与角度
     try:
         rect = poly.minimum_rotated_rectangle
     except Exception:
@@ -117,6 +122,7 @@ def _rotate_point(point, angle_deg: float):
 
 
 def _build_qfn_group(pads, polys, config: StencilConfig):
+    # 通过旋转归一化 + 行列聚类，尝试构建 QFN 四边
     centers = [p["center"] for p in pads]
     rect = MultiPoint(centers).minimum_rotated_rectangle
     rect_metrics = _polygon_rect_metrics(rect)
@@ -156,6 +162,7 @@ def _build_qfn_group(pads, polys, config: StencilConfig):
 
 
 def _cluster_rows(pads, axis: str, config: StencilConfig):
+    # 在指定轴上聚类为行（容差与焊盘尺寸相关）
     widths = [p["short"] for p in pads if p["short"] > 0]
     if not widths:
         return []
@@ -202,6 +209,7 @@ def _estimate_center(pads):
 
 
 def _pick_qfn_sides(horiz_rows, vert_rows, center):
+    # 从上下左右行中选出四边并做对称性检查
     if len(horiz_rows) < 2 or len(vert_rows) < 2:
         return None
     horiz_rows = sorted(horiz_rows, key=lambda r: r["coord"])
@@ -230,6 +238,7 @@ def _pick_qfn_sides(horiz_rows, vert_rows, center):
 
 
 def _detect_center_pad(polys, center_norm, pads, global_angle):
+    # 根据面积与中心距离尝试识别中心焊盘
     pad_areas = [p["poly"].area for p in pads]
     if not pad_areas:
         return None
@@ -253,6 +262,7 @@ def _detect_center_pad(polys, center_norm, pads, global_angle):
 
 
 def _score_qfn(qfn):
+    # 根据间距一致性、宽度一致性、对称性评分
     scores = []
     spacing_scores = []
     for side in (qfn["top"], qfn["bottom"], qfn["left"], qfn["right"]):
@@ -316,6 +326,7 @@ def _median(values):
 
 
 def _regenerate_qfn_geometry(qfn, polys, config: StencilConfig):
+    # 按四边焊盘生成 slots 或保持原焊盘
     min_feature = config.qfn_min_feature_mm
     slots = []
     kept = []
@@ -363,6 +374,7 @@ def _estimate_pitch_and_width(side):
 
 
 def _generate_slots_for_side(side, qfn, min_feature):
+    # 根据焊盘数量生成若干条 slot（减少锡膏）
     pads = side["pads"]
     count = len(pads)
     if count <= 6:
@@ -436,6 +448,7 @@ def _outward_sign(side, center_norm):
 
 
 def _generate_center_windowpane(center_pad, qfn, min_feature):
+    # 对中心焊盘进行分窗，改善回流焊空洞
     rotated = affinity.rotate(center_pad, -qfn["global_angle"], origin=(0, 0))
     bounds = rotated.bounds
     width = bounds[2] - bounds[0]

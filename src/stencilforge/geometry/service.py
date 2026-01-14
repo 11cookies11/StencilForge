@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Gerber 几何服务：负责读取图层与单位换算。"""
+
 import logging
 from pathlib import Path
 from typing import Iterable
@@ -22,6 +24,7 @@ class GerberGeometryService:
         self._outline_builder = OutlineBuilder(config)
 
     def load_paste_geometry(self, paths: Iterable[Path]):
+        # 读取多份锡膏层并合并
         geometries = []
         for path in paths:
             layer = self._load_layer(path, "paste")
@@ -31,12 +34,14 @@ class GerberGeometryService:
         return self._merge_geometries(geometries)
 
     def load_outline_geometry(self, path: Path):
+        # 读取板框并构建轮廓
         layer = self._load_layer(path, "outline")
         geom, _ = self._outline_builder.build(layer.primitives)
         geom = self._scale_to_mm(geom, layer.cam_source.units)
         return geom
 
     def load_outline_geometry_debug(self, path: Path):
+        # 读取板框并返回中间调试数据
         layer = self._load_layer(path, "outline")
         geom, debug = self._outline_builder.build(layer.primitives)
         geom = self._scale_to_mm(geom, layer.cam_source.units)
@@ -49,6 +54,7 @@ class GerberGeometryService:
         return geom, debug
 
     def load_outline_segments(self, path: Path):
+        # 仅输出线段集合（调试用途）
         layer = self._load_layer(path, "outline")
         segments = self._outline_builder.build_segments(layer.primitives)
         merged = unary_union(segments) if segments else None
@@ -59,6 +65,7 @@ class GerberGeometryService:
 
     @staticmethod
     def _load_layer(path: Path, label: str):
+        # Gerber 图层读取与基础信息输出
         logger.info("Loading %s layer: %s", label, path.name)
         layer = load_layer(str(path))
         logger.info("Units: %s, primitives: %s", layer.cam_source.units, len(layer.primitives))
@@ -66,6 +73,7 @@ class GerberGeometryService:
 
     @staticmethod
     def _scale_to_mm(geom, units: str):
+        # 统一单位为 mm
         if geom is None or geom.is_empty:
             return geom
         if units == "inch":
@@ -74,6 +82,7 @@ class GerberGeometryService:
 
     @staticmethod
     def _merge_geometries(geometries):
+        # 合并多几何并忽略空项
         if not geometries:
             return None
         return unary_union([g for g in geometries if g is not None and not g.is_empty])

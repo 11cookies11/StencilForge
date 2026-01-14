@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+"""定位结构构建：用于在钢网上生成桥、台阶或环形定位结构。"""
+
 from shapely.geometry import box
 
 
 def build_locator_ring(outline_geom, clearance_mm: float, width_mm: float, open_side: str, open_width_mm: float):
+    # 基于外轮廓生成环形定位墙：外扩 - 内扩得到环
     if width_mm <= 0:
         return None
     inner = outline_geom.buffer(clearance_mm)
@@ -14,6 +17,7 @@ def build_locator_ring(outline_geom, clearance_mm: float, width_mm: float, open_
 
 
 def build_locator_step(outline_geom, clearance_mm: float, step_width_mm: float, open_side: str, open_width_mm: float):
+    # 台阶与环形类似，但用于做“台阶”几何，后续会向负 Z 方向挤出
     if step_width_mm <= 0:
         return None
     inner = outline_geom.buffer(clearance_mm)
@@ -24,6 +28,7 @@ def build_locator_step(outline_geom, clearance_mm: float, step_width_mm: float, 
 
 
 def build_locator_bridge(outline_geom, clearance_mm: float, open_side: str, open_width_mm: float):
+    # 桥结构：用外扩轮廓减去原轮廓，形成外侧桥环
     if clearance_mm <= 0:
         return None
     outer = outline_geom.buffer(clearance_mm)
@@ -33,6 +38,7 @@ def build_locator_bridge(outline_geom, clearance_mm: float, open_side: str, open
 
 
 def apply_open_side(ring, outer, open_side: str, open_width_mm: float):
+    # 在指定边开口：通过减去一个裁剪矩形形成缺口
     if open_side == "none" or open_width_mm <= 0:
         return ring
     min_x, min_y, max_x, max_y = outer.bounds
