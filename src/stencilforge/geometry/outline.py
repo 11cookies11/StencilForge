@@ -31,6 +31,7 @@ class OutlineBuilder:
         debug = {
             "source": None,
             "segments_geom": None,
+            "segments_raw_geom": None,
             "snapped_geom": None,
             "snap_tol": None,
             "loops_count": 0,
@@ -48,9 +49,16 @@ class OutlineBuilder:
         if segments:
             # 先尝试按路径顺序闭合，再退回基于图的闭合
             logger.info("Outline segments: %s", len(segments))
+            debug["segments_raw_geom"] = MultiLineString(segments) if len(segments) > 1 else segments[0]
+            snap_tol = self._config.outline_snap_mm
+            if snap_tol is not None and snap_tol > 0:
+                segments = self._snap_segments(segments, snap_tol)
+                debug["snapped_geom"] = MultiLineString(segments) if len(segments) > 1 else segments[0]
+                debug["snap_tol"] = snap_tol
             merged = unary_union(segments)
             debug["source"] = "segments"
             debug["segments_geom"] = merged
+            segments = self._merge_outline_segments(segments, merged)
             debug["max_gap_pair"] = self._find_max_gap_pair(segments)
             loops = self._build_loops_in_order(segments, self._config.outline_snap_mm)
             if not loops:
@@ -88,6 +96,56 @@ class OutlineBuilder:
                 arc_pts = _arc_points(prim, self._config.arc_steps)
                 if len(arc_pts) >= 2:
                     segments.append(LineString(arc_pts))
+        return segments
+
+    def _snap_segments(self, segments, tol: float):
+        # 基于网格的坐标归一化，减少细小偏差导致的断点。
+        if tol <= 0:
+            return segments
+
+        def _snap_point(point):
+            return (round(point[0] / tol) * tol, round(point[1] / tol) * tol)
+
+        snapped = []
+        for line in segments:
+            coords = [_snap_point(p) for p in line.coords]
+            deduped = []
+            for p in coords:
+                if not deduped or p != deduped[-1]:
+                    deduped.append(p)
+            if len(deduped) < 2:
+                continue
+            if len(deduped) == 2 and deduped[0] == deduped[1]:
+                continue
+            snapped.append(LineString(deduped))
+        if snapped:
+            logger.info("Outline segments snapped: %s -> %s (tol=%.6f)", len(segments), len(snapped), tol)
+        return snapped if snapped else segments
+
+    def _merge_outline_segments(self, segments, merged):
+        # 合并重叠/共线线段，减少重复以利于闭合。
+        if merged is None:
+            return segments
+        merged_segments = []
+
+        def _collect_lines(geom):
+            if geom is None or geom.is_empty:
+                return
+            if isinstance(geom, LineString):
+                if len(geom.coords) >= 2:
+                    merged_segments.append(geom)
+                return
+            if isinstance(geom, MultiLineString):
+                for line in geom.geoms:
+                    _collect_lines(line)
+                return
+            for child in getattr(geom, "geoms", []):
+                _collect_lines(child)
+
+        _collect_lines(merged)
+        if merged_segments:
+            logger.info("Outline segments merged: %s -> %s", len(segments), len(merged_segments))
+            return merged_segments
         return segments
 
     def _build_loops_in_order(self, segments, tol: float):

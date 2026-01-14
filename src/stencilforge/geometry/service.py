@@ -48,6 +48,9 @@ class GerberGeometryService:
         debug_geom = debug.get("segments_geom")
         if debug_geom is not None:
             debug["segments_geom"] = self._scale_to_mm(debug_geom, layer.cam_source.units)
+        raw_geom = debug.get("segments_raw_geom")
+        if raw_geom is not None:
+            debug["segments_raw_geom"] = self._scale_to_mm(raw_geom, layer.cam_source.units)
         snapped_geom = debug.get("snapped_geom")
         if snapped_geom is not None:
             debug["snapped_geom"] = self._scale_to_mm(snapped_geom, layer.cam_source.units)

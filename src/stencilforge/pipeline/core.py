@@ -14,6 +14,7 @@ from ..geometry import GerberGeometryService
 from .cadquery import export_cadquery_stl
 from .debug import (
     dump_geometry,
+    dump_colored_segments_png,
     dump_gko_paths_png,
     geometry_png_with_markers,
     log_geometry,
@@ -85,31 +86,46 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     outline_geom = None
     outline_files = _find_files(input_dir, config.outline_patterns)
     if outline_files:
+        # DEBUG: 调试产物为可选输出，失败不影响正常流程。
         if debug_dir is not None:
             try:
                 shutil.copy2(outline_files[0], debug_dir / "outline_source.gko")
             except OSError:
                 logger.warning("Failed to copy outline source to debug dir.")
             try:
-                # 调试：直接将 GKO 路径渲染成彩色 PNG
+            # DEBUG: 直接将 GKO 路径渲染成彩色 PNG
                 dump_gko_paths_png(outline_files[0], debug_dir)
             except Exception as exc:
                 logger.warning("Failed to render GKO paths: %s", exc)
         if debug_dir is not None and config.debug_enabled:
+            # DEBUG: 读取板框同时输出中间几何，便于排查断点/闭合问题。
             try:
                 outline_geom, outline_debug = geometry_service.load_outline_geometry_debug(outline_files[0])
                 outline_segments = outline_debug.get("segments_geom")
                 if outline_segments is not None:
-                    # 调试：输出原始线段集合
+                    # DEBUG: 输出合并后的线段集合
                     dump_geometry(debug_dir, "step2_outline_segments", outline_segments)
+                    dump_colored_segments_png(
+                        debug_dir,
+                        "step2_outline_segments_merged_colored",
+                        outline_segments,
+                    )
+                outline_segments_raw = outline_debug.get("segments_raw_geom")
+                if outline_segments_raw is not None:
+                    # DEBUG: 输出合并前线段集合
+                    dump_colored_segments_png(
+                        debug_dir,
+                        "step2_outline_segments_raw_colored",
+                        outline_segments_raw,
+                    )
                 outline_loops = outline_debug.get("loops_geom")
                 if outline_loops is not None:
-                    # 调试：输出闭合后的线段环
+                    # DEBUG: 输出闭合后的线段环
                     dump_geometry(debug_dir, "step2_outline_segments_closed", outline_loops)
                 max_gap = outline_debug.get("max_gap_pair")
                 if outline_segments is not None and max_gap is not None:
                     points = [max_gap[0], max_gap[1]]
-                    # 调试：标记最大断点
+                    # DEBUG: 标记最大断点
                     image = geometry_png_with_markers(
                         outline_segments,
                         points,
@@ -120,7 +136,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                         image.save(debug_dir / "step2_outline_segments_gap.png")
                 snapped_segments = outline_debug.get("snapped_geom")
                 if snapped_segments is not None:
-                    # 调试：输出吸附后的线段
+                    # DEBUG: 输出吸附后的线段
                     dump_geometry(debug_dir, "step2_outline_segments_snapped", snapped_segments)
                 snap_tol = outline_debug.get("snap_tol")
                 if snap_tol is not None:
@@ -129,6 +145,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                 logger.warning("Failed to dump outline debug: %s", exc)
                 outline_geom = geometry_service.load_outline_geometry(outline_files[0])
         else:
+            # 非调试模式：仅加载板框几何。
             outline_geom = geometry_service.load_outline_geometry(outline_files[0])
         logger.info("Outline layer: %s", outline_files[0].name)
 

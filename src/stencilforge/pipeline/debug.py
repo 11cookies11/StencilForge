@@ -204,6 +204,79 @@ def geometry_png_with_markers(geom, points, stroke: str, marker: str) -> Image.I
     return image
 
 
+def dump_colored_segments_png(out_dir: Path | None, name: str, geom, target_size: int = 1024) -> None:
+    # DEBUG: 线段按序着色，并用偏移实心圆标注端点。
+    if out_dir is None or geom is None or geom.is_empty:
+        return
+    bounds = geom.bounds
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    if width <= 0 or height <= 0:
+        return
+    scale = float(target_size) / max(width, height)
+    padding = 10
+    img_w = max(int(width * scale) + padding * 2, 1)
+    img_h = max(int(height * scale) + padding * 2, 1)
+    image = Image.new("RGB", (img_w, img_h), "white")
+    draw = ImageDraw.Draw(image)
+    colors = [
+        "#1f2937",
+        "#0f766e",
+        "#7c2d12",
+        "#1d4ed8",
+        "#6d28d9",
+        "#9f1239",
+        "#15803d",
+    ]
+    lines = []
+
+    def map_point(point) -> tuple[float, float]:
+        x, y = point
+        px = (x - bounds[0]) * scale + padding
+        py = (bounds[3] - y) * scale + padding
+        return (px, py)
+
+    def collect_lines(item) -> None:
+        if item is None or item.is_empty:
+            return
+        if item.geom_type == "LineString":
+            lines.append(item)
+        elif item.geom_type == "MultiLineString":
+            lines.extend(item.geoms)
+        elif item.geom_type == "GeometryCollection":
+            for sub in item.geoms:
+                collect_lines(sub)
+
+    collect_lines(geom)
+    if not lines:
+        return
+    for idx, line in enumerate(lines):
+        coords = [map_point(p) for p in line.coords]
+        if len(coords) < 2:
+            continue
+        color = colors[idx % len(colors)]
+        draw.line(coords, fill=color, width=2)
+        sx, sy = coords[0]
+        ex, ey = coords[-1]
+        jitter = 4.0
+        angle = (idx * 0.61803398875) % (2 * math.pi)
+        ox = math.cos(angle) * jitter
+        oy = math.sin(angle) * jitter
+        radius = 4
+        draw.ellipse(
+            (sx + ox - radius, sy + oy - radius, sx + ox + radius, sy + oy + radius),
+            fill=color,
+            outline=color,
+        )
+        draw.ellipse(
+            (ex - ox - radius, ey - oy - radius, ex - ox + radius, ey - oy + radius),
+            fill=color,
+            outline=color,
+        )
+    safe = name.replace(" ", "_").lower()
+    image.save(out_dir / f"{safe}.png")
+
+
 def dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> None:
     # 将 GKO 线段按“路径索引”上色，便于检查路径连续性
     segments = _parse_gko_paths(path)
