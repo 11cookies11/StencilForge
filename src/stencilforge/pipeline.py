@@ -4,6 +4,7 @@ from pathlib import Path
 from fnmatch import fnmatch
 import logging
 import math
+import shutil
 
 from shapely import affinity
 from shapely.geometry import box, Polygon, MultiPoint
@@ -11,9 +12,15 @@ from shapely.geometry.polygon import orient
 from shapely.ops import unary_union, triangulate
 from shapely.validation import explain_validity
 import trimesh
+from PIL import Image, ImageDraw
 
 from .config import StencilConfig
-from .gerber_adapter import load_outline_geometry, load_paste_geometry
+from .gerber_adapter import (
+    load_outline_geometry,
+    load_outline_geometry_debug,
+    load_outline_segments,
+    load_paste_geometry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +72,28 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     outline_geom = None
     outline_files = _find_files(input_dir, config.outline_patterns)
     if outline_files:
-        outline_geom = load_outline_geometry(outline_files[0], config)
+        if debug_dir is not None:
+            try:
+                shutil.copy2(outline_files[0], debug_dir / "outline_source.gko")
+            except OSError:
+                logger.warning("Failed to copy outline source to debug dir.")
+        if debug_dir is not None and config.debug_enabled:
+            try:
+                outline_geom, outline_debug = load_outline_geometry_debug(outline_files[0], config)
+                outline_segments = outline_debug.get("segments_geom")
+                if outline_segments is not None:
+                    _dump_geometry(debug_dir, "step2_outline_segments", outline_segments)
+                snapped_segments = outline_debug.get("snapped_geom")
+                if snapped_segments is not None:
+                    _dump_geometry(debug_dir, "step2_outline_segments_snapped", snapped_segments)
+                snap_tol = outline_debug.get("snap_tol")
+                if snap_tol is not None:
+                    logger.info("Outline snap tol used: %s", snap_tol)
+            except Exception as exc:
+                logger.warning("Failed to dump outline debug: %s", exc)
+                outline_geom = load_outline_geometry(outline_files[0], config)
+        else:
+            outline_geom = load_outline_geometry(outline_files[0], config)
         logger.info("Outline layer: %s", outline_files[0].name)
 
     if outline_geom is None or outline_geom.is_empty:
@@ -73,6 +101,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
     else:
         _log_geometry("outline", outline_geom, config.debug_enabled and config.debug_log_detail)
+    _dump_geometry(debug_dir, "step2_outline", outline_geom)
     _dump_geometry(debug_dir, "step5_outline", outline_geom)
 
     logger.info("Output mode: %s", config.output_mode)
@@ -1155,6 +1184,12 @@ def _dump_geometry(out_dir: Path | None, name: str, geom) -> None:
             (out_dir / f"{safe}.svg").write_text(svg, encoding="utf-8")
     except OSError:
         pass
+    try:
+        png = _geometry_png(geom, stroke="#1f2937")
+        if png is not None:
+            png.save(out_dir / f"{safe}.png")
+    except OSError:
+        pass
 
 
 def _geometry_svg(geom, stroke: str) -> str:
@@ -1182,6 +1217,62 @@ def _geometry_svg(geom, stroke: str) -> str:
         f"fill=\"none\" stroke=\"{stroke}\" stroke-width=\"0.1\"",
     )
     return svg
+
+
+def _geometry_png(geom, stroke: str, target_size: int = 1024) -> Image.Image | None:
+    if geom is None or geom.is_empty:
+        return None
+    bounds = geom.bounds
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    if width <= 0 or height <= 0:
+        return None
+    scale = float(target_size) / max(width, height)
+    padding = 10
+    img_w = max(int(width * scale) + padding * 2, 1)
+    img_h = max(int(height * scale) + padding * 2, 1)
+    image = Image.new("RGB", (img_w, img_h), "white")
+    draw = ImageDraw.Draw(image)
+
+    def map_point(point) -> tuple[float, float]:
+        x, y = point
+        px = (x - bounds[0]) * scale + padding
+        py = (bounds[3] - y) * scale + padding
+        return (px, py)
+
+    def draw_poly(poly) -> None:
+        exterior = [map_point(p) for p in poly.exterior.coords]
+        if len(exterior) >= 2:
+            draw.line(exterior, fill=stroke, width=2)
+        for interior in poly.interiors:
+            ring = [map_point(p) for p in interior.coords]
+            if len(ring) >= 2:
+                draw.line(ring, fill=stroke, width=1)
+
+    def draw_line(line) -> None:
+        coords = [map_point(p) for p in line.coords]
+        if len(coords) >= 2:
+            draw.line(coords, fill=stroke, width=1)
+
+    def draw_geom(item) -> None:
+        if item is None or item.is_empty:
+            return
+        if item.geom_type == "Polygon":
+            draw_poly(item)
+        elif item.geom_type == "MultiPolygon":
+            for poly in item.geoms:
+                draw_poly(poly)
+        elif item.geom_type == "LineString":
+            draw_line(item)
+        elif item.geom_type == "MultiLineString":
+            for line in item.geoms:
+                draw_line(line)
+        elif item.geom_type == "GeometryCollection":
+            for sub in item.geoms:
+                draw_geom(sub)
+
+    draw_geom(geom)
+    return image
 
 
 def _write_debug_svg(output_path: Path, outline, paste, stencil) -> None:
