@@ -9,6 +9,7 @@ from shapely import affinity
 from shapely.geometry import box, Polygon, MultiPoint
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union, triangulate
+from shapely.validation import explain_validity
 import trimesh
 
 from .config import StencilConfig
@@ -23,19 +24,29 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     config.validate()
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
+    if config.debug_log_detail:
+        logger.info(
+            "Config: mode=%s backend=%s thickness=%s offset=%s outline_margin=%s arc_steps=%s curve_resolution=%s",
+            config.output_mode,
+            config.model_backend,
+            config.thickness_mm,
+            config.paste_offset_mm,
+            config.outline_margin_mm,
+            config.arc_steps,
+            config.curve_resolution,
+        )
+    debug_dir = _resolve_debug_dir(output_path, config)
     paste_files = _find_files(input_dir, config.paste_patterns)
     if not paste_files:
         raise FileNotFoundError("No paste layer files found in input directory.")
+    if config.debug_log_detail:
+        logger.info("Paste files: %s", ", ".join(p.name for p in paste_files))
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
     paste_geom = load_paste_geometry(paste_files, config)
     if paste_geom is None or paste_geom.is_empty:
         raise ValueError("Paste layer produced empty geometry.")
-    logger.info(
-        "Paste geometry: type=%s area=%.6f bounds=%s",
-        paste_geom.geom_type,
-        paste_geom.area,
-        paste_geom.bounds,
-    )
+    _log_geometry("paste", paste_geom, config.debug_log_detail)
+    _dump_geometry(debug_dir, "paste_raw", paste_geom)
     if config.qfn_regen_enabled:
         try:
             paste_geom = _regenerate_qfn_paste(paste_geom, config)
@@ -48,6 +59,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     if paste_geom.is_empty:
         raise ValueError("Paste offset produced empty geometry.")
     logger.info("Paste offset: %s mm", config.paste_offset_mm)
+    _log_geometry("paste_offset", paste_geom, config.debug_log_detail)
+    _dump_geometry(debug_dir, "paste_offset", paste_geom)
 
     outline_geom = None
     outline_files = _find_files(input_dir, config.outline_patterns)
@@ -59,12 +72,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         outline_geom = _outline_from_paste(paste_geom, config.outline_margin_mm)
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
     else:
-        logger.info(
-            "Outline geometry: type=%s area=%.6f bounds=%s",
-            outline_geom.geom_type,
-            outline_geom.area,
-            outline_geom.bounds,
-        )
+        _log_geometry("outline", outline_geom, config.debug_log_detail)
+    _dump_geometry(debug_dir, "outline", outline_geom)
 
     logger.info("Output mode: %s", config.output_mode)
     if config.output_mode == "holes_only":
@@ -80,6 +89,8 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             hole_count,
         )
         _write_debug_svg(output_path, outline_geom, paste_geom, stencil_2d)
+        _log_geometry("stencil_2d", stencil_2d, config.debug_log_detail)
+        _dump_geometry(debug_dir, "stencil_2d", stencil_2d)
     locator_bridge_geom = None
     if (
         config.locator_enabled
@@ -97,6 +108,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
         if locator_bridge_geom is not None and not locator_bridge_geom.is_empty:
             stencil_2d = unary_union([stencil_2d, locator_bridge_geom])
             logger.info("Locator bridge: clearance=%s open=%s(%s)", config.locator_clearance_mm, config.locator_open_side, config.locator_open_width_mm)
+            _dump_geometry(debug_dir, "locator_bridge", locator_bridge_geom)
 
     logger.info("Base thickness: %s mm", config.thickness_mm)
 
@@ -159,6 +171,10 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                     config.locator_open_side,
                     config.locator_open_width_mm,
                 )
+    if locator_step_geom is not None and not locator_step_geom.is_empty:
+        _dump_geometry(debug_dir, "locator_step", locator_step_geom)
+    if locator_geom is not None and not locator_geom.is_empty:
+        _dump_geometry(debug_dir, "locator_wall", locator_geom)
 
     if config.model_backend == "cadquery":
         _export_cadquery_stl(stencil_2d, locator_geom, locator_step_geom, output_path, config)
@@ -354,6 +370,16 @@ def _count_holes(geometry) -> int:
         return len(geometry.interiors)
     if geometry.geom_type == "MultiPolygon":
         return sum(len(poly.interiors) for poly in geometry.geoms)
+    return 0
+
+
+def _count_polygons(geometry) -> int:
+    if geometry.is_empty:
+        return 0
+    if geometry.geom_type == "Polygon":
+        return 1
+    if geometry.geom_type == "MultiPolygon":
+        return len(geometry.geoms)
     return 0
 
 
@@ -1064,6 +1090,96 @@ def _translate_to_origin(mesh: trimesh.Trimesh) -> None:
     offset = (-min_x, -min_y, -min_z)
     mesh.apply_translation(offset)
     logger.info("Mesh translated to origin: offset=%s", offset)
+
+
+def _resolve_debug_dir(output_path: Path, config: StencilConfig) -> Path | None:
+    if not config.debug_dump_dir:
+        return None
+    base = Path(config.debug_dump_dir)
+    if not base.is_absolute():
+        base = output_path.parent / base
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        return base
+    except OSError:
+        logger.warning("Failed to create debug dump dir: %s", base)
+        return None
+
+
+def _log_geometry(label: str, geom, detail: bool) -> None:
+    if geom is None:
+        logger.info("%s geometry: None", label)
+        return
+    if geom.is_empty:
+        logger.info("%s geometry: empty", label)
+        return
+    poly_count = _count_polygons(geom)
+    hole_count = _count_holes(geom)
+    logger.info(
+        "%s geometry: type=%s area=%.6f bounds=%s polygons=%s holes=%s",
+        label,
+        geom.geom_type,
+        geom.area,
+        geom.bounds,
+        poly_count,
+        hole_count,
+    )
+    if detail:
+        try:
+            valid = geom.is_valid
+        except Exception:
+            valid = None
+        if valid is False:
+            try:
+                reason = explain_validity(geom)
+            except Exception:
+                reason = "unknown"
+            logger.info("%s geometry validity: invalid (%s)", label, reason)
+        elif valid is True:
+            logger.info("%s geometry validity: ok", label)
+
+
+def _dump_geometry(out_dir: Path | None, name: str, geom) -> None:
+    if out_dir is None or geom is None or geom.is_empty:
+        return
+    safe = name.replace(" ", "_").lower()
+    try:
+        (out_dir / f"{safe}.wkt").write_text(geom.wkt, encoding="utf-8")
+    except OSError:
+        pass
+    try:
+        svg = _geometry_svg(geom, stroke="#1f2937")
+        if svg:
+            (out_dir / f"{safe}.svg").write_text(svg, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _geometry_svg(geom, stroke: str) -> str:
+    if geom is None or geom.is_empty:
+        return ""
+    bounds = geom.bounds
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    if width <= 0 or height <= 0:
+        return ""
+    padding = 2.0
+    view = (
+        bounds[0] - padding,
+        bounds[1] - padding,
+        width + padding * 2,
+        height + padding * 2,
+    )
+    svg = geom.svg(scale_factor=1.0)
+    svg = svg.replace(
+        "<svg ",
+        f"<svg viewBox=\"{view[0]} {view[1]} {view[2]} {view[3]}\" ",
+    )
+    svg = svg.replace(
+        "fill=\"none\"",
+        f"fill=\"none\" stroke=\"{stroke}\" stroke-width=\"0.1\"",
+    )
+    return svg
 
 
 def _write_debug_svg(output_path: Path, outline, paste, stencil) -> None:

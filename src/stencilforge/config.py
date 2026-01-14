@@ -34,6 +34,8 @@ class StencilConfig:
     qfn_min_feature_mm: float
     qfn_confidence_threshold: float
     qfn_max_pad_width_mm: float
+    debug_log_detail: bool
+    debug_dump_dir: str
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
@@ -93,6 +95,8 @@ class StencilConfig:
         qfn_min_feature_mm = float(data.get("qfn_min_feature_mm", 0.6))
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
         qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
+        debug_log_detail = bool(data.get("debug_log_detail", False))
+        debug_dump_dir = str(data.get("debug_dump_dir", "") or "")
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
@@ -118,6 +122,8 @@ class StencilConfig:
             qfn_min_feature_mm=qfn_min_feature_mm,
             qfn_confidence_threshold=qfn_confidence_threshold,
             qfn_max_pad_width_mm=qfn_max_pad_width_mm,
+            debug_log_detail=debug_log_detail,
+            debug_dump_dir=debug_dump_dir,
         )
 
     def validate(self) -> None:

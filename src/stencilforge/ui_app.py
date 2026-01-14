@@ -2,6 +2,7 @@
 
 import base64
 import ctypes
+import logging
 import os
 import subprocess
 import sys
@@ -130,6 +131,8 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "qfn_min_feature_mm": config.qfn_min_feature_mm,
         "qfn_confidence_threshold": config.qfn_confidence_threshold,
         "qfn_max_pad_width_mm": config.qfn_max_pad_width_mm,
+        "debug_log_detail": config.debug_log_detail,
+        "debug_dump_dir": config.debug_dump_dir,
     }
 
 
@@ -226,6 +229,7 @@ class BackendBridge(QObject):
         self._external_preview = sys.platform == "win32" and not getattr(sys, "frozen", False)
         self._locale = "zh-CN"
         self._log_path = _resolve_log_path(project_root)
+        self._ensure_log_handler()
         self.jobError.connect(self._on_job_error)
         self._log_line("Backend initialized.")
 
@@ -270,9 +274,25 @@ class BackendBridge(QObject):
         except OSError:
             pass
 
+    def _ensure_log_handler(self) -> None:
+        if not self._log_path:
+            return
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, logging.FileHandler):
+                try:
+                    if Path(handler.baseFilename) == self._log_path:
+                        return
+                except Exception:
+                    continue
+        formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+        handler = logging.FileHandler(self._log_path, encoding="utf-8")
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.INFO)
+
     def _emit_log(self, message: str) -> None:
         self._log_line(message)
-        self.jobLog.emit(message)
 
     def _on_job_error(self, message: str) -> None:
         labels = _dialog_labels(self._locale)
