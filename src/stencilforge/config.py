@@ -34,9 +34,6 @@ class StencilConfig:
     qfn_min_feature_mm: float
     qfn_confidence_threshold: float
     qfn_max_pad_width_mm: float
-    debug_enabled: bool
-    debug_log_detail: bool
-    debug_dump_dir: str
     outline_fill_rule: str
     outline_merge_tol_mm: float
 
@@ -98,9 +95,6 @@ class StencilConfig:
         qfn_min_feature_mm = float(data.get("qfn_min_feature_mm", 0.6))
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
         qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
-        debug_enabled = bool(data.get("debug_enabled", False))
-        debug_log_detail = bool(data.get("debug_log_detail", False))
-        debug_dump_dir = str(data.get("debug_dump_dir", "") or "")
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
         return StencilConfig(
@@ -128,9 +122,6 @@ class StencilConfig:
             qfn_min_feature_mm=qfn_min_feature_mm,
             qfn_confidence_threshold=qfn_confidence_threshold,
             qfn_max_pad_width_mm=qfn_max_pad_width_mm,
-            debug_enabled=debug_enabled,
-            debug_log_detail=debug_log_detail,
-            debug_dump_dir=debug_dump_dir,
             outline_fill_rule=outline_fill_rule,
             outline_merge_tol_mm=outline_merge_tol_mm,
         )

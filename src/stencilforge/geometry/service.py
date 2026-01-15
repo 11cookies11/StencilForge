@@ -36,40 +36,8 @@ class GerberGeometryService:
     def load_outline_geometry(self, path: Path):
         # 读取板框并构建轮廓
         layer = self._load_layer(path, "outline")
-        geom, _ = self._outline_builder.build(layer.primitives)
+        geom = self._outline_builder.build(layer.primitives, layer.cam_source.units)
         geom = self._scale_to_mm(geom, layer.cam_source.units)
-        return geom
-
-    def load_outline_geometry_debug(self, path: Path):
-        # 读取板框并返回中间调试数据
-        layer = self._load_layer(path, "outline")
-        geom, debug = self._outline_builder.build(layer.primitives)
-        geom = self._scale_to_mm(geom, layer.cam_source.units)
-        debug_geom = debug.get("segments_geom")
-        if debug_geom is not None:
-            debug["segments_geom"] = self._scale_to_mm(debug_geom, layer.cam_source.units)
-        raw_geom = debug.get("segments_raw_geom")
-        if raw_geom is not None:
-            debug["segments_raw_geom"] = self._scale_to_mm(raw_geom, layer.cam_source.units)
-        merge_in = debug.get("segments_merge_in_geom")
-        if merge_in is not None:
-            debug["segments_merge_in_geom"] = self._scale_to_mm(merge_in, layer.cam_source.units)
-        merge_out = debug.get("segments_merge_out_geom")
-        if merge_out is not None:
-            debug["segments_merge_out_geom"] = self._scale_to_mm(merge_out, layer.cam_source.units)
-        snapped_geom = debug.get("snapped_geom")
-        if snapped_geom is not None:
-            debug["snapped_geom"] = self._scale_to_mm(snapped_geom, layer.cam_source.units)
-        return geom, debug
-
-    def load_outline_segments(self, path: Path):
-        # 仅输出线段集合（调试用途）
-        layer = self._load_layer(path, "outline")
-        segments = self._outline_builder.build_segments(layer.primitives)
-        merged = unary_union(segments) if segments else None
-        geom = merged
-        if geom is not None:
-            geom = self._scale_to_mm(geom, layer.cam_source.units)
         return geom
 
     @staticmethod

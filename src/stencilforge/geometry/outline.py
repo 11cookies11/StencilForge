@@ -23,53 +23,31 @@ class OutlineBuilder:
         self._close_tol_mm = 0.02
         self._merge_tol_mm = config.outline_merge_tol_mm
 
-    def build(self, primitives):
-        return self._outline_from_primitives(primitives)
+    def build(self, primitives, units: str | None = None):
+        return self._outline_from_primitives(primitives, units)
 
-    def build_segments(self, primitives):
-        return self._outline_segments_from_primitives(primitives)
-
-    def _outline_from_primitives(self, primitives):
+    def _outline_from_primitives(self, primitives, units: str | None = None):
         # 优先使用 Region；否则用线段集合闭合为轮廓
-        debug = {
-            "source": None,
-            "segments_geom": None,
-            "segments_raw_geom": None,
-            "segments_merge_in_geom": None,
-            "segments_merge_out_geom": None,
-            "loops_count": 0,
-            "loops_geom": None,
-            "max_gap_pair": None,
-        }
         for prim in primitives:
             if isinstance(prim, gprim.Region):
                 geom = self._primitive_builder._region_to_shape(prim)
                 if geom is not None and not geom.is_empty:
                     logger.info("Outline source: region")
-                    debug["source"] = "region"
-                    return geom, debug
+                    return geom
         segments = self._outline_segments_from_primitives(primitives)
         if segments:
             # 先尝试按路径顺序闭合，再退回基于图的闭合
             logger.info("Outline segments: %s", len(segments))
-            debug["segments_raw_geom"] = MultiLineString(segments) if len(segments) > 1 else segments[0]
-            if self._merge_tol_mm > 0:
-                debug["segments_merge_in_geom"] = debug["segments_raw_geom"]
-                segments = self._merge_near_colinear_segments(segments, self._merge_tol_mm)
-                debug["segments_merge_out_geom"] = (
-                    MultiLineString(segments) if len(segments) > 1 else segments[0]
-                )
+            merge_tol = self._tol_in_units(self._merge_tol_mm, units)
+            close_tol = self._tol_in_units(self._close_tol_mm, units)
+            if merge_tol > 0:
+                segments = self._merge_near_colinear_segments(segments, merge_tol)
             merged = unary_union(segments)
-            debug["source"] = "segments"
-            debug["segments_geom"] = merged
             segments = self._merge_outline_segments(segments, merged)
-            debug["max_gap_pair"] = self._find_max_gap_pair(segments)
-            loops = self._build_loops_in_order(segments, self._close_tol_mm)
+            loops = self._build_loops_in_order(segments, close_tol)
             if not loops:
-                loops = self._build_closed_loops(segments, self._close_tol_mm)
+                loops = self._build_closed_loops(segments, close_tol)
             if loops:
-                debug["loops_count"] = len(loops)
-                debug["loops_geom"] = MultiLineString(loops) if len(loops) > 1 else loops[0]
                 polygons = self._loops_to_polygons(loops)
             else:
                 polygons = []
@@ -80,15 +58,14 @@ class OutlineBuilder:
                     poly = max(polygons, key=lambda p: p.area)
                     if not poly.is_valid:
                         poly = poly.buffer(0)
-                    return poly, debug
+                    return poly
                 filled = self._outline_evenodd(polygons)
                 if filled is not None and not filled.is_empty:
                     # 奇偶规则填充：适用于套娃轮廓
                     logger.info("Outline fill rule: evenodd")
-                    return filled, debug
+                    return filled
         logger.info("Outline fallback: primitives_to_geometry")
-        debug["source"] = "primitives"
-        return self._primitive_builder._primitives_to_geometry(primitives), debug
+        return self._primitive_builder._primitives_to_geometry(primitives)
 
     def _outline_segments_from_primitives(self, primitives):
         # 仅从线段/圆弧提取轮廓线
@@ -142,6 +119,13 @@ class OutlineBuilder:
         if merged_count:
             logger.info("Outline segments merged near-colinear: %s -> %s", len(segments), len(merged_lines))
         return merged_lines
+
+    def _tol_in_units(self, tol_mm: float, units: str | None) -> float:
+        if tol_mm <= 0:
+            return 0.0
+        if units == "inch":
+            return tol_mm / 25.4
+        return tol_mm
 
     def _try_merge_lines(self, line_a: LineString, line_b: LineString, tol: float, angle_cos: float):
         if line_a is None or line_b is None:
@@ -264,7 +248,6 @@ class OutlineBuilder:
 
     def _build_closed_loops(self, segments, tol: float):
         # 构建端点邻接图，尝试遍历成闭合环
-        self._log_endpoint_gaps(segments, tol)
         edges = []
         adjacency = {}
         nodes = []
@@ -399,87 +382,6 @@ class OutlineBuilder:
             return dist == 0
         return dist <= tol
 
-    def _log_endpoint_gaps(self, segments, tol: float) -> None:
-        # 输出端点间距离统计，辅助判断断点问题
-        endpoints = []
-        for line in segments:
-            coords = list(line.coords)
-            if len(coords) < 2:
-                continue
-            endpoints.append(coords[0])
-            endpoints.append(coords[-1])
-        if not endpoints:
-            return
-        gaps = []
-        for i, point in enumerate(endpoints):
-            min_dist = None
-            for j, other in enumerate(endpoints):
-                if i == j:
-                    continue
-                dx = point[0] - other[0]
-                dy = point[1] - other[1]
-                dist = (dx * dx + dy * dy) ** 0.5
-                if min_dist is None or dist < min_dist:
-                    min_dist = dist
-            if min_dist is not None:
-                gaps.append(min_dist)
-        if not gaps:
-            return
-        gaps.sort()
-        count = len(gaps)
-        avg = sum(gaps) / count
-        p50 = gaps[int(count * 0.5)]
-        p90 = gaps[int(count * 0.9)]
-        max_gap = gaps[-1]
-        logger.info(
-            "Outline endpoint gaps: count=%s avg=%.6f p50=%.6f p90=%.6f max=%.6f snap_tol=%.6f",
-            count,
-            avg,
-            p50,
-            p90,
-            max_gap,
-            tol,
-        )
-        max_info = self._find_max_gap_pair(segments)
-        if max_info is not None:
-            (p1, p2, dist) = max_info
-            logger.info(
-                "Outline max gap pair: dist=%.6f p1=(%.6f, %.6f) p2=(%.6f, %.6f)",
-                dist,
-                p1[0],
-                p1[1],
-                p2[0],
-                p2[1],
-            )
-
-    def _find_max_gap_pair(self, segments):
-        endpoints = []
-        for line in segments:
-            coords = list(line.coords)
-            if len(coords) < 2:
-                continue
-            endpoints.append(coords[0])
-            endpoints.append(coords[-1])
-        if len(endpoints) < 2:
-            return None
-        max_dist = -1.0
-        max_pair = None
-        for i, p1 in enumerate(endpoints):
-            min_dist = None
-            min_point = None
-            for j, p2 in enumerate(endpoints):
-                if i == j:
-                    continue
-                dx = p1[0] - p2[0]
-                dy = p1[1] - p2[1]
-                dist = (dx * dx + dy * dy) ** 0.5
-                if min_dist is None or dist < min_dist:
-                    min_dist = dist
-                    min_point = p2
-            if min_dist is not None and min_dist > max_dist:
-                max_dist = min_dist
-                max_pair = (p1, min_point, min_dist)
-        return max_pair
 
     def _loops_to_polygons(self, loops):
         polygons = []

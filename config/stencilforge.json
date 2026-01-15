@@ -30,9 +30,6 @@
   "qfn_min_feature_mm": 0.6,
   "qfn_confidence_threshold": 0.75,
   "qfn_max_pad_width_mm": 1.2,
-  "debug_enabled": true,
-  "debug_log_detail": false,
-  "debug_dump_dir": "debug-dumps",
   "outline_fill_rule": "evenodd",
   "outline_merge_tol_mm": 0.01
 }

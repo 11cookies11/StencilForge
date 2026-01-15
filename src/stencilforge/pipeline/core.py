@@ -3,7 +3,6 @@ from __future__ import annotations
 from fnmatch import fnmatch
 from pathlib import Path
 import logging
-import shutil
 
 from shapely.geometry import box
 from shapely.ops import unary_union
@@ -12,15 +11,6 @@ import trimesh
 from ..config import StencilConfig
 from ..geometry import GerberGeometryService
 from .cadquery import export_cadquery_stl
-from .debug import (
-    dump_geometry,
-    dump_colored_segments_png,
-    dump_gko_paths_png,
-    geometry_png_with_markers,
-    log_geometry,
-    resolve_debug_dir,
-    write_debug_svg,
-)
 from .geometry import count_holes, extrude_geometry
 from .locator import build_locator_bridge, build_locator_ring, build_locator_step
 from .mesh import cleanup_mesh, translate_to_origin
@@ -38,33 +28,14 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     geometry_service = GerberGeometryService(config)
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
-    # 调试模式下输出关键配置，便于复现
-    if config.debug_enabled and config.debug_log_detail:
-        logger.info(
-            "Config: mode=%s backend=%s thickness=%s offset=%s outline_margin=%s arc_steps=%s curve_resolution=%s",
-            config.output_mode,
-            config.model_backend,
-            config.thickness_mm,
-            config.paste_offset_mm,
-            config.outline_margin_mm,
-            config.arc_steps,
-            config.curve_resolution,
-        )
-    # 调试输出目录（可为 None）
-    debug_dir = resolve_debug_dir(output_path, config)
     # 1) 读取锡膏层（Paste），这是钢网孔洞的直接来源
     paste_files = _find_files(input_dir, config.paste_patterns)
     if not paste_files:
         raise FileNotFoundError("No paste layer files found in input directory.")
-    if config.debug_enabled and config.debug_log_detail:
-        logger.info("Paste files: %s", ", ".join(p.name for p in paste_files))
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
     paste_geom = geometry_service.load_paste_geometry(paste_files)
     if paste_geom is None or paste_geom.is_empty:
         raise ValueError("Paste layer produced empty geometry.")
-    # 记录锡膏几何统计并可视化落盘
-    log_geometry("paste", paste_geom, config.debug_enabled and config.debug_log_detail)
-    dump_geometry(debug_dir, "step2_paste", paste_geom)
     # 可选：对 QFN 器件的开窗进行再生成，提升可焊性
     if config.qfn_regen_enabled:
         try:
@@ -79,99 +50,18 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     if paste_geom.is_empty:
         raise ValueError("Paste offset produced empty geometry.")
     logger.info("Paste offset: %s mm", config.paste_offset_mm)
-    log_geometry("paste_offset", paste_geom, config.debug_enabled and config.debug_log_detail)
-    dump_geometry(debug_dir, "step2_paste_offset", paste_geom)
 
     # 3) 读取板框（Outline），用于确定钢网外轮廓
     outline_geom = None
     outline_files = _find_files(input_dir, config.outline_patterns)
     if outline_files:
-        # DEBUG: 调试产物为可选输出，失败不影响正常流程。
-        if debug_dir is not None:
-            try:
-                shutil.copy2(outline_files[0], debug_dir / "outline_source.gko")
-            except OSError:
-                logger.warning("Failed to copy outline source to debug dir.")
-            try:
-            # DEBUG: 直接将 GKO 路径渲染成彩色 PNG
-                dump_gko_paths_png(outline_files[0], debug_dir)
-            except Exception as exc:
-                logger.warning("Failed to render GKO paths: %s", exc)
-        if debug_dir is not None and config.debug_enabled:
-            # DEBUG: 读取板框同时输出中间几何，便于排查断点/闭合问题。
-            try:
-                outline_geom, outline_debug = geometry_service.load_outline_geometry_debug(outline_files[0])
-                outline_segments = outline_debug.get("segments_geom")
-                if outline_segments is not None:
-                    # DEBUG: 输出合并后的线段集合
-                    dump_geometry(debug_dir, "step2_outline_segments", outline_segments)
-                    dump_colored_segments_png(
-                        debug_dir,
-                        "step2_outline_segments_merged_colored",
-                        outline_segments,
-                    )
-                outline_segments_raw = outline_debug.get("segments_raw_geom")
-                if outline_segments_raw is not None:
-                    # DEBUG: 输出合并前线段集合
-                    dump_colored_segments_png(
-                        debug_dir,
-                        "step2_outline_segments_raw_colored",
-                        outline_segments_raw,
-                    )
-                outline_segments_merge_in = outline_debug.get("segments_merge_in_geom")
-                if outline_segments_merge_in is not None:
-                    dump_colored_segments_png(
-                        debug_dir,
-                        "step2_outline_segments_merge_in",
-                        outline_segments_merge_in,
-                    )
-                outline_segments_merge_out = outline_debug.get("segments_merge_out_geom")
-                if outline_segments_merge_out is not None:
-                    dump_colored_segments_png(
-                        debug_dir,
-                        "step2_outline_segments_merge_out",
-                        outline_segments_merge_out,
-                    )
-                outline_loops = outline_debug.get("loops_geom")
-                if outline_loops is not None:
-                    # DEBUG: 输出闭合后的线段环
-                    dump_geometry(debug_dir, "step2_outline_segments_closed", outline_loops)
-                max_gap = outline_debug.get("max_gap_pair")
-                if outline_segments is not None and max_gap is not None:
-                    points = [max_gap[0], max_gap[1]]
-                    # DEBUG: 标记最大断点
-                    image = geometry_png_with_markers(
-                        outline_segments,
-                        points,
-                        stroke="#1f2937",
-                        marker="#dc2626",
-                    )
-                    if image is not None:
-                        image.save(debug_dir / "step2_outline_segments_gap.png")
-                snapped_segments = outline_debug.get("snapped_geom")
-                if snapped_segments is not None:
-                    # DEBUG: 输出吸附后的线段
-                    dump_geometry(debug_dir, "step2_outline_segments_snapped", snapped_segments)
-                snap_tol = outline_debug.get("snap_tol")
-                if snap_tol is not None:
-                    logger.info("Outline snap tol used: %s", snap_tol)
-            except Exception as exc:
-                logger.warning("Failed to dump outline debug: %s", exc)
-                outline_geom = geometry_service.load_outline_geometry(outline_files[0])
-        else:
-            # 非调试模式：仅加载板框几何。
-            outline_geom = geometry_service.load_outline_geometry(outline_files[0])
+        outline_geom = geometry_service.load_outline_geometry(outline_files[0])
         logger.info("Outline layer: %s", outline_files[0].name)
 
     # 3.1) 若没有板框，则用锡膏外包矩形兜底
     if outline_geom is None or outline_geom.is_empty:
         outline_geom = _outline_from_paste(paste_geom, config.outline_margin_mm)
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
-    else:
-        log_geometry("outline", outline_geom, config.debug_enabled and config.debug_log_detail)
-    # 调试：输出轮廓相关几何
-    dump_geometry(debug_dir, "step2_outline", outline_geom)
-    dump_geometry(debug_dir, "step5_outline", outline_geom)
 
     # 4) 生成 2D 钢网：默认用板框减去锡膏（形成孔洞）
     logger.info("Output mode: %s", config.output_mode)
@@ -187,10 +77,6 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             stencil_2d.bounds if not stencil_2d.is_empty else None,
             hole_count,
         )
-        # 调试：输出三层叠加的 SVG 便于肉眼检查
-        write_debug_svg(output_path, outline_geom, paste_geom, stencil_2d)
-        log_geometry("stencil_2d", stencil_2d, config.debug_enabled and config.debug_log_detail)
-        dump_geometry(debug_dir, "step6_stencil_2d", stencil_2d)
     # 5) 可选定位结构（桥/环/台阶）
     locator_bridge_geom = None
     if (
@@ -215,7 +101,6 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                 config.locator_open_side,
                 config.locator_open_width_mm,
             )
-            dump_geometry(debug_dir, "locator_bridge", locator_bridge_geom)
 
     logger.info("Base thickness: %s mm", config.thickness_mm)
 
@@ -279,10 +164,6 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                     config.locator_open_side,
                     config.locator_open_width_mm,
                 )
-    if locator_step_geom is not None and not locator_step_geom.is_empty:
-        dump_geometry(debug_dir, "locator_step", locator_step_geom)
-    if locator_geom is not None and not locator_geom.is_empty:
-        dump_geometry(debug_dir, "locator_wall", locator_geom)
 
     # 6) 导出模式：CadQuery 或 Trimesh
     if config.model_backend == "cadquery":
