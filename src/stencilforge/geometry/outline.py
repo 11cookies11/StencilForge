@@ -39,7 +39,67 @@ class RobustOutlineExtractor:
         self.debug: Dict[str, Any] = {}
 
     def extract(self, primitives) -> Polygon:
+        segments = self._primitives_to_segments(primitives)
+        self.debug["raw_segments_count"] = len(segments)
         raise NotImplementedError
+
+    def _primitives_to_segments(self, primitives) -> list[Segment2D]:
+        segments: list[Segment2D] = []
+        for prim in primitives:
+            if isinstance(prim, gprim.Line):
+                segments.append((prim.start, prim.end))
+            elif isinstance(prim, gprim.Arc):
+                points = self._discretize_arc(prim)
+                for i in range(len(points) - 1):
+                    segments.append((points[i], points[i + 1]))
+            elif isinstance(prim, gprim.Region):
+                geom = self._primitive_builder._region_to_shape(prim)
+                segments.extend(self._segments_from_shape(geom))
+        return segments
+
+    def _segments_from_shape(self, geom) -> list[Segment2D]:
+        if geom is None or geom.is_empty:
+            return []
+        segments: list[Segment2D] = []
+        if geom.geom_type == "Polygon":
+            segments.extend(self._segments_from_ring(list(geom.exterior.coords)))
+        elif geom.geom_type == "MultiPolygon":
+            for poly in geom.geoms:
+                segments.extend(self._segments_from_ring(list(poly.exterior.coords)))
+        return segments
+
+    @staticmethod
+    def _segments_from_ring(coords: list[Point2D]) -> list[Segment2D]:
+        if len(coords) < 2:
+            return []
+        return [(coords[i], coords[i + 1]) for i in range(len(coords) - 1)]
+
+    def _discretize_arc(self, arc: gprim.Arc) -> list[Point2D]:
+        if arc.center is None or arc.radius is None:
+            raise ValueError("R-arc not supported: missing arc center or radius")
+        radius = float(arc.radius)
+        if radius <= 0:
+            raise ValueError("Arc radius must be > 0")
+        start = float(arc.start_angle)
+        end = float(arc.end_angle)
+        if arc.direction == "counterclockwise":
+            if end <= start:
+                end += 2 * math.pi
+            sweep = end - start
+        else:
+            if end >= start:
+                end -= 2 * math.pi
+            sweep = start - end
+        chord_err = float(self.cfg.arc_max_chord_error_mm)
+        max_angle = 2 * math.acos(max(0.0, 1.0 - chord_err / radius))
+        if max_angle <= 0 or math.isnan(max_angle):
+            max_angle = sweep
+        steps = max(2, int(math.ceil(sweep / max_angle)) + 1)
+        angles = [start + sweep * i / (steps - 1) for i in range(steps)]
+        if arc.direction != "counterclockwise":
+            angles = [start - sweep * i / (steps - 1) for i in range(steps)]
+        cx, cy = arc.center
+        return [(cx + radius * math.cos(a), cy + radius * math.sin(a)) for a in angles]
 
 
 class OutlineBuilder:
