@@ -31,5 +31,7 @@ debug-dumps/
 # Generated stencil outputs
 stencil.stl
 stencil_debug_*.svg
+gko_outline.gko
+gko_outline_raw.png
 dist-installer/
 build-logs/
