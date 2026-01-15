@@ -41,6 +41,10 @@ class RobustOutlineExtractor:
     def extract(self, primitives) -> Polygon:
         segments = self._primitives_to_segments(primitives)
         self.debug["raw_segments_count"] = len(segments)
+        segments = self._snap_segments(segments)
+        self.debug["snapped_segments_count"] = len(segments)
+        segments = self._filter_and_dedupe_segments(segments)
+        self.debug["deduped_segments_count"] = len(segments)
         raise NotImplementedError
 
     def _primitives_to_segments(self, primitives) -> list[Segment2D]:
@@ -100,6 +104,33 @@ class RobustOutlineExtractor:
             angles = [start - sweep * i / (steps - 1) for i in range(steps)]
         cx, cy = arc.center
         return [(cx + radius * math.cos(a), cy + radius * math.sin(a)) for a in angles]
+
+    def _snap_point(self, point: Point2D) -> Point2D:
+        eps = self.cfg.eps_mm
+        return (round(point[0] / eps) * eps, round(point[1] / eps) * eps)
+
+    def _snap_segments(self, segments: list[Segment2D]) -> list[Segment2D]:
+        return [(self._snap_point(p1), self._snap_point(p2)) for p1, p2 in segments]
+
+    def _filter_and_dedupe_segments(self, segments: list[Segment2D]) -> list[Segment2D]:
+        min_len = self.cfg.eps_mm * self.cfg.min_seg_len_scale
+        deduped: list[Segment2D] = []
+        seen: set[tuple[Point2D, Point2D]] = set()
+        for p1, p2 in segments:
+            if self._segment_length(p1, p2) < min_len:
+                continue
+            key = (p1, p2) if p1 <= p2 else (p2, p1)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append((p1, p2))
+        return deduped
+
+    @staticmethod
+    def _segment_length(p1: Point2D, p2: Point2D) -> float:
+        dx = p1[0] - p2[0]
+        dy = p1[1] - p2[1]
+        return (dx * dx + dy * dy) ** 0.5
 
 
 class OutlineBuilder:
