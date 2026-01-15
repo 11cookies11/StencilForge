@@ -2,12 +2,16 @@ from __future__ import annotations
 
 """板框解析：从 Gerber 线段/圆弧构建闭合轮廓并填充。"""
 
+import argparse
 import math
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict
 
 from gerber import primitives as gprim
+from gerber import load_layer
+from shapely import affinity
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.strtree import STRtree
 from shapely.ops import linemerge, polygonize, unary_union
@@ -214,6 +218,15 @@ class OutlineBuilder:
                 if geom is not None and not geom.is_empty:
                     logger.info("Outline source: region")
                     return geom
+        if self._config.outline_close_strategy == "robust_polygonize":
+            eps = self._tol_in_units(self._config.outline_snap_eps_mm, units)
+            arc_err = self._tol_in_units(self._config.outline_arc_max_chord_error_mm, units)
+            cfg = RobustOutlineConfig(eps_mm=eps, arc_max_chord_error_mm=arc_err)
+            extractor = RobustOutlineExtractor(cfg, self._primitive_builder)
+            try:
+                return extractor.extract(primitives)
+            except Exception as exc:
+                logger.warning("Robust outline failed, falling back to legacy: %s", exc)
         segments = self._outline_segments_from_primitives(primitives)
         if segments:
             # 先尝试按路径顺序闭合，再退回基于图的闭合
@@ -630,3 +643,57 @@ def _arc_points(arc: gprim.Arc, steps: int):
         angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
     cx, cy = arc.center
     return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
+
+
+def _cli() -> int:
+    parser = argparse.ArgumentParser(description="Outline extraction quick check")
+    parser.add_argument("--input", required=True, help="Outline Gerber file path")
+    parser.add_argument("--strategy", default="legacy", help="outline close strategy")
+    args = parser.parse_args()
+
+    path = Path(args.input)
+    if not path.exists():
+        raise SystemExit(f"input not found: {path}")
+
+    config = StencilConfig.from_dict({"outline_close_strategy": args.strategy})
+    layer = load_layer(str(path))
+    units = layer.cam_source.units
+    builder = OutlineBuilder(config)
+
+    if args.strategy == "robust_polygonize":
+        eps = builder._tol_in_units(config.outline_snap_eps_mm, units)
+        arc_err = builder._tol_in_units(config.outline_arc_max_chord_error_mm, units)
+        cfg = RobustOutlineConfig(eps_mm=eps, arc_max_chord_error_mm=arc_err)
+        extractor = RobustOutlineExtractor(cfg, builder._primitive_builder)
+        geom = extractor.extract(layer.primitives)
+        used_fallback = extractor.debug.get("used_fallback")
+    else:
+        geom = builder.build(layer.primitives, units)
+        used_fallback = None
+
+    if units == "inch":
+        geom = affinity.scale(geom, xfact=25.4, yfact=25.4, origin=(0, 0))
+
+    bounds = geom.bounds
+    width = bounds[2] - bounds[0]
+    height = bounds[3] - bounds[1]
+    point_count = None
+    if geom.geom_type == "Polygon":
+        point_count = len(geom.exterior.coords)
+    elif geom.geom_type == "MultiPolygon" and geom.geoms:
+        poly = max(geom.geoms, key=lambda p: p.area)
+        point_count = len(poly.exterior.coords)
+
+    print(f"bbox: {bounds}")
+    print(f"width: {width}")
+    print(f"height: {height}")
+    print(f"area: {geom.area}")
+    print(f"point_count: {point_count}")
+    print(f"is_valid: {geom.is_valid}")
+    if used_fallback is not None:
+        print(f"used_fallback: {used_fallback}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_cli())
