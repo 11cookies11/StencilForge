@@ -132,7 +132,14 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "qfn_confidence_threshold": config.qfn_confidence_threshold,
         "qfn_max_pad_width_mm": config.qfn_max_pad_width_mm,
         "outline_fill_rule": config.outline_fill_rule,
+        "outline_close_strategy": config.outline_close_strategy,
         "outline_merge_tol_mm": config.outline_merge_tol_mm,
+        "outline_snap_eps_mm": config.outline_snap_eps_mm,
+        "outline_arc_max_chord_error_mm": config.outline_arc_max_chord_error_mm,
+        "ui_debug_plot_outline": config.ui_debug_plot_outline,
+        "ui_debug_plot_max_segments": config.ui_debug_plot_max_segments,
+        "ui_debug_plot_max_offset_vectors": config.ui_debug_plot_max_offset_vectors,
+        "ui_debug_plot_offset_min_mm": config.ui_debug_plot_offset_min_mm,
     }
 
 
@@ -212,6 +219,7 @@ class BackendBridge(QObject):
     jobLog = Signal(str)
     jobDone = Signal(dict)
     jobError = Signal(str)
+    showOutlineDebug = Signal(dict)
 
     def __init__(self, project_root: Path):
         super().__init__()
@@ -231,6 +239,7 @@ class BackendBridge(QObject):
         self._log_path = _resolve_log_path(project_root)
         self._ensure_log_handler()
         self.jobError.connect(self._on_job_error)
+        self.showOutlineDebug.connect(self._on_show_outline_debug)
         self._log_line("Backend initialized.")
 
     def attach_preview(self, dialog: QDialog, viewer: "VtkStlViewer", ui: dict | None = None) -> None:
@@ -311,6 +320,23 @@ class BackendBridge(QObject):
         dialog.exec()
         if open_button is not None and dialog.clickedButton() == open_button:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._log_path)))
+
+    def _on_show_outline_debug(self, payload: dict) -> None:
+        if not payload:
+            return
+        try:
+            from .geometry.outline_plot import show_outline_debug_plot
+        except Exception as exc:
+            self._emit_log(f"无法加载调试绘图: {exc}")
+            return
+        debug = payload.get("debug")
+        plot_cfg = payload.get("plot_cfg")
+        if not debug or not plot_cfg:
+            return
+        try:
+            show_outline_debug_plot(debug, plot_cfg)
+        except Exception as exc:
+            self._emit_log(f"调试绘图失败: {exc}")
 
     def _show_preview(self) -> None:
         if self._external_preview:
@@ -526,7 +552,18 @@ class BackendBridge(QObject):
                 if config_path:
                     config = StencilConfig.from_json(Path(config_path))
                 self._log_line(f"Resolved input: {resolved_input}")
-                generate_stencil(Path(resolved_input), Path(output_stl), config)
+                outline_debug = generate_stencil(Path(resolved_input), Path(output_stl), config)
+                if (
+                    outline_debug
+                    and config.ui_debug_plot_outline
+                    and config.outline_close_strategy == "robust_polygonize"
+                ):
+                    plot_cfg = {
+                        "max_segments": config.ui_debug_plot_max_segments,
+                        "max_offset_vectors": config.ui_debug_plot_max_offset_vectors,
+                        "offset_min_mm": config.ui_debug_plot_offset_min_mm,
+                    }
+                    self.showOutlineDebug.emit({"debug": outline_debug, "plot_cfg": plot_cfg})
                 self.jobProgress.emit(100)
                 self.jobStatus.emit("success")
                 self._log_line("Job status: success")

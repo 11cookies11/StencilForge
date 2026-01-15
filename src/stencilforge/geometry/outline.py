@@ -34,6 +34,9 @@ class RobustOutlineConfig:
     buffer_scale: float = 2.0
     min_seg_len_scale: float = 0.5
     try_fix_invalid: bool = True
+    collect_debug_data: bool = False
+    max_debug_segments: int = 20000
+    max_debug_offset_vectors: int = 800
 
 
 class RobustOutlineExtractor:
@@ -44,11 +47,23 @@ class RobustOutlineExtractor:
 
     def extract(self, primitives) -> Polygon:
         segments = self._primitives_to_segments(primitives)
+        self.debug["eps_mm"] = self.cfg.eps_mm
+        self.debug["arc_max_chord_error_mm"] = self.cfg.arc_max_chord_error_mm
         self.debug["raw_segments_count"] = len(segments)
+        if self.cfg.collect_debug_data:
+            self.debug["raw_segments"] = self._limit_segments(segments)
+            self.debug["bbox"] = self._segments_bbox(segments)
         segments = self._snap_segments(segments)
         self.debug["snapped_segments_count"] = len(segments)
+        if self.cfg.collect_debug_data:
+            self.debug["snapped_segments"] = self._limit_segments(segments)
         segments = self._filter_and_dedupe_segments(segments)
         self.debug["deduped_segments_count"] = len(segments)
+        if self.cfg.collect_debug_data:
+            self.debug["deduped_segments"] = self._limit_segments(segments)
+            self.debug["offset_vectors"] = self._build_offset_vectors(
+                self.debug.get("raw_segments", []),
+            )
         if not segments:
             raise ValueError(self._format_error("no segments after filtering"))
         polygons = []
@@ -77,6 +92,8 @@ class RobustOutlineExtractor:
         self.debug["polygon_count"] = len(polygons)
         self.debug["chosen_area"] = float(poly.area)
         self.debug["used_fallback"] = used_fallback
+        if self.cfg.collect_debug_data:
+            self.debug["chosen_polygon_coords"] = self._polygon_coords(poly)
         return poly
 
     def _primitives_to_segments(self, primitives) -> list[Segment2D]:
@@ -164,6 +181,46 @@ class RobustOutlineExtractor:
         dy = p1[1] - p2[1]
         return (dx * dx + dy * dy) ** 0.5
 
+    def _limit_segments(self, segments: list[Segment2D]) -> list[Segment2D]:
+        limit = self.cfg.max_debug_segments
+        if limit <= 0 or len(segments) <= limit:
+            return list(segments)
+        stride = max(1, int(math.ceil(len(segments) / limit)))
+        return [segments[idx] for idx in range(0, len(segments), stride)][:limit]
+
+    def _segments_bbox(self, segments: list[Segment2D]) -> tuple[float, float, float, float] | None:
+        if not segments:
+            return None
+        xs = []
+        ys = []
+        for p1, p2 in segments:
+            xs.extend((p1[0], p2[0]))
+            ys.extend((p1[1], p2[1]))
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def _build_offset_vectors(self, raw_segments: list[Segment2D]) -> list[tuple[Point2D, Point2D, float]]:
+        offsets: dict[Point2D, tuple[Point2D, float]] = {}
+        for p1, p2 in raw_segments:
+            for point in (p1, p2):
+                snapped = self._snap_point(point)
+                dist = self._segment_length(point, snapped)
+                current = offsets.get(point)
+                if current is None or dist > current[1]:
+                    offsets[point] = (snapped, dist)
+        vectors = [(raw, snapped, dist) for raw, (snapped, dist) in offsets.items()]
+        vectors.sort(key=lambda item: item[2], reverse=True)
+        limit = self.cfg.max_debug_offset_vectors
+        if limit >= 0:
+            vectors = vectors[:limit]
+        return vectors
+
+    @staticmethod
+    def _polygon_coords(poly: Polygon) -> list[Point2D]:
+        coords = list(poly.exterior.coords)
+        if len(coords) > 1 and coords[0] == coords[-1]:
+            coords = coords[:-1]
+        return coords
+
     def _polygonize_segments(self, segments: list[Segment2D]) -> list[Polygon]:
         lines = [LineString([p1, p2]) for p1, p2 in segments]
         if not lines:
@@ -206,8 +263,10 @@ class OutlineBuilder:
         self._primitive_builder = PrimitiveGeometryBuilder(config)
         self._close_tol_mm = 0.02
         self._merge_tol_mm = config.outline_merge_tol_mm
+        self._last_robust_debug: Dict[str, Any] | None = None
 
     def build(self, primitives, units: str | None = None):
+        self._last_robust_debug = None
         return self._outline_from_primitives(primitives, units)
 
     def _outline_from_primitives(self, primitives, units: str | None = None):
@@ -221,10 +280,18 @@ class OutlineBuilder:
         if self._config.outline_close_strategy == "robust_polygonize":
             eps = self._tol_in_units(self._config.outline_snap_eps_mm, units)
             arc_err = self._tol_in_units(self._config.outline_arc_max_chord_error_mm, units)
-            cfg = RobustOutlineConfig(eps_mm=eps, arc_max_chord_error_mm=arc_err)
+            cfg = RobustOutlineConfig(
+                eps_mm=eps,
+                arc_max_chord_error_mm=arc_err,
+                collect_debug_data=self._config.ui_debug_plot_outline,
+                max_debug_segments=self._config.ui_debug_plot_max_segments,
+                max_debug_offset_vectors=self._config.ui_debug_plot_max_offset_vectors,
+            )
             extractor = RobustOutlineExtractor(cfg, self._primitive_builder)
             try:
-                return extractor.extract(primitives)
+                poly = extractor.extract(primitives)
+                self._last_robust_debug = self._finalize_debug(extractor.debug, units)
+                return poly
             except Exception as exc:
                 logger.warning("Robust outline failed, falling back to legacy: %s", exc)
         segments = self._outline_segments_from_primitives(primitives)
@@ -259,6 +326,47 @@ class OutlineBuilder:
                     return filled
         logger.info("Outline fallback: primitives_to_geometry")
         return self._primitive_builder._primitives_to_geometry(primitives)
+
+    def get_last_robust_debug(self) -> Dict[str, Any] | None:
+        return self._last_robust_debug
+
+    def _finalize_debug(self, debug: Dict[str, Any], units: str | None) -> Dict[str, Any]:
+        debug = dict(debug)
+        debug["eps_mm"] = float(self._config.outline_snap_eps_mm)
+        debug["arc_max_chord_error_mm"] = float(self._config.outline_arc_max_chord_error_mm)
+        if units == "inch":
+            debug = self._scale_debug_to_mm(debug)
+        return debug
+
+    def _scale_debug_to_mm(self, debug: Dict[str, Any]) -> Dict[str, Any]:
+        scale = 25.4
+
+        def scale_point(point: Point2D) -> Point2D:
+            return (point[0] * scale, point[1] * scale)
+
+        def scale_segment(segment: Segment2D) -> Segment2D:
+            return (scale_point(segment[0]), scale_point(segment[1]))
+
+        def scale_segments(segments: list[Segment2D]) -> list[Segment2D]:
+            return [scale_segment(seg) for seg in segments]
+
+        if "raw_segments" in debug:
+            debug["raw_segments"] = scale_segments(debug["raw_segments"])
+        if "snapped_segments" in debug:
+            debug["snapped_segments"] = scale_segments(debug["snapped_segments"])
+        if "deduped_segments" in debug:
+            debug["deduped_segments"] = scale_segments(debug["deduped_segments"])
+        if "chosen_polygon_coords" in debug:
+            debug["chosen_polygon_coords"] = [scale_point(p) for p in debug["chosen_polygon_coords"]]
+        if "bbox" in debug and debug["bbox"] is not None:
+            min_x, min_y, max_x, max_y = debug["bbox"]
+            debug["bbox"] = (min_x * scale, min_y * scale, max_x * scale, max_y * scale)
+        if "offset_vectors" in debug:
+            scaled = []
+            for raw, snapped, dist in debug["offset_vectors"]:
+                scaled.append((scale_point(raw), scale_point(snapped), dist * scale))
+            debug["offset_vectors"] = scaled
+        return debug
 
     def _outline_segments_from_primitives(self, primitives):
         # 仅从线段/圆弧提取轮廓线

@@ -22,6 +22,7 @@ class GerberGeometryService:
         self._config = config
         self._primitive_builder = PrimitiveGeometryBuilder(config)
         self._outline_builder = OutlineBuilder(config)
+        self._last_outline_debug: dict | None = None
 
     def load_paste_geometry(self, paths: Iterable[Path]):
         # 读取多份锡膏层并合并
@@ -37,8 +38,12 @@ class GerberGeometryService:
         # 读取板框并构建轮廓
         layer = self._load_layer(path, "outline")
         geom = self._outline_builder.build(layer.primitives, layer.cam_source.units)
+        self._last_outline_debug = self._outline_builder.get_last_robust_debug()
         geom = self._scale_to_mm(geom, layer.cam_source.units)
         return geom
+
+    def get_last_outline_debug(self) -> dict | None:
+        return self._last_outline_debug
 
     @staticmethod
     def _load_layer(path: Path, label: str):

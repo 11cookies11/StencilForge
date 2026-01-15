@@ -39,6 +39,10 @@ class StencilConfig:
     outline_merge_tol_mm: float
     outline_snap_eps_mm: float
     outline_arc_max_chord_error_mm: float
+    ui_debug_plot_outline: bool
+    ui_debug_plot_max_segments: int
+    ui_debug_plot_max_offset_vectors: int
+    ui_debug_plot_offset_min_mm: float
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
@@ -103,6 +107,10 @@ class StencilConfig:
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
         outline_snap_eps_mm = float(data.get("outline_snap_eps_mm", 0.001))
         outline_arc_max_chord_error_mm = float(data.get("outline_arc_max_chord_error_mm", 0.01))
+        ui_debug_plot_outline = bool(data.get("ui_debug_plot_outline", False))
+        ui_debug_plot_max_segments = int(data.get("ui_debug_plot_max_segments", 20000))
+        ui_debug_plot_max_offset_vectors = int(data.get("ui_debug_plot_max_offset_vectors", 800))
+        ui_debug_plot_offset_min_mm = float(data.get("ui_debug_plot_offset_min_mm", 0.0))
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
@@ -133,6 +141,10 @@ class StencilConfig:
             outline_merge_tol_mm=outline_merge_tol_mm,
             outline_snap_eps_mm=outline_snap_eps_mm,
             outline_arc_max_chord_error_mm=outline_arc_max_chord_error_mm,
+            ui_debug_plot_outline=ui_debug_plot_outline,
+            ui_debug_plot_max_segments=ui_debug_plot_max_segments,
+            ui_debug_plot_max_offset_vectors=ui_debug_plot_max_offset_vectors,
+            ui_debug_plot_offset_min_mm=ui_debug_plot_offset_min_mm,
         )
 
     def validate(self) -> None:
@@ -185,6 +197,12 @@ class StencilConfig:
             raise ValueError("outline_snap_eps_mm must be > 0")
         if self.outline_arc_max_chord_error_mm <= 0:
             raise ValueError("outline_arc_max_chord_error_mm must be > 0")
+        if self.ui_debug_plot_max_segments < 0:
+            raise ValueError("ui_debug_plot_max_segments must be >= 0")
+        if self.ui_debug_plot_max_offset_vectors < 0:
+            raise ValueError("ui_debug_plot_max_offset_vectors must be >= 0")
+        if self.ui_debug_plot_offset_min_mm < 0:
+            raise ValueError("ui_debug_plot_offset_min_mm must be >= 0")
 
 
 def _ensure_list(value: Iterable[str] | str | None) -> list[str]:

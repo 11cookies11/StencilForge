@@ -19,7 +19,7 @@ from .qfn import regenerate_qfn_paste
 logger = logging.getLogger(__name__)
 
 
-def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) -> None:
+def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) -> dict | None:
     # 主流程：从输入 Gerber 解析 -> 2D 几何 -> 3D 网格 -> 导出 STL
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -53,9 +53,11 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
 
     # 3) 读取板框（Outline），用于确定钢网外轮廓
     outline_geom = None
+    outline_debug: dict | None = None
     outline_files = _find_files(input_dir, config.outline_patterns)
     if outline_files:
         outline_geom = geometry_service.load_outline_geometry(outline_files[0])
+        outline_debug = geometry_service.get_last_outline_debug()
         logger.info("Outline layer: %s", outline_files[0].name)
 
     # 3.1) 若没有板框，则用锡膏外包矩形兜底
@@ -168,7 +170,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     # 6) 导出模式：CadQuery 或 Trimesh
     if config.model_backend == "cadquery":
         export_cadquery_stl(stencil_2d, locator_geom, locator_step_geom, output_path, config)
-        return
+        return outline_debug
 
     # 7) 2D -> 3D 网格挤出，并叠加定位结构
     mesh = extrude_geometry(stencil_2d, config.thickness_mm)
@@ -217,6 +219,7 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
     except Exception as exc:
         raise ValueError(f"Failed to validate exported STL: {exc}") from exc
     logger.info("STL export complete")
+    return outline_debug
 
 
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
