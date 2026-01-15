@@ -31,5 +31,8 @@
   "qfn_confidence_threshold": 0.75,
   "qfn_max_pad_width_mm": 1.2,
   "outline_fill_rule": "evenodd",
-  "outline_merge_tol_mm": 0.01
+  "outline_close_strategy": "legacy",
+  "outline_merge_tol_mm": 0.01,
+  "outline_snap_eps_mm": 0.001,
+  "outline_arc_max_chord_error_mm": 0.01
 }

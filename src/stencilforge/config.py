@@ -35,7 +35,10 @@ class StencilConfig:
     qfn_confidence_threshold: float
     qfn_max_pad_width_mm: float
     outline_fill_rule: str
+    outline_close_strategy: str
     outline_merge_tol_mm: float
+    outline_snap_eps_mm: float
+    outline_arc_max_chord_error_mm: float
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
@@ -96,7 +99,10 @@ class StencilConfig:
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
         qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
+        outline_close_strategy = str(data.get("outline_close_strategy", "legacy"))
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
+        outline_snap_eps_mm = float(data.get("outline_snap_eps_mm", 0.001))
+        outline_arc_max_chord_error_mm = float(data.get("outline_arc_max_chord_error_mm", 0.01))
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
@@ -123,7 +129,10 @@ class StencilConfig:
             qfn_confidence_threshold=qfn_confidence_threshold,
             qfn_max_pad_width_mm=qfn_max_pad_width_mm,
             outline_fill_rule=outline_fill_rule,
+            outline_close_strategy=outline_close_strategy,
             outline_merge_tol_mm=outline_merge_tol_mm,
+            outline_snap_eps_mm=outline_snap_eps_mm,
+            outline_arc_max_chord_error_mm=outline_arc_max_chord_error_mm,
         )
 
     def validate(self) -> None:
@@ -168,8 +177,14 @@ class StencilConfig:
             raise ValueError("locator_open_side must be none/top/right/bottom/left")
         if self.outline_fill_rule not in {"legacy", "evenodd"}:
             raise ValueError("outline_fill_rule must be legacy or evenodd")
+        if self.outline_close_strategy not in {"legacy", "graph", "robust_polygonize"}:
+            raise ValueError("outline_close_strategy must be legacy, graph, or robust_polygonize")
         if self.outline_merge_tol_mm < 0:
             raise ValueError("outline_merge_tol_mm must be >= 0")
+        if self.outline_snap_eps_mm <= 0:
+            raise ValueError("outline_snap_eps_mm must be > 0")
+        if self.outline_arc_max_chord_error_mm <= 0:
+            raise ValueError("outline_arc_max_chord_error_mm must be > 0")
 
 
 def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
