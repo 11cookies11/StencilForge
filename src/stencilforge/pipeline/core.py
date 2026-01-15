@@ -118,6 +118,20 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
                         "step2_outline_segments_raw_colored",
                         outline_segments_raw,
                     )
+                outline_segments_merge_in = outline_debug.get("segments_merge_in_geom")
+                if outline_segments_merge_in is not None:
+                    dump_colored_segments_png(
+                        debug_dir,
+                        "step2_outline_segments_merge_in",
+                        outline_segments_merge_in,
+                    )
+                outline_segments_merge_out = outline_debug.get("segments_merge_out_geom")
+                if outline_segments_merge_out is not None:
+                    dump_colored_segments_png(
+                        debug_dir,
+                        "step2_outline_segments_merge_out",
+                        outline_segments_merge_out,
+                    )
                 outline_loops = outline_debug.get("loops_geom")
                 if outline_loops is not None:
                     # DEBUG: 输出闭合后的线段环

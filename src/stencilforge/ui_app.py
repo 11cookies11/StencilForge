@@ -135,6 +135,7 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "debug_log_detail": config.debug_log_detail,
         "debug_dump_dir": config.debug_dump_dir,
         "outline_fill_rule": config.outline_fill_rule,
+        "outline_merge_tol_mm": config.outline_merge_tol_mm,
     }
 
 

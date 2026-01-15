@@ -6,7 +6,8 @@ import math
 import logging
 
 from gerber import primitives as gprim
-from shapely.geometry import LineString, MultiLineString, Polygon
+from shapely.geometry import LineString, MultiLineString, Point, Polygon
+from shapely.strtree import STRtree
 from shapely.ops import unary_union
 
 from ..config import StencilConfig
@@ -20,6 +21,7 @@ class OutlineBuilder:
         self._config = config
         self._primitive_builder = PrimitiveGeometryBuilder(config)
         self._close_tol_mm = 0.02
+        self._merge_tol_mm = config.outline_merge_tol_mm
 
     def build(self, primitives):
         return self._outline_from_primitives(primitives)
@@ -33,6 +35,8 @@ class OutlineBuilder:
             "source": None,
             "segments_geom": None,
             "segments_raw_geom": None,
+            "segments_merge_in_geom": None,
+            "segments_merge_out_geom": None,
             "loops_count": 0,
             "loops_geom": None,
             "max_gap_pair": None,
@@ -49,6 +53,12 @@ class OutlineBuilder:
             # 先尝试按路径顺序闭合，再退回基于图的闭合
             logger.info("Outline segments: %s", len(segments))
             debug["segments_raw_geom"] = MultiLineString(segments) if len(segments) > 1 else segments[0]
+            if self._merge_tol_mm > 0:
+                debug["segments_merge_in_geom"] = debug["segments_raw_geom"]
+                segments = self._merge_near_colinear_segments(segments, self._merge_tol_mm)
+                debug["segments_merge_out_geom"] = (
+                    MultiLineString(segments) if len(segments) > 1 else segments[0]
+                )
             merged = unary_union(segments)
             debug["source"] = "segments"
             debug["segments_geom"] = merged
@@ -91,6 +101,101 @@ class OutlineBuilder:
                 if len(arc_pts) >= 2:
                     segments.append(LineString(arc_pts))
         return segments
+
+    def _merge_near_colinear_segments(self, segments, tol: float):
+        # 合并近似共线且重叠/相接的冗余线段，避免闭合受干扰
+        if tol <= 0 or len(segments) < 2:
+            return segments
+        lines = [line for line in segments if line is not None and not line.is_empty and len(line.coords) >= 2]
+        if len(lines) < 2:
+            return lines
+        removed = set()
+        merged_count = 0
+        angle_cos = math.cos(math.radians(1.0))
+        changed = True
+        while changed:
+            changed = False
+            active = [line for idx, line in enumerate(lines) if idx not in removed]
+            if len(active) < 2:
+                break
+            tree = STRtree(active)
+            geom_to_idx = {id(line): idx for idx, line in enumerate(lines) if idx not in removed}
+            for idx, line in enumerate(lines):
+                if idx in removed:
+                    continue
+                corridor = line.buffer(tol, cap_style=2, join_style=2)
+                for candidate in tree.query(corridor):
+                    cand_idx = geom_to_idx.get(id(candidate))
+                    if cand_idx is None or cand_idx == idx or cand_idx in removed:
+                        continue
+                    merged = self._try_merge_lines(line, lines[cand_idx], tol, angle_cos)
+                    if merged is None:
+                        continue
+                    lines[idx] = merged
+                    removed.add(cand_idx)
+                    merged_count += 1
+                    changed = True
+                    break
+                if changed:
+                    break
+        merged_lines = [line for idx, line in enumerate(lines) if idx not in removed]
+        if merged_count:
+            logger.info("Outline segments merged near-colinear: %s -> %s", len(segments), len(merged_lines))
+        return merged_lines
+
+    def _try_merge_lines(self, line_a: LineString, line_b: LineString, tol: float, angle_cos: float):
+        if line_a is None or line_b is None:
+            return None
+        coords_a = list(line_a.coords)
+        coords_b = list(line_b.coords)
+        if len(coords_a) < 2 or len(coords_b) < 2:
+            return None
+        ax0, ay0 = coords_a[0]
+        ax1, ay1 = coords_a[-1]
+        bx0, by0 = coords_b[0]
+        bx1, by1 = coords_b[-1]
+        dax = ax1 - ax0
+        day = ay1 - ay0
+        dbx = bx1 - bx0
+        dby = by1 - by0
+        len_a = (dax * dax + day * day) ** 0.5
+        len_b = (dbx * dbx + dby * dby) ** 0.5
+        if len_a == 0 or len_b == 0:
+            return None
+        dir_a = (dax / len_a, day / len_a)
+        dir_b = (dbx / len_b, dby / len_b)
+        dot = abs(dir_a[0] * dir_b[0] + dir_a[1] * dir_b[1])
+        if dot < angle_cos:
+            return None
+        if line_a.distance(Point(coords_b[0])) > tol or line_a.distance(Point(coords_b[-1])) > tol:
+            return None
+
+        def proj(point) -> float:
+            return (point[0] - ax0) * dir_a[0] + (point[1] - ay0) * dir_a[1]
+
+        t_a0 = proj(coords_a[0])
+        t_a1 = proj(coords_a[-1])
+        t_b0 = proj(coords_b[0])
+        t_b1 = proj(coords_b[-1])
+        a_min = min(t_a0, t_a1)
+        a_max = max(t_a0, t_a1)
+        b_min = min(t_b0, t_b1)
+        b_max = max(t_b0, t_b1)
+        if a_max < b_min:
+            gap = b_min - a_max
+        elif b_max < a_min:
+            gap = a_min - b_max
+        else:
+            gap = 0.0
+        if gap > tol:
+            return None
+        t_min = min(a_min, b_min)
+        t_max = max(a_max, b_max)
+        start = (ax0 + dir_a[0] * t_min, ay0 + dir_a[1] * t_min)
+        end = (ax0 + dir_a[0] * t_max, ay0 + dir_a[1] * t_max)
+        if self._points_close(start, end, tol):
+            return None
+        return LineString([start, end])
 
     def _merge_outline_segments(self, segments, merged):
         # 合并重叠/共线线段，减少重复以利于闭合。

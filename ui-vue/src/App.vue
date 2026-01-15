@@ -237,6 +237,16 @@
                   step="0.1"
                 />
               </label>
+              <label class="text-xs font-semibold text-slate-600">{{ t("config.outlineMergeTol") }}
+                <input
+                  v-model.number="config.outline_merge_tol_mm"
+                  @change="updateConfig"
+                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                />
+              </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.arcSteps") }}
                 <input
                   v-model.number="config.arc_steps"
@@ -550,6 +560,7 @@ const MESSAGES = {
     "config.outputModeHoles": "Holes Only",
     "config.pasteOffset": "焊膏偏移 (mm)",
     "config.outlineMargin": "外形边距 (mm)",
+    "config.outlineMergeTol": "外形合并容差 (mm)",
     "config.arcSteps": "圆弧步数",
     "config.curveResolution": "曲线分辨率",
     "config.locatorEnabled": "启用 PCB 定位",
@@ -635,6 +646,7 @@ const MESSAGES = {
     "config.outputModeHoles": "Holes Only",
     "config.pasteOffset": "Paste offset (mm)",
     "config.outlineMargin": "Outline margin (mm)",
+    "config.outlineMergeTol": "Outline merge tolerance (mm)",
     "config.arcSteps": "Arc steps",
     "config.curveResolution": "Curve resolution",
     "config.locatorEnabled": "Enable PCB locating",
@@ -718,6 +730,7 @@ export default {
         thickness_mm: 0.12,
         paste_offset_mm: -0.05,
         outline_margin_mm: 5.0,
+        outline_merge_tol_mm: 0.01,
         locator_enabled: true,
         locator_height_mm: 2.0,
         locator_width_mm: 2.0,

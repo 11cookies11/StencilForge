@@ -33,5 +33,6 @@
   "debug_enabled": true,
   "debug_log_detail": false,
   "debug_dump_dir": "debug-dumps",
-  "outline_fill_rule": "evenodd"
+  "outline_fill_rule": "evenodd",
+  "outline_merge_tol_mm": 0.01
 }

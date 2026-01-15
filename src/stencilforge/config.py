@@ -38,6 +38,7 @@ class StencilConfig:
     debug_log_detail: bool
     debug_dump_dir: str
     outline_fill_rule: str
+    outline_merge_tol_mm: float
 
     @staticmethod
     def default_path(project_root: Path) -> Path:
@@ -101,6 +102,7 @@ class StencilConfig:
         debug_log_detail = bool(data.get("debug_log_detail", False))
         debug_dump_dir = str(data.get("debug_dump_dir", "") or "")
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
+        outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
@@ -130,6 +132,7 @@ class StencilConfig:
             debug_log_detail=debug_log_detail,
             debug_dump_dir=debug_dump_dir,
             outline_fill_rule=outline_fill_rule,
+            outline_merge_tol_mm=outline_merge_tol_mm,
         )
 
     def validate(self) -> None:
@@ -174,6 +177,8 @@ class StencilConfig:
             raise ValueError("locator_open_side must be none/top/right/bottom/left")
         if self.outline_fill_rule not in {"legacy", "evenodd"}:
             raise ValueError("outline_fill_rule must be legacy or evenodd")
+        if self.outline_merge_tol_mm < 0:
+            raise ValueError("outline_merge_tol_mm must be >= 0")
 
 
 def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
