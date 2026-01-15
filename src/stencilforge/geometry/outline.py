@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict
 
 from gerber import primitives as gprim
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
@@ -14,6 +16,30 @@ from ..config import StencilConfig
 from .primitives import PrimitiveGeometryBuilder
 
 logger = logging.getLogger(__name__)
+
+
+Point2D = tuple[float, float]
+Segment2D = tuple[Point2D, Point2D]
+
+
+@dataclass(frozen=True)
+class RobustOutlineConfig:
+    eps_mm: float = 0.001
+    arc_max_chord_error_mm: float = 0.01
+    use_buffer_fallback: bool = True
+    buffer_scale: float = 2.0
+    min_seg_len_scale: float = 0.5
+    try_fix_invalid: bool = True
+
+
+class RobustOutlineExtractor:
+    def __init__(self, cfg: RobustOutlineConfig, primitive_builder: PrimitiveGeometryBuilder) -> None:
+        self.cfg = cfg
+        self._primitive_builder = primitive_builder
+        self.debug: Dict[str, Any] = {}
+
+    def extract(self, primitives) -> Polygon:
+        raise NotImplementedError
 
 
 class OutlineBuilder:
