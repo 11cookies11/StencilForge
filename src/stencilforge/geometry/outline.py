@@ -10,7 +10,7 @@ from typing import Any, Dict
 from gerber import primitives as gprim
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.strtree import STRtree
-from shapely.ops import unary_union
+from shapely.ops import linemerge, polygonize, unary_union
 
 from ..config import StencilConfig
 from .primitives import PrimitiveGeometryBuilder
@@ -45,7 +45,35 @@ class RobustOutlineExtractor:
         self.debug["snapped_segments_count"] = len(segments)
         segments = self._filter_and_dedupe_segments(segments)
         self.debug["deduped_segments_count"] = len(segments)
-        raise NotImplementedError
+        if not segments:
+            raise ValueError(self._format_error("no segments after filtering"))
+        polygons = []
+        poly_exc: Exception | None = None
+        try:
+            polygons = self._polygonize_segments(segments)
+        except Exception as exc:
+            poly_exc = exc
+        used_fallback = False
+        if not polygons and self.cfg.use_buffer_fallback:
+            try:
+                polygons = self._fallback_buffer_polygon(segments)
+                used_fallback = True
+            except Exception as exc:
+                poly_exc = exc
+        if not polygons:
+            extra = f" polygonize_error={poly_exc}" if poly_exc else ""
+            raise ValueError(self._format_error("polygonize produced no polygons") + extra)
+        poly = self._choose_largest_polygon(polygons)
+        if poly is None or poly.is_empty:
+            raise ValueError(self._format_error("empty polygon result"))
+        if self.cfg.try_fix_invalid and not poly.is_valid:
+            poly = poly.buffer(0)
+        if poly.is_empty or poly.area <= 0:
+            raise ValueError(self._format_error("invalid polygon area"))
+        self.debug["polygon_count"] = len(polygons)
+        self.debug["chosen_area"] = float(poly.area)
+        self.debug["used_fallback"] = used_fallback
+        return poly
 
     def _primitives_to_segments(self, primitives) -> list[Segment2D]:
         segments: list[Segment2D] = []
@@ -131,6 +159,41 @@ class RobustOutlineExtractor:
         dx = p1[0] - p2[0]
         dy = p1[1] - p2[1]
         return (dx * dx + dy * dy) ** 0.5
+
+    def _polygonize_segments(self, segments: list[Segment2D]) -> list[Polygon]:
+        lines = [LineString([p1, p2]) for p1, p2 in segments]
+        if not lines:
+            return []
+        unioned = unary_union(lines)
+        merged = linemerge(unioned)
+        return [poly for poly in polygonize(merged)]
+
+    @staticmethod
+    def _choose_largest_polygon(polygons: list[Polygon]) -> Polygon | None:
+        if not polygons:
+            return None
+        return max(polygons, key=lambda p: p.area)
+
+    def _fallback_buffer_polygon(self, segments: list[Segment2D]) -> list[Polygon]:
+        lines = [LineString([p1, p2]) for p1, p2 in segments]
+        if not lines:
+            return []
+        unioned = unary_union(lines)
+        buffered = unioned.buffer(self.cfg.eps_mm * self.cfg.buffer_scale)
+        if buffered.is_empty:
+            return []
+        if buffered.geom_type == "Polygon":
+            return [buffered]
+        if buffered.geom_type == "MultiPolygon":
+            return list(buffered.geoms)
+        return []
+
+    def _format_error(self, reason: str) -> str:
+        return (
+            f"robust outline failed: {reason}; eps_mm={self.cfg.eps_mm} "
+            f"arc_err={self.cfg.arc_max_chord_error_mm} raw={self.debug.get('raw_segments_count')} "
+            f"deduped={self.debug.get('deduped_segments_count')} fallback={self.cfg.use_buffer_fallback}"
+        )
 
 
 class OutlineBuilder:
