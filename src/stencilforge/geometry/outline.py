@@ -67,9 +67,10 @@ class RobustOutlineExtractor:
         if not segments:
             raise ValueError(self._format_error("no segments after filtering"))
         polygons = []
+        poly_stats: Dict[str, Any] = {}
         poly_exc: Exception | None = None
         try:
-            polygons = self._polygonize_segments(segments)
+            polygons, poly_stats = self._polygonize_segments(segments)
         except Exception as exc:
             poly_exc = exc
         used_fallback = False
@@ -79,8 +80,12 @@ class RobustOutlineExtractor:
                 used_fallback = True
             except Exception as exc:
                 poly_exc = exc
+        if poly_stats:
+            self.debug.update(poly_stats)
         if not polygons:
             extra = f" polygonize_error={poly_exc}" if poly_exc else ""
+            if poly_stats:
+                extra += f" polygonize_stats={poly_stats}"
             raise ValueError(self._format_error("polygonize produced no polygons") + extra)
         poly = self._choose_largest_polygon(polygons)
         if poly is None or poly.is_empty:
@@ -221,13 +226,19 @@ class RobustOutlineExtractor:
             coords = coords[:-1]
         return coords
 
-    def _polygonize_segments(self, segments: list[Segment2D]) -> list[Polygon]:
+    def _polygonize_segments(self, segments: list[Segment2D]) -> tuple[list[Polygon], Dict[str, Any]]:
         lines = [LineString([p1, p2]) for p1, p2 in segments]
         if not lines:
-            return []
+            return [], {"polygonize_union_type": None, "polygonize_merged_type": None}
         unioned = unary_union(lines)
         merged = linemerge(unioned)
-        return [poly for poly in polygonize(merged)]
+        polygons = [poly for poly in polygonize(merged)]
+        stats = {
+            "polygonize_union_type": getattr(unioned, "geom_type", None),
+            "polygonize_merged_type": getattr(merged, "geom_type", None),
+            "polygonize_count": len(polygons),
+        }
+        return polygons, stats
 
     @staticmethod
     def _choose_largest_polygon(polygons: list[Polygon]) -> Polygon | None:

@@ -6,7 +6,7 @@ from typing import Iterable
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
-from matplotlib.widgets import CheckButtons
+from matplotlib.patches import Rectangle
 
 
 Point2D = tuple[float, float]
@@ -36,7 +36,7 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
     offset_vectors = [vec for vec in offset_vectors if vec[2] >= offset_min]
     distances = [dist for _, _, dist in offset_vectors]
 
-    fig = plt.figure(figsize=(12.5, 8.5))
+    fig = plt.figure(figsize=(13.8, 8.6), constrained_layout=False)
     grid = fig.add_gridspec(2, 2, height_ratios=[2.0, 1.0])
     ax_raw = fig.add_subplot(grid[0, 0])
     ax_final = fig.add_subplot(grid[0, 1])
@@ -50,10 +50,10 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         _apply_bbox(ax_raw, bbox)
         _apply_bbox(ax_final, bbox)
 
-    raw_lc = _add_segments(ax_raw, raw_segments, color="#94a3b8", alpha=0.3, lw=0.8)
-    snapped_lc = _add_segments(ax_raw, snapped_segments, color="#60a5fa", alpha=0.5, lw=0.8)
-    final_lc = _add_segments(ax_final, deduped_segments, color="#0f172a", alpha=0.9, lw=1.8)
-    poly_line = _add_polygon(ax_final, polygon_coords, color="#ef4444", lw=2.8)
+    raw_lc = _add_segments(ax_raw, raw_segments, color="#94a3b8", alpha=0.3, lw=0.7)
+    snapped_lc = _add_segments(ax_raw, snapped_segments, color="#60a5fa", alpha=0.5, lw=0.7)
+    final_lc = _add_segments(ax_final, deduped_segments, color="#0f172a", alpha=0.9, lw=1.6)
+    poly_line = _add_polygon(ax_final, polygon_coords, color="#ef4444", lw=2.4)
 
     raw_pts = _add_endpoints(ax_raw, raw_segments, color="#94a3b8")
     final_pts = _add_endpoints(ax_final, deduped_segments, color="#0f172a")
@@ -83,8 +83,9 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         stats = f"max={max(distances):.6f} mean={mean(distances):.6f} p95={p95:.6f}"
     else:
         stats = "no offsets"
+    poly_stats = _format_poly_stats(debug)
     ax_hist.set_title(
-        f"Offset histogram (count={len(distances)} min={offset_min:.6f}) {stats}"
+        f"Offset histogram (count={len(distances)} min={offset_min:.6f}) {stats}{poly_stats}"
     )
     ax_hist.set_xlabel("Offset distance (mm)")
     ax_hist.set_ylabel("Count")
@@ -98,8 +99,30 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         "Show Offset Vectors",
     ]
     visibility = [True, False, True, True, True, False]
-    controls_ax = fig.add_axes([0.86, 0.52, 0.12, 0.22])
-    checks = CheckButtons(controls_ax, labels, visibility)
+    fig.subplots_adjust(right=0.83, wspace=0.18, hspace=0.28)
+    controls_ax = fig.add_axes([0.85, 0.52, 0.13, 0.24])
+    controls_ax.set_facecolor("white")
+    controls_ax.patch.set_alpha(0.95)
+    controls_ax.set_zorder(10)
+    controls_ax.set_navigate(False)
+    controls_ax.set_xlim(0, 1)
+    controls_ax.set_ylim(0, 1)
+    controls_ax.axis("off")
+
+    box_patches = []
+    check_marks = []
+    label_texts = []
+    row_h = 1.0 / (len(labels) + 0.5)
+    for idx, label in enumerate(labels):
+        y = 1.0 - (idx + 1) * row_h
+        box = Rectangle((0.05, y + 0.02), 0.08, 0.08, edgecolor="black", facecolor="white", lw=1)
+        controls_ax.add_patch(box)
+        mark = controls_ax.text(0.065, y + 0.025, "x", fontsize=9, color="black", va="bottom", ha="left")
+        mark.set_visible(visibility[idx])
+        text = controls_ax.text(0.18, y + 0.02, label, fontsize=9, va="bottom", ha="left")
+        box_patches.append(box)
+        check_marks.append(mark)
+        label_texts.append(text)
 
     artists = {
         "Show Raw": [raw_lc],
@@ -110,14 +133,29 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         "Show Offset Vectors": [offset_lc],
     }
 
-    def _toggle(label: str) -> None:
+    def _toggle(label: str, idx: int) -> None:
         for artist in artists.get(label, []):
             if artist is not None:
                 artist.set_visible(not artist.get_visible())
+        check_marks[idx].set_visible(not check_marks[idx].get_visible())
         fig.canvas.draw_idle()
 
-    checks.on_clicked(_toggle)
-    plt.show()
+    def _on_click(event) -> None:
+        if event.inaxes != controls_ax or event.ydata is None or event.xdata is None:
+            return
+        x, y = event.xdata, event.ydata
+        if x < 0.05 or x > 0.95:
+            return
+        idx = int((1.0 - y) / row_h)
+        if 0 <= idx < len(labels):
+            _toggle(labels[idx], idx)
+
+    fig.canvas.mpl_connect("button_press_event", _on_click)
+
+    if fig.canvas.toolbar is not None:
+        fig.canvas.toolbar.mode = ""
+    fig.canvas.draw_idle()
+    plt.show(block=False)
 
 
 def _add_segments(ax, segments: Iterable[Segment2D], color: str, alpha: float, lw: float):
@@ -147,7 +185,7 @@ def _add_endpoints(ax, segments: Iterable[Segment2D], color: str):
     if not points:
         return None
     xs, ys = zip(*points)
-    return ax.scatter(xs, ys, s=8, c=color, alpha=0.8)
+    return ax.scatter(xs, ys, s=6, c=color, alpha=0.8)
 
 
 def _add_offset_vectors(ax, vectors, color: str):
@@ -195,16 +233,25 @@ def _apply_bbox(ax, bbox):
 
 def _format_title(label: str, eps: float, debug: dict, counts: tuple, area: float | None = None) -> str:
     raw_key, other_key = counts
-    parts = [label, f"eps={eps:.6f}", f"arc_err={float(debug.get('arc_max_chord_error_mm', 0.0)):.6f}"]
+    parts = [label, f"eps={eps:.4g}", f"arc={float(debug.get('arc_max_chord_error_mm', 0.0)):.4g}"]
     if raw_key:
-        parts.append(f"{raw_key}={debug.get(raw_key)}")
+        parts.append(f"{raw_key.split('_')[0]}={debug.get(raw_key)}")
     if other_key:
-        parts.append(f"{other_key}={debug.get(other_key)}")
+        parts.append(f"{other_key.split('_')[0]}={debug.get(other_key)}")
     if area is not None:
-        parts.append(f"area={area:.6f}")
+        parts.append(f"area={area:.4g}")
     if debug.get("used_fallback") is not None:
-        parts.append(f"fallback={debug.get('used_fallback')}")
+        parts.append(f"fb={debug.get('used_fallback')}")
     return " | ".join(parts)
+
+
+def _format_poly_stats(debug: dict) -> str:
+    union_type = debug.get("polygonize_union_type")
+    merged_type = debug.get("polygonize_merged_type")
+    poly_count = debug.get("polygonize_count")
+    if union_type is None and merged_type is None:
+        return ""
+    return f" | poly={poly_count} union={union_type} merge={merged_type}"
 
 
 def _percentile(values: list[float], percent: float) -> float:
