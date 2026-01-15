@@ -299,6 +299,8 @@ def dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> No
     img_h = max(int(height * px_per_mm) + padding * 2, 1)
     image = Image.new("RGB", (img_w, img_h), "white")
     draw = ImageDraw.Draw(image)
+    concentric = Image.new("RGB", (img_w, img_h), "white")
+    concentric_draw = ImageDraw.Draw(concentric)
     colors = [
         "#1f2937",
         "#0f766e",
@@ -318,24 +320,38 @@ def dump_gko_paths_png(path: Path, out_dir: Path, px_per_mm: float = 10.0) -> No
     for seg_idx, (segment, color_idx) in enumerate(segments):
         coords = [map_point(p) for p in segment]
         if len(coords) >= 2:
-            draw.line(coords, fill=colors[color_idx % len(colors)], width=2)
+            color = colors[color_idx % len(colors)]
+            draw.line(coords, fill=color, width=2)
+            concentric_draw.line(coords, fill=color, width=2)
             sx, sy = coords[0]
             ex, ey = coords[-1]
-            color = colors[color_idx % len(colors)]
             jitter = 4.0
             angle = (seg_idx * 0.61803398875) % (2 * math.pi)
             ox = math.cos(angle) * jitter
             oy = math.sin(angle) * jitter
             draw.ellipse((sx + ox - 3, sy + oy - 3, sx + ox + 3, sy + oy + 3), fill=color, outline=color)
             draw.ellipse((ex - ox - 3, ey - oy - 3, ex - ox + 3, ey - oy + 3), fill=color, outline=color)
+            for radius in (3, 6):
+                concentric_draw.ellipse(
+                    (sx - radius, sy - radius, sx + radius, sy + radius),
+                    outline=color,
+                    width=2,
+                )
+                concentric_draw.ellipse(
+                    (ex - radius, ey - radius, ex + radius, ey + radius),
+                    outline=color,
+                    width=2,
+                )
     gap = _max_gap_pair_from_segments(segments)
     if gap is not None:
         p1, p2, _ = gap
         for point in (p1, p2):
             px, py = map_point(point)
             draw.ellipse((px - 6, py - 6, px + 6, py + 6), outline="#dc2626", width=2)
+            concentric_draw.ellipse((px - 6, py - 6, px + 6, py + 6), outline="#dc2626", width=2)
     image.save(out_dir / "step2_outline_segments_paths.png")
     image.save(out_dir / "step2_outline_segments_paths_deduped.png")
+    concentric.save(out_dir / "step2_outline_segments_paths_concentric.png")
 
 
 def _parse_gko_paths(path: Path):
