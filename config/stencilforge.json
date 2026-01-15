@@ -33,7 +33,7 @@
   "outline_fill_rule": "evenodd",
   "outline_close_strategy": "legacy",
   "outline_merge_tol_mm": 0.01,
-  "outline_snap_eps_mm": 0.001,
+  "outline_snap_eps_mm": 0.05,
   "outline_arc_max_chord_error_mm": 0.01,
   "ui_debug_plot_outline": false,
   "ui_debug_plot_max_segments": 20000,

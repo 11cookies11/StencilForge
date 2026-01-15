@@ -37,6 +37,7 @@ class RobustOutlineConfig:
     collect_debug_data: bool = False
     max_debug_segments: int = 20000
     max_debug_offset_vectors: int = 800
+    max_debug_gap_markers: int = 60
 
 
 class RobustOutlineExtractor:
@@ -64,6 +65,7 @@ class RobustOutlineExtractor:
             self.debug["offset_vectors"] = self._build_offset_vectors(
                 self.debug.get("raw_segments", []),
             )
+            self.debug["gap_markers"] = self._build_gap_markers(segments)
         if not segments:
             raise ValueError(self._format_error("no segments after filtering"))
         polygons = []
@@ -226,6 +228,32 @@ class RobustOutlineExtractor:
             coords = coords[:-1]
         return coords
 
+    def _build_gap_markers(self, segments: list[Segment2D]) -> list[tuple[Point2D, Point2D, float]]:
+        endpoints: list[Point2D] = []
+        for p1, p2 in segments:
+            endpoints.append(p1)
+            endpoints.append(p2)
+        if len(endpoints) < 2:
+            return []
+        gaps = []
+        for i, p1 in enumerate(endpoints):
+            min_dist = None
+            closest = None
+            for j, p2 in enumerate(endpoints):
+                if i == j:
+                    continue
+                dist = self._segment_length(p1, p2)
+                if min_dist is None or dist < min_dist:
+                    min_dist = dist
+                    closest = p2
+            if min_dist is not None and closest is not None:
+                gaps.append((p1, closest, min_dist))
+        gaps.sort(key=lambda item: item[2], reverse=True)
+        limit = self.cfg.max_debug_gap_markers
+        if limit >= 0:
+            gaps = gaps[:limit]
+        return gaps
+
     def _polygonize_segments(self, segments: list[Segment2D]) -> tuple[list[Polygon], Dict[str, Any]]:
         lines = [LineString([p1, p2]) for p1, p2 in segments]
         if not lines:
@@ -297,6 +325,7 @@ class OutlineBuilder:
                 collect_debug_data=self._config.ui_debug_plot_outline,
                 max_debug_segments=self._config.ui_debug_plot_max_segments,
                 max_debug_offset_vectors=self._config.ui_debug_plot_max_offset_vectors,
+                max_debug_gap_markers=self._config.ui_debug_plot_max_offset_vectors,
             )
             extractor = RobustOutlineExtractor(cfg, self._primitive_builder)
             try:
