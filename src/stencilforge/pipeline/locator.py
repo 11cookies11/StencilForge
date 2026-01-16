@@ -5,6 +5,18 @@ from __future__ import annotations
 from shapely.geometry import box
 
 
+def _exclude_keepout(geom, keepout):
+    if geom is None or geom.is_empty:
+        return None
+    if keepout is None or keepout.is_empty:
+        return geom
+    trimmed = geom.difference(keepout)
+    if trimmed.is_empty:
+        return None
+    return trimmed
+
+
+
 def build_locator_ring(outline_geom, clearance_mm: float, width_mm: float, open_side: str, open_width_mm: float):
     # 基于外轮廓生成环形定位墙：外扩 - 内扩得到环
     if width_mm <= 0:
@@ -13,7 +25,7 @@ def build_locator_ring(outline_geom, clearance_mm: float, width_mm: float, open_
     outer = outline_geom.buffer(clearance_mm + width_mm)
     ring = outer.difference(inner)
     ring = apply_open_side(ring, outer, open_side, open_width_mm)
-    return ring
+    return _exclude_keepout(ring, outline_geom)
 
 
 def build_locator_step(outline_geom, clearance_mm: float, step_width_mm: float, open_side: str, open_width_mm: float):
@@ -24,7 +36,7 @@ def build_locator_step(outline_geom, clearance_mm: float, step_width_mm: float, 
     outer = outline_geom.buffer(clearance_mm + step_width_mm)
     step = outer.difference(inner)
     step = apply_open_side(step, outer, open_side, open_width_mm)
-    return step
+    return _exclude_keepout(step, outline_geom)
 
 
 def build_locator_bridge(outline_geom, clearance_mm: float, open_side: str, open_width_mm: float):
@@ -34,7 +46,7 @@ def build_locator_bridge(outline_geom, clearance_mm: float, open_side: str, open
     outer = outline_geom.buffer(clearance_mm)
     ring = outer.difference(outline_geom)
     ring = apply_open_side(ring, outer, open_side, open_width_mm)
-    return ring
+    return _exclude_keepout(ring, outline_geom)
 
 
 def apply_open_side(ring, outer, open_side: str, open_width_mm: float):
