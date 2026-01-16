@@ -3,6 +3,7 @@ from __future__ import annotations
 """CadQuery 导出：将 2D 几何挤出为 3D 并导出 STL。"""
 
 import logging
+import time
 from pathlib import Path
 
 from shapely.ops import unary_union
@@ -175,8 +176,15 @@ def cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
             polygons.extend([poly for poly in merged.geoms if poly.area > 0])
 
     solids = []
-    for poly in polygons:
+    for idx, poly in enumerate(polygons, start=1):
+        t0 = time.perf_counter()
         solid = cadquery_extrude_polygon(poly, thickness_mm, cq)
+        logger.info(
+            "CadQuery polygon %s/%s extrude in %.3fs",
+            idx,
+            len(polygons),
+            time.perf_counter() - t0,
+        )
         if solid is None:
             continue
         solids.append(solid)
@@ -184,24 +192,46 @@ def cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
 
 
 def cadquery_extrude_polygon(poly, thickness_mm: float, cq):
-    # 外轮廓挤出为实体，再逐个孔洞切割
+    # Outer boundary extrusion and hole cutting.
+    hole_count = len(poly.interiors)
+    logger.info("CadQuery polygon holes: %s", hole_count)
     outer = ring_to_cadquery_wire(poly.exterior, cq)
     if outer is None:
         return None
+    t0 = time.perf_counter()
     base = cq.Workplane("XY").add(outer).toPending().extrude(thickness_mm).val()
+    logger.info("CadQuery outer extrude in %.3fs", time.perf_counter() - t0)
     hole_solids = []
-    for hole in poly.interiors:
+    for hole_idx, hole in enumerate(poly.interiors, start=1):
         hole_wire = ring_to_cadquery_wire(hole, cq)
         if hole_wire is None:
             continue
+        t0 = time.perf_counter()
         hole_solid = cq.Workplane("XY").add(hole_wire).toPending().extrude(thickness_mm).val()
+        if hole_idx == 1 or hole_idx % 100 == 0 or hole_idx == hole_count:
+            logger.info(
+                "CadQuery hole %s/%s extrude in %.3fs",
+                hole_idx,
+                hole_count,
+                time.perf_counter() - t0,
+            )
         hole_solids.append(hole_solid)
     if hole_solids:
         try:
+            t0 = time.perf_counter()
             base = base.cut(cq.Compound.makeCompound(hole_solids))
+            logger.info("CadQuery hole batch cut in %.3fs", time.perf_counter() - t0)
         except Exception:
-            for hole_solid in hole_solids:
+            for hole_idx, hole_solid in enumerate(hole_solids, start=1):
+                t0 = time.perf_counter()
                 base = base.cut(hole_solid)
+                if hole_idx == 1 or hole_idx % 100 == 0 or hole_idx == hole_count:
+                    logger.info(
+                        "CadQuery hole %s/%s cut in %.3fs",
+                        hole_idx,
+                        hole_count,
+                        time.perf_counter() - t0,
+                    )
     return base
 
 
