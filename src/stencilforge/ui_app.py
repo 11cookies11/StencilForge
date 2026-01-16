@@ -591,7 +591,19 @@ class BackendBridge(QObject):
                     while process.is_alive():
                         if self._job_cancel_requested:
                             self._log_line("Job cancel requested: terminating worker process.")
-                            process.terminate()
+                            pid = process.pid
+                            if pid:
+                                try:
+                                    subprocess.run(
+                                        ["taskkill", "/F", "/T", "/PID", str(pid)],
+                                        check=True,
+                                        capture_output=True,
+                                        text=True,
+                                    )
+                                except Exception as exc:
+                                    self._log_line(f"Job cancel: taskkill failed: {exc}")
+                            else:
+                                self._log_line("Job cancel: missing worker PID.")
                             process.join(5)
                             if process.is_alive() and hasattr(process, "kill"):
                                 process.kill()
@@ -662,7 +674,19 @@ class BackendBridge(QObject):
         self._job_cancel_requested = True
         if self._job_process is not None and self._job_process.is_alive():
             self._emit_log("已请求停止，正在终止导出进程。")
-            self._job_process.terminate()
+            pid = self._job_process.pid
+            if pid:
+                try:
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(pid)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                except Exception as exc:
+                    self._emit_log(f"终止进程失败: {exc}")
+            else:
+                self._emit_log("终止进程失败: 无法获取进程 ID。")
         else:
             self._emit_log("已请求停止，正在等待任务响应。")
 
