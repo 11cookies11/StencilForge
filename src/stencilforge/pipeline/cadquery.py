@@ -217,10 +217,20 @@ def cadquery_extrude_polygon(poly, thickness_mm: float, cq):
             )
         hole_solids.append(hole_solid)
     if hole_solids:
+        batch_size = 50
         try:
-            t0 = time.perf_counter()
-            base = base.cut(cq.Compound.makeCompound(hole_solids))
-            logger.info("CadQuery hole batch cut in %.3fs", time.perf_counter() - t0)
+            for start in range(0, len(hole_solids), batch_size):
+                batch = hole_solids[start : start + batch_size]
+                batch_end = start + len(batch)
+                t0 = time.perf_counter()
+                base = base.cut(cq.Compound.makeCompound(batch))
+                logger.info(
+                    "CadQuery hole batch cut %s-%s/%s in %.3fs",
+                    start + 1,
+                    batch_end,
+                    hole_count,
+                    time.perf_counter() - t0,
+                )
         except Exception:
             for hole_idx, hole_solid in enumerate(hole_solids, start=1):
                 t0 = time.perf_counter()
