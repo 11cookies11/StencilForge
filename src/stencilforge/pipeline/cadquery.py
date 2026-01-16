@@ -26,13 +26,46 @@ def export_cadquery_stl(
     except ImportError as exc:
         raise ImportError("CadQuery is required for model_backend=cadquery") from exc
 
-    solids = cadquery_extrude_geometry(stencil_2d, config.thickness_mm, cq)
-    # 定位结构分别挤出并叠加
+    main_stats = _geometry_complexity(stencil_2d)
+    logger.info(
+        "CadQuery input main: type=%s area=%.6f bounds=%s polys=%s holes=%s points=%s",
+        main_stats["geom_type"],
+        main_stats["area"],
+        main_stats["bounds"],
+        main_stats["polygons"],
+        main_stats["holes"],
+        main_stats["points"],
+    )
+    base_solids = cadquery_extrude_geometry(stencil_2d, config.thickness_mm, cq)
+    solids = list(base_solids)
+    # Locator solids extrude and merge.
+    locator_solids = []
     if locator_geom is not None and not locator_geom.is_empty and config.locator_height_mm > 0:
+        locator_stats = _geometry_complexity(locator_geom)
+        logger.info(
+            "CadQuery input locator: type=%s area=%.6f bounds=%s polys=%s holes=%s points=%s",
+            locator_stats["geom_type"],
+            locator_stats["area"],
+            locator_stats["bounds"],
+            locator_stats["polygons"],
+            locator_stats["holes"],
+            locator_stats["points"],
+        )
         locator_solids = cadquery_extrude_geometry(locator_geom, config.locator_height_mm, cq)
         for solid in locator_solids:
             solids.append(solid.translate((0, 0, config.thickness_mm)))
+    step_solids = []
     if locator_step_geom is not None and not locator_step_geom.is_empty and config.locator_step_height_mm > 0:
+        step_stats = _geometry_complexity(locator_step_geom)
+        logger.info(
+            "CadQuery input step: type=%s area=%.6f bounds=%s polys=%s holes=%s points=%s",
+            step_stats["geom_type"],
+            step_stats["area"],
+            step_stats["bounds"],
+            step_stats["polygons"],
+            step_stats["holes"],
+            step_stats["points"],
+        )
         step_solids = cadquery_extrude_geometry(
             locator_step_geom, config.locator_step_height_mm, cq
         )
@@ -41,6 +74,14 @@ def export_cadquery_stl(
 
     if not solids:
         raise ValueError("Failed to create CadQuery solids from geometry.")
+
+    logger.info(
+        "CadQuery solids: base=%s locator=%s step=%s total=%s",
+        len(base_solids),
+        len(locator_solids),
+        len(step_solids),
+        len(solids),
+    )
 
     solid = combine_cadquery_solids(solids, cq)
     solid = translate_cadquery_to_origin(solid)
@@ -60,6 +101,57 @@ def export_cadquery_stl(
     logger.info("STL size: %s bytes", size)
     if size <= 0:
         raise ValueError("Exported STL file is empty.")
+
+
+def _geometry_complexity(geometry) -> dict[str, object]:
+    stats = {
+        "geom_type": None,
+        "area": 0.0,
+        "bounds": None,
+        "polygons": 0,
+        "holes": 0,
+        "points": 0,
+    }
+    if geometry is None or geometry.is_empty:
+        return stats
+    stats["geom_type"] = geometry.geom_type
+    try:
+        stats["area"] = float(geometry.area)
+    except Exception:
+        stats["area"] = 0.0
+    try:
+        stats["bounds"] = geometry.bounds
+    except Exception:
+        stats["bounds"] = None
+    geom = geometry
+    if geom.geom_type not in ("Polygon", "MultiPolygon"):
+        try:
+            geom = unary_union([geom])
+        except Exception:
+            return stats
+    if geom.geom_type == "Polygon":
+        polys = [geom]
+    elif geom.geom_type == "MultiPolygon":
+        polys = list(geom.geoms)
+    else:
+        return stats
+    stats["polygons"] = len(polys)
+    holes = 0
+    points = 0
+    for poly in polys:
+        ext = list(poly.exterior.coords)
+        if len(ext) > 1 and ext[0] == ext[-1]:
+            ext = ext[:-1]
+        points += len(ext)
+        for ring in poly.interiors:
+            holes += 1
+            coords = list(ring.coords)
+            if len(coords) > 1 and coords[0] == coords[-1]:
+                coords = coords[:-1]
+            points += len(coords)
+    stats["holes"] = holes
+    stats["points"] = points
+    return stats
 
 
 def cadquery_extrude_geometry(geometry, thickness_mm: float, cq):
