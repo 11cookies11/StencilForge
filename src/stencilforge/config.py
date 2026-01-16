@@ -26,8 +26,10 @@ class StencilConfig:
     locator_open_width_mm: float
     output_mode: str
     model_backend: str
+    stl_quality: str
     stl_linear_deflection: float
     stl_angular_deflection: float
+    stl_tolerance: float
     arc_steps: int
     curve_resolution: int
     qfn_regen_enabled: bool
@@ -39,6 +41,10 @@ class StencilConfig:
     outline_merge_tol_mm: float
     outline_snap_eps_mm: float
     outline_arc_max_chord_error_mm: float
+    outline_gap_bridge_mm: float
+    cadquery_simplify_tol_mm: float
+    cadquery_short_edge_min_mm: float
+    cadquery_quantize_mm: float
     ui_debug_plot_outline: bool
     ui_debug_plot_max_segments: int
     ui_debug_plot_max_offset_vectors: int
@@ -94,8 +100,21 @@ class StencilConfig:
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
         model_backend = str(data.get("model_backend", "cadquery"))
+        stl_quality = str(data.get("stl_quality", "balanced"))
         stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
+        stl_tolerance = float(data.get("stl_tolerance", 0.0))
+        stl_presets = {
+            "fast": (0.2, 0.35),
+            "balanced": (0.05, 0.1),
+            "high_quality": (0.02, 0.05),
+        }
+        if stl_quality in stl_presets:
+            preset_linear, preset_angular = stl_presets[stl_quality]
+            if "stl_linear_deflection" not in data:
+                stl_linear_deflection = preset_linear
+            if "stl_angular_deflection" not in data:
+                stl_angular_deflection = preset_angular
         arc_steps = int(data.get("arc_steps", 64))
         curve_resolution = int(data.get("curve_resolution", 16))
         qfn_regen_enabled = bool(data.get("qfn_regen_enabled", True))
@@ -107,6 +126,10 @@ class StencilConfig:
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
         outline_snap_eps_mm = float(data.get("outline_snap_eps_mm", 0.001))
         outline_arc_max_chord_error_mm = float(data.get("outline_arc_max_chord_error_mm", 0.01))
+        outline_gap_bridge_mm = float(data.get("outline_gap_bridge_mm", 0.05))
+        cadquery_simplify_tol_mm = float(data.get("cadquery_simplify_tol_mm", 0.0))
+        cadquery_short_edge_min_mm = float(data.get("cadquery_short_edge_min_mm", 0.0001))
+        cadquery_quantize_mm = float(data.get("cadquery_quantize_mm", 0.00001))
         ui_debug_plot_outline = bool(data.get("ui_debug_plot_outline", False))
         ui_debug_plot_max_segments = int(data.get("ui_debug_plot_max_segments", 20000))
         ui_debug_plot_max_offset_vectors = int(data.get("ui_debug_plot_max_offset_vectors", 800))
@@ -128,8 +151,10 @@ class StencilConfig:
             locator_open_width_mm=locator_open_width_mm,
             output_mode=output_mode,
             model_backend=model_backend,
+            stl_quality=stl_quality,
             stl_linear_deflection=stl_linear_deflection,
             stl_angular_deflection=stl_angular_deflection,
+            stl_tolerance=stl_tolerance,
             arc_steps=arc_steps,
             curve_resolution=curve_resolution,
             qfn_regen_enabled=qfn_regen_enabled,
@@ -141,6 +166,10 @@ class StencilConfig:
             outline_merge_tol_mm=outline_merge_tol_mm,
             outline_snap_eps_mm=outline_snap_eps_mm,
             outline_arc_max_chord_error_mm=outline_arc_max_chord_error_mm,
+            outline_gap_bridge_mm=outline_gap_bridge_mm,
+            cadquery_simplify_tol_mm=cadquery_simplify_tol_mm,
+            cadquery_short_edge_min_mm=cadquery_short_edge_min_mm,
+            cadquery_quantize_mm=cadquery_quantize_mm,
             ui_debug_plot_outline=ui_debug_plot_outline,
             ui_debug_plot_max_segments=ui_debug_plot_max_segments,
             ui_debug_plot_max_offset_vectors=ui_debug_plot_max_offset_vectors,
@@ -168,6 +197,10 @@ class StencilConfig:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:
             raise ValueError("stl_angular_deflection must be > 0")
+        if self.stl_tolerance < 0:
+            raise ValueError("stl_tolerance must be >= 0")
+        if self.stl_quality and self.stl_quality not in ("fast", "balanced", "high_quality"):
+            raise ValueError("stl_quality must be fast, balanced, or high_quality")
         if self.locator_height_mm < 0:
             raise ValueError("locator_height_mm must be >= 0")
         if self.locator_width_mm < 0:
@@ -197,6 +230,14 @@ class StencilConfig:
             raise ValueError("outline_snap_eps_mm must be > 0")
         if self.outline_arc_max_chord_error_mm <= 0:
             raise ValueError("outline_arc_max_chord_error_mm must be > 0")
+        if self.outline_gap_bridge_mm < 0:
+            raise ValueError("outline_gap_bridge_mm must be >= 0")
+        if self.cadquery_simplify_tol_mm < 0:
+            raise ValueError("cadquery_simplify_tol_mm must be >= 0")
+        if self.cadquery_short_edge_min_mm < 0:
+            raise ValueError("cadquery_short_edge_min_mm must be >= 0")
+        if self.cadquery_quantize_mm < 0:
+            raise ValueError("cadquery_quantize_mm must be >= 0")
         if self.ui_debug_plot_max_segments < 0:
             raise ValueError("ui_debug_plot_max_segments must be >= 0")
         if self.ui_debug_plot_max_offset_vectors < 0:
