@@ -21,7 +21,7 @@
   "locator_open_side": "none",
   "locator_open_width_mm": 0.0,
   "output_mode": "solid_with_cutouts",
-  "model_backend": "cadquery",
+  "model_backend": "trimesh",
   "stl_linear_deflection": 0.05,
   "stl_angular_deflection": 0.1,
   "arc_steps": 64,
