@@ -594,12 +594,19 @@ class BackendBridge(QObject):
                             pid = process.pid
                             if pid:
                                 try:
-                                    subprocess.run(
+                                    proc = subprocess.run(
                                         ["taskkill", "/F", "/T", "/PID", str(pid)],
-                                        check=True,
+                                        check=False,
                                         capture_output=True,
                                         text=True,
                                     )
+                                    if proc.returncode != 0:
+                                        detail = (
+                                            proc.stderr.strip()
+                                            or proc.stdout.strip()
+                                            or f"exit={proc.returncode}"
+                                        )
+                                        self._log_line(f"Job cancel: taskkill failed: {detail}")
                                 except Exception as exc:
                                     self._log_line(f"Job cancel: taskkill failed: {exc}")
                             else:
@@ -677,12 +684,15 @@ class BackendBridge(QObject):
             pid = self._job_process.pid
             if pid:
                 try:
-                    subprocess.run(
+                    proc = subprocess.run(
                         ["taskkill", "/F", "/T", "/PID", str(pid)],
-                        check=True,
+                        check=False,
                         capture_output=True,
                         text=True,
                     )
+                    if proc.returncode != 0:
+                        detail = proc.stderr.strip() or proc.stdout.strip() or f"exit={proc.returncode}"
+                        self._emit_log(f"终止进程失败: {detail}")
                 except Exception as exc:
                     self._emit_log(f"终止进程失败: {exc}")
             else:
