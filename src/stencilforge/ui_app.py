@@ -118,19 +118,20 @@ if sys.platform == "win32":
 class _JobCanceledError(RuntimeError):
     pass
 
-    def _apply_snap_styles(hwnd: int) -> None:
-        style = user32.GetWindowLongW(hwnd, GWL_STYLE)
-        style |= WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU
-        user32.SetWindowLongW(hwnd, GWL_STYLE, style)
-        user32.SetWindowPos(
-            hwnd,
-            0,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-        )
+
+def _apply_snap_styles(hwnd: int) -> None:
+    style = user32.GetWindowLongW(hwnd, GWL_STYLE)
+    style |= WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU
+    user32.SetWindowLongW(hwnd, GWL_STYLE, style)
+    user32.SetWindowPos(
+        hwnd,
+        0,
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+    )
 
 
 def _config_to_dict(config: StencilConfig) -> dict:
