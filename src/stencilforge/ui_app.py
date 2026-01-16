@@ -4,12 +4,14 @@ import base64
 import ctypes
 import logging
 import os
+import multiprocessing as mp
 import subprocess
 import sys
 import tempfile
 import threading
 import zipfile
 from datetime import datetime
+from dataclasses import asdict
 from ctypes import Structure
 from ctypes import wintypes
 from fnmatch import fnmatch
@@ -41,6 +43,28 @@ except ImportError:
     from stencilforge.config import StencilConfig
     from stencilforge.pipeline import generate_stencil
     from stencilforge.title_bar import TitleBar
+
+
+def _run_generate_stencil_subprocess(
+    input_dir: str,
+    output_stl: str,
+    config_data: dict,
+    result_queue: "mp.Queue[dict]",
+) -> None:
+    try:
+        config = StencilConfig.from_dict(config_data)
+        outline_debug = generate_stencil(Path(input_dir), Path(output_stl), config)
+        result_queue.put({"ok": True, "outline_debug": outline_debug})
+    except Exception as exc:
+        import traceback
+
+        result_queue.put(
+            {
+                "ok": False,
+                "error": str(exc),
+                "trace": traceback.format_exc().strip(),
+            }
+        )
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -234,6 +258,8 @@ class BackendBridge(QObject):
         self._preview_ui: dict | None = None
         self._window: QMainWindow | None = None
         self._last_preview_path: str | None = None
+        self._job_cancel_requested = False
+        self._job_process: mp.Process | None = None
         self._external_preview = sys.platform == "win32" and not getattr(sys, "frozen", False)
         self._locale = "zh-CN"
         self._log_path = _resolve_log_path(project_root)
@@ -536,6 +562,7 @@ class BackendBridge(QObject):
                 self._emit_log("任务已在运行。")
                 return
             self._job_running = True
+            self._job_cancel_requested = False
 
         def worker():
             try:
@@ -552,7 +579,38 @@ class BackendBridge(QObject):
                 if config_path:
                     config = StencilConfig.from_json(Path(config_path))
                 self._log_line(f"Resolved input: {resolved_input}")
-                outline_debug = generate_stencil(Path(resolved_input), Path(output_stl), config)
+                if config.model_backend == "cadquery":
+                    ctx = mp.get_context("spawn")
+                    result_queue: mp.Queue[dict] = ctx.Queue()
+                    process = ctx.Process(
+                        target=_run_generate_stencil_subprocess,
+                        args=(resolved_input, output_stl, asdict(config), result_queue),
+                    )
+                    self._job_process = process
+                    process.start()
+                    while process.is_alive():
+                        if self._job_cancel_requested:
+                            self._log_line("Job cancel requested: terminating worker process.")
+                            process.terminate()
+                            process.join(5)
+                            if process.is_alive() and hasattr(process, "kill"):
+                                process.kill()
+                                process.join(5)
+                            raise ValueError("任务已取消。")
+                        process.join(0.1)
+                    result = None
+                    try:
+                        result = result_queue.get_nowait()
+                    except Exception:
+                        result = None
+                    if process.exitcode not in (0, None) and not result:
+                        raise ValueError(f"CadQuery worker exited with code {process.exitcode}")
+                    if result and not result.get("ok"):
+                        detail = result.get("trace") or result.get("error")
+                        raise ValueError(f"CadQuery worker failed: {detail}")
+                    outline_debug = result.get("outline_debug") if result else None
+                else:
+                    outline_debug = generate_stencil(Path(resolved_input), Path(output_stl), config)
                 if (
                     outline_debug
                     and config.ui_debug_plot_outline
@@ -580,6 +638,8 @@ class BackendBridge(QObject):
             finally:
                 with self._job_lock:
                     self._job_running = False
+                    self._job_process = None
+                    self._job_cancel_requested = False
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -596,7 +656,15 @@ class BackendBridge(QObject):
 
     @Slot()
     def stopJob(self) -> None:
-        self._emit_log("已请求停止，当前任务暂不支持取消。")
+        if not self._job_running:
+            self._emit_log("当前没有运行中的任务。")
+            return
+        self._job_cancel_requested = True
+        if self._job_process is not None and self._job_process.is_alive():
+            self._emit_log("已请求停止，正在终止导出进程。")
+            self._job_process.terminate()
+        else:
+            self._emit_log("已请求停止，正在等待任务响应。")
 
     @Slot()
     def windowMinimize(self) -> None:
