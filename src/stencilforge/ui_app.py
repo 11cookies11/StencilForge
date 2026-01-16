@@ -114,6 +114,10 @@ if sys.platform == "win32":
             + user32.GetSystemMetrics(SM_CXPADDEDBORDER)
         )
 
+
+class _JobCanceledError(RuntimeError):
+    pass
+
     def _apply_snap_styles(hwnd: int) -> None:
         style = user32.GetWindowLongW(hwnd, GWL_STYLE)
         style |= WS_THICKFRAME | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU
@@ -615,7 +619,7 @@ class BackendBridge(QObject):
                             if process.is_alive() and hasattr(process, "kill"):
                                 process.kill()
                                 process.join(5)
-                            raise ValueError("任务已取消。")
+                            raise _JobCanceledError("任务已取消。")
                         process.join(0.1)
                     result = None
                     try:
@@ -645,6 +649,11 @@ class BackendBridge(QObject):
                 self.jobStatus.emit("success")
                 self._log_line("Job status: success")
                 self.jobDone.emit({"output_stl": output_stl})
+            except _JobCanceledError as exc:
+                self._log_line(f"Job canceled: {exc}")
+                self.jobStatus.emit("error")
+                self._log_line("Job status: canceled")
+                self.jobError.emit(str(exc))
             except Exception as exc:
                 import traceback
 
