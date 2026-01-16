@@ -59,6 +59,7 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
     final_pts = _add_endpoints(ax_final, deduped_segments, color="#0f172a")
     offset_lc = _add_offset_vectors(ax_raw, offset_vectors, color="#f97316")
     gap_markers = _add_gap_markers(ax_raw, ax_final, debug.get("gap_markers", []))
+    bridge_lc = _add_segments(ax_final, debug.get("bridged_segments", []), color="#10b981", alpha=0.9, lw=2.0)
 
     ax_raw.set_title(
         _format_title(
@@ -99,8 +100,9 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         "Show Endpoints",
         "Show Offset Vectors",
         "Show Gaps",
+        "Show Bridges",
     ]
-    visibility = [True, False, True, True, True, False, False]
+    visibility = [True, False, True, True, True, False, False, False]
     fig.subplots_adjust(right=0.83, wspace=0.18, hspace=0.28)
     controls_ax = fig.add_axes([0.85, 0.52, 0.13, 0.24])
     controls_ax.set_facecolor("white")
@@ -134,6 +136,7 @@ def show_outline_debug_plot(debug: dict, plot_cfg: dict) -> None:
         "Show Endpoints": [raw_pts, final_pts],
         "Show Offset Vectors": [offset_lc],
         "Show Gaps": gap_markers,
+        "Show Bridges": [bridge_lc],
     }
 
     def _toggle(label: str, idx: int) -> None:
