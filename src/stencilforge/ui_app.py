@@ -553,6 +553,17 @@ class BackendBridge(QObject):
                     config = StencilConfig.from_json(Path(config_path))
                 self._log_line(f"Resolved input: {resolved_input}")
                 outline_debug = generate_stencil(Path(resolved_input), Path(output_stl), config)
+                if (
+                    outline_debug
+                    and config.ui_debug_plot_outline
+                    and config.outline_close_strategy == "robust_polygonize"
+                ):
+                    plot_cfg = {
+                        "max_segments": config.ui_debug_plot_max_segments,
+                        "max_offset_vectors": config.ui_debug_plot_max_offset_vectors,
+                        "offset_min_mm": config.ui_debug_plot_offset_min_mm,
+                    }
+                    self.showOutlineDebug.emit({"debug": outline_debug, "plot_cfg": plot_cfg})
                 self.jobProgress.emit(100)
                 self.jobStatus.emit("success")
                 self._log_line("Job status: success")
