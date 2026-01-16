@@ -38,6 +38,8 @@ class RobustOutlineConfig:
     max_debug_segments: int = 20000
     max_debug_offset_vectors: int = 800
     max_debug_gap_markers: int = 60
+    gap_bridge_mm: float = 0.05
+    gap_bridge_max_links: int = 200
 
 
 class RobustOutlineExtractor:
@@ -66,6 +68,12 @@ class RobustOutlineExtractor:
                 self.debug.get("raw_segments", []),
             )
             self.debug["gap_markers"] = self._build_gap_markers(segments)
+        if self.cfg.gap_bridge_mm > 0:
+            segments, bridged = self._bridge_gaps(segments)
+            if bridged:
+                self.debug["bridged_segments_count"] = len(bridged)
+                if self.cfg.collect_debug_data:
+                    self.debug["bridged_segments"] = self._limit_segments(bridged)
         if not segments:
             raise ValueError(self._format_error("no segments after filtering"))
         polygons = []
@@ -254,6 +262,57 @@ class RobustOutlineExtractor:
             gaps = gaps[:limit]
         return gaps
 
+    def _bridge_gaps(self, segments: list[Segment2D]) -> tuple[list[Segment2D], list[Segment2D]]:
+        if not segments:
+            return segments, []
+        endpoints: list[Point2D] = []
+        for p1, p2 in segments:
+            endpoints.append(p1)
+            endpoints.append(p2)
+        if len(endpoints) < 2:
+            return segments, []
+        nearest: list[tuple[int, float]] = []
+        for i, p1 in enumerate(endpoints):
+            best_idx = -1
+            best_dist = None
+            for j, p2 in enumerate(endpoints):
+                if i == j:
+                    continue
+                dist = self._segment_length(p1, p2)
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    best_idx = j
+            if best_idx >= 0 and best_dist is not None:
+                nearest.append((best_idx, best_dist))
+            else:
+                nearest.append((-1, 0.0))
+        bridged = []
+        used = set()
+        max_links = self.cfg.gap_bridge_max_links
+        for i, (j, dist) in enumerate(nearest):
+            if j < 0 or i in used or j in used:
+                continue
+            if dist > self.cfg.gap_bridge_mm:
+                continue
+            back_idx, back_dist = nearest[j]
+            if back_idx != i:
+                continue
+            if back_dist > self.cfg.gap_bridge_mm:
+                continue
+            p1 = endpoints[i]
+            p2 = endpoints[j]
+            key = (p1, p2) if p1 <= p2 else (p2, p1)
+            if key in used:
+                continue
+            bridged.append((p1, p2))
+            used.add(i)
+            used.add(j)
+            if max_links >= 0 and len(bridged) >= max_links:
+                break
+        if not bridged:
+            return segments, []
+        return segments + bridged, bridged
+
     def _polygonize_segments(self, segments: list[Segment2D]) -> tuple[list[Polygon], Dict[str, Any]]:
         lines = [LineString([p1, p2]) for p1, p2 in segments]
         if not lines:
@@ -326,6 +385,7 @@ class OutlineBuilder:
                 max_debug_segments=self._config.ui_debug_plot_max_segments,
                 max_debug_offset_vectors=self._config.ui_debug_plot_max_offset_vectors,
                 max_debug_gap_markers=self._config.ui_debug_plot_max_offset_vectors,
+                gap_bridge_mm=self._config.outline_gap_bridge_mm,
             )
             extractor = RobustOutlineExtractor(cfg, self._primitive_builder)
             try:
