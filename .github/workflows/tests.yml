@@ -1,0 +1,63 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - feat/**
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (i18n + unit + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui-vue
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui-vue/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: i18n check
+        run: npm run check:i18n
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+  python:
+    name: Python (unit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          pytest --cov=src/stencilforge --cov-report=term --cov-report=xml
+
