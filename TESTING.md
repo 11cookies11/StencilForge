@@ -62,10 +62,22 @@ pytest
 python scripts/run_sfmesh_regression.py
 ```
 
+Run in auto mode (fast first, then watertight fallback if needed):
+
+```bash
+python scripts/run_sfmesh_regression.py --quality-mode auto
+```
+
 Run in watertight mode (requires `scipy` and `scikit-image`):
 
 ```bash
 python scripts/run_sfmesh_regression.py --quality-mode watertight --voxel-pitch-mm 0.08
+```
+
+Run in parallel with cache enabled (default):
+
+```bash
+python scripts/run_sfmesh_regression.py --jobs 4
 ```
 
 With expect baseline strict checking:
