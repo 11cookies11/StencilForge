@@ -3,14 +3,17 @@
 This project uses layered automated tests to reduce manual QA:
 
 1. Frontend fast checks:
+
 - `npm run check:i18n`
 - `npm run test:unit`
 - `npm run build`
 
-2. Python fast checks:
+1. Python fast checks:
+
 - `pytest --cov=src/stencilforge`
 
-3. Nightly E2E:
+1. Nightly E2E:
+
 - `npm run test:e2e` (Playwright)
 
 ## Quick Start (One Command)
