@@ -1,17 +1,29 @@
 import en from "./locales/en.json";
+import de from "./locales/de.json";
+import es from "./locales/es.json";
+import ja from "./locales/ja.json";
 import zhCN from "./locales/zh-CN.json";
 
 export const DEFAULT_LOCALE = "en";
-export const SUPPORTED_LOCALES = ["zh-CN", "en"];
+export const SUPPORTED_LOCALES = ["zh-CN", "en", "ja", "de", "es"];
 
 const MESSAGES = {
   "zh-CN": zhCN,
   en,
+  ja,
+  de,
+  es,
 };
 
 export function normalizeLocale(locale) {
-  if (locale === "zh-CN" || locale === "en") return locale;
-  if (typeof locale === "string" && locale.toLowerCase().startsWith("en")) return "en";
+  if (SUPPORTED_LOCALES.includes(locale)) return locale;
+  if (typeof locale === "string") {
+    const lowered = locale.toLowerCase();
+    if (lowered.startsWith("en")) return "en";
+    if (lowered.startsWith("ja")) return "ja";
+    if (lowered.startsWith("de")) return "de";
+    if (lowered.startsWith("es")) return "es";
+  }
   return "zh-CN";
 }
 
@@ -24,7 +36,7 @@ export function getInitialLocale() {
   }
   if (typeof navigator !== "undefined") {
     const lang = navigator.language || "";
-    if (lang.toLowerCase().startsWith("en")) return "en";
+    return normalizeLocale(lang);
   }
   return DEFAULT_LOCALE;
 }

@@ -47,32 +47,20 @@
             >
               <div class="p-1.5 space-y-0.5">
                 <button
+                  v-for="option in localeOptions"
+                  :key="option.value"
                   class="w-full text-left flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors"
                   :class="
-                    locale === 'zh-CN'
+                    locale === option.value
                       ? 'text-primary bg-blue-50'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   "
                   type="button"
                   role="menuitem"
-                  @click="setLocaleFromMenu('zh-CN')"
+                  @click="setLocaleFromMenu(option.value)"
                 >
-                  <span>{{ t("language.zh") }}</span>
-                  <AppIcon v-if="locale === 'zh-CN'" name="check" :size="18" />
-                </button>
-                <button
-                  class="w-full text-left flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                  :class="
-                    locale === 'en'
-                      ? 'text-primary bg-blue-50'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  "
-                  type="button"
-                  role="menuitem"
-                  @click="setLocaleFromMenu('en')"
-                >
-                  <span>{{ t("language.en") }}</span>
-                  <AppIcon v-if="locale === 'en'" name="check" :size="18" />
+                  <span>{{ t(option.labelKey) }}</span>
+                  <AppIcon v-if="locale === option.value" name="check" :size="18" />
                 </button>
               </div>
             </div>
@@ -525,6 +513,14 @@
 import AppIcon from "./components/AppIcon.vue";
 import { getInitialLocale, t as translate } from "./i18n";
 
+const LOCALE_OPTIONS = [
+  { value: "zh-CN", labelKey: "language.zh" },
+  { value: "en", labelKey: "language.en" },
+  { value: "ja", labelKey: "language.ja" },
+  { value: "de", labelKey: "language.de" },
+  { value: "es", labelKey: "language.es" },
+];
+
 export default {
   components: {
     AppIcon,
@@ -577,8 +573,12 @@ export default {
     };
   },
   computed: {
+    localeOptions() {
+      return LOCALE_OPTIONS;
+    },
     currentLocaleLabel() {
-      return this.locale === "en" ? this.t("language.en") : this.t("language.zh");
+      const current = this.localeOptions.find((item) => item.value === this.locale);
+      return current ? this.t(current.labelKey) : this.t("language.en");
     },
     statusLabel() {
       const map = {
@@ -617,7 +617,7 @@ export default {
         }
       }
       if (typeof document !== "undefined" && document.documentElement) {
-        document.documentElement.lang = this.locale === "en" ? "en" : "zh-CN";
+        document.documentElement.lang = this.locale;
       }
     },
     setLocale() {

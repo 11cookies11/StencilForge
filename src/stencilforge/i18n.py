@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -88,6 +88,132 @@ _MESSAGES = {
         "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
+    "ja": {
+        "preview.title": "ステンシルプレビュー",
+        "preview.fit": "フィット",
+        "preview.reset": "リセット",
+        "preview.wireframe": "ワイヤーフレーム",
+        "preview.axes": "座標軸",
+        "preview.no_preview_path": "プレビュー STL パスが空です。",
+        "preview.preview_unavailable": "プレビューウィンドウが初期化されていません。",
+        "dialog.error_title": "ジョブ失敗",
+        "dialog.error_body": "エラーが発生したため、ジョブを停止しました。",
+        "dialog.error_detail": "エラー: {message}",
+        "dialog.error_log": "ログ保存先: {path}",
+        "dialog.error_open_log": "ログを開く",
+        "ui.debug_plot_load_failed": "デバッグプロットの読み込みに失敗しました: {error}",
+        "ui.debug_plot_failed": "デバッグプロットに失敗しました: {error}",
+        "ui.config_not_found": "設定ファイルが見つかりません: {path}",
+        "ui.pick_save_stl_title": "STL を保存",
+        "ui.pick_directory_title": "Gerber フォルダを選択",
+        "ui.pick_config_title": "設定ファイルを選択",
+        "ui.pick_zip_title": "Gerber ZIP を選択",
+        "ui.pick_stl_title": "STL を選択",
+        "ui.file_not_found": "ファイルが見つかりません: {path}",
+        "ui.read_file_failed": "ファイルの読み込みに失敗しました: {error}",
+        "ui.preview_path_empty": "プレビュー STL パスが空です。",
+        "ui.preview_viewer_uninitialized": "プレビュービューアが初期化されていません。",
+        "ui.stl_not_found": "STL が見つかりません: {path}",
+        "ui.preview_launch_failed": "プレビュー起動に失敗しました: {error}",
+        "ui.zip_not_found": "ZIP ファイルが見つかりません: {path}",
+        "ui.zip_invalid": "無効な ZIP ファイルです。",
+        "ui.job_already_running": "ジョブは既に実行中です。",
+        "ui.zip_extract_failed": "ZIP 入力の展開に失敗しました。",
+        "ui.job_canceled": "ジョブをキャンセルしました。",
+        "ui.zip_extracted": "ZIP を展開しました: {name}",
+        "ui.no_running_job": "実行中のジョブはありません。",
+        "ui.stop_requested_terminating": "停止要求を受信しました。エクスポートプロセスを終了しています。",
+        "ui.terminate_failed": "プロセス終了に失敗しました: {detail}",
+        "ui.terminate_pid_missing": "プロセス終了に失敗しました: プロセス ID がありません。",
+        "ui.stop_requested_waiting": "停止要求を受信しました。ジョブ終了を待機しています。",
+        "ui.ui_dist_missing": "UI ビルド成果物が見つかりません。フロントエンド資産が同梱されているか確認してください。\n確認済みパス:\n{paths}",
+        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.stl_not_found": "STL not found: {path}",
+    },
+    "de": {
+        "preview.title": "Schablonen-Vorschau",
+        "preview.fit": "Anpassen",
+        "preview.reset": "Zurücksetzen",
+        "preview.wireframe": "Drahtgitter",
+        "preview.axes": "Achsen",
+        "preview.no_preview_path": "Vorschau-STL-Pfad ist leer.",
+        "preview.preview_unavailable": "Vorschaufenster ist nicht initialisiert.",
+        "dialog.error_title": "Job fehlgeschlagen",
+        "dialog.error_body": "Ein Fehler ist aufgetreten und der Job wurde gestoppt.",
+        "dialog.error_detail": "Fehler: {message}",
+        "dialog.error_log": "Log gespeichert unter: {path}",
+        "dialog.error_open_log": "Log öffnen",
+        "ui.debug_plot_load_failed": "Debug-Plot-Modul konnte nicht geladen werden: {error}",
+        "ui.debug_plot_failed": "Debug-Plot fehlgeschlagen: {error}",
+        "ui.config_not_found": "Konfigurationsdatei nicht gefunden: {path}",
+        "ui.pick_save_stl_title": "STL speichern",
+        "ui.pick_directory_title": "Gerber-Ordner auswählen",
+        "ui.pick_config_title": "Konfigurationsdatei auswählen",
+        "ui.pick_zip_title": "Gerber-ZIP auswählen",
+        "ui.pick_stl_title": "STL auswählen",
+        "ui.file_not_found": "Datei nicht gefunden: {path}",
+        "ui.read_file_failed": "Datei konnte nicht gelesen werden: {error}",
+        "ui.preview_path_empty": "Vorschau-STL-Pfad ist leer.",
+        "ui.preview_viewer_uninitialized": "Vorschau-Viewer ist nicht initialisiert.",
+        "ui.stl_not_found": "STL nicht gefunden: {path}",
+        "ui.preview_launch_failed": "Vorschau konnte nicht gestartet werden: {error}",
+        "ui.zip_not_found": "ZIP-Datei nicht gefunden: {path}",
+        "ui.zip_invalid": "Ungültige ZIP-Datei.",
+        "ui.job_already_running": "Ein Job läuft bereits.",
+        "ui.zip_extract_failed": "ZIP-Eingabe konnte nicht entpackt werden.",
+        "ui.job_canceled": "Job wurde abgebrochen.",
+        "ui.zip_extracted": "ZIP entpackt: {name}",
+        "ui.no_running_job": "Kein laufender Job.",
+        "ui.stop_requested_terminating": "Stopp angefordert. Exportprozess wird beendet.",
+        "ui.terminate_failed": "Prozess konnte nicht beendet werden: {detail}",
+        "ui.terminate_pid_missing": "Prozess konnte nicht beendet werden: Prozess-ID fehlt.",
+        "ui.stop_requested_waiting": "Stopp angefordert. Warte auf Beendigung des Jobs.",
+        "ui.ui_dist_missing": "UI-Build-Artefakte wurden nicht gefunden. Prüfen Sie, ob Frontend-Ressourcen enthalten sind.\nGeprüfte Pfade:\n{paths}",
+        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.stl_not_found": "STL not found: {path}",
+    },
+    "es": {
+        "preview.title": "Vista previa de plantilla",
+        "preview.fit": "Ajustar",
+        "preview.reset": "Restablecer",
+        "preview.wireframe": "Alámbrico",
+        "preview.axes": "Ejes",
+        "preview.no_preview_path": "La ruta STL de vista previa está vacía.",
+        "preview.preview_unavailable": "La ventana de vista previa no está inicializada.",
+        "dialog.error_title": "Trabajo fallido",
+        "dialog.error_body": "Ocurrió un error y el trabajo se detuvo.",
+        "dialog.error_detail": "Error: {message}",
+        "dialog.error_log": "Registro guardado en: {path}",
+        "dialog.error_open_log": "Abrir registro",
+        "ui.debug_plot_load_failed": "No se pudo cargar el módulo de trazado de depuración: {error}",
+        "ui.debug_plot_failed": "Falló el trazado de depuración: {error}",
+        "ui.config_not_found": "Archivo de configuración no encontrado: {path}",
+        "ui.pick_save_stl_title": "Guardar STL",
+        "ui.pick_directory_title": "Seleccionar carpeta Gerber",
+        "ui.pick_config_title": "Seleccionar archivo de configuración",
+        "ui.pick_zip_title": "Seleccionar ZIP de Gerber",
+        "ui.pick_stl_title": "Seleccionar STL",
+        "ui.file_not_found": "Archivo no encontrado: {path}",
+        "ui.read_file_failed": "No se pudo leer el archivo: {error}",
+        "ui.preview_path_empty": "La ruta STL de vista previa está vacía.",
+        "ui.preview_viewer_uninitialized": "El visor de vista previa no está inicializado.",
+        "ui.stl_not_found": "STL no encontrado: {path}",
+        "ui.preview_launch_failed": "No se pudo iniciar la vista previa: {error}",
+        "ui.zip_not_found": "Archivo ZIP no encontrado: {path}",
+        "ui.zip_invalid": "Archivo ZIP no válido.",
+        "ui.job_already_running": "Ya hay un trabajo en ejecución.",
+        "ui.zip_extract_failed": "No se pudo extraer el ZIP de entrada.",
+        "ui.job_canceled": "Trabajo cancelado.",
+        "ui.zip_extracted": "ZIP extraído: {name}",
+        "ui.no_running_job": "No hay trabajos en ejecución.",
+        "ui.stop_requested_terminating": "Se solicitó detener. Terminando el proceso de exportación.",
+        "ui.terminate_failed": "No se pudo terminar el proceso: {detail}",
+        "ui.terminate_pid_missing": "No se pudo terminar el proceso: falta el ID del proceso.",
+        "ui.stop_requested_waiting": "Se solicitó detener. Esperando a que el trabajo termine.",
+        "ui.ui_dist_missing": "No se encontraron los artefactos de compilación de UI. Asegúrese de incluir los recursos frontend.\nRutas comprobadas:\n{paths}",
+        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.stl_not_found": "STL not found: {path}",
+    },
 }
 
 
@@ -97,13 +223,21 @@ def normalize_locale(locale: str | None) -> str:
     lowered = locale.lower()
     if lowered.startswith("en"):
         return "en"
+    if lowered.startswith("ja"):
+        return "ja"
+    if lowered.startswith("de"):
+        return "de"
+    if lowered.startswith("es"):
+        return "es"
+    if lowered.startswith("zh"):
+        return "zh-CN"
     return "zh-CN"
 
 
 def text(locale: str | None, key: str, **kwargs: Any) -> str:
     normalized = normalize_locale(locale)
-    table = _MESSAGES.get(normalized, _MESSAGES["zh-CN"])
-    fallback = _MESSAGES["zh-CN"]
+    table = _MESSAGES.get(normalized, _MESSAGES["en"])
+    fallback = _MESSAGES["en"]
     message = table.get(key) or fallback.get(key) or key
     if kwargs:
         return message.format(**kwargs)
