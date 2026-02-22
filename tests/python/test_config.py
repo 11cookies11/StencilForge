@@ -33,12 +33,17 @@ def test_stl_quality_preset_does_not_override_explicit_values() -> None:
     assert cfg.stl_angular_deflection == 0.6
 
 
+def test_sfmesh_backend_is_valid() -> None:
+    cfg = StencilConfig.from_dict({"model_backend": "sfmesh"})
+    cfg.validate()
+
+
 @pytest.mark.parametrize(
     ("patch", "message"),
     [
         ({"thickness_mm": 0}, "thickness_mm must be > 0"),
         ({"output_mode": "bad_mode"}, "output_mode must be holes_only or solid_with_cutouts"),
-        ({"model_backend": "bad_backend"}, "model_backend must be trimesh or cadquery"),
+        ({"model_backend": "bad_backend"}, "model_backend must be trimesh, cadquery, or sfmesh"),
         ({"stl_quality": "ultra"}, "stl_quality must be fast, balanced, or high_quality"),
         ({"locator_open_side": "middle"}, "locator_open_side must be none/top/right/bottom/left"),
     ],

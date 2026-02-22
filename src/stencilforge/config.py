@@ -191,8 +191,8 @@ class StencilConfig:
             raise ValueError("qfn_max_pad_width_mm must be > 0")
         if self.output_mode not in {"holes_only", "solid_with_cutouts"}:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
-        if self.model_backend not in {"trimesh", "cadquery"}:
-            raise ValueError("model_backend must be trimesh or cadquery")
+        if self.model_backend not in {"trimesh", "cadquery", "sfmesh"}:
+            raise ValueError("model_backend must be trimesh, cadquery, or sfmesh")
         if self.stl_linear_deflection <= 0:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:
