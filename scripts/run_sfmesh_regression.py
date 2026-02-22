@@ -19,10 +19,12 @@ from stencilforge.config import StencilConfig
 from stencilforge.pipeline import generate_stencil
 
 
-def _default_config() -> StencilConfig:
+def _default_config(quality_mode: str, voxel_pitch_mm: float) -> StencilConfig:
     return StencilConfig.from_dict(
         {
             "model_backend": "sfmesh",
+            "sfmesh_quality_mode": quality_mode,
+            "sfmesh_voxel_pitch_mm": voxel_pitch_mm,
             "paste_patterns": [
                 "*gtp*",
                 "*.gtp",
@@ -52,6 +54,7 @@ def _collect_metrics(stl_path: Path) -> dict:
     return {
         "faces": int(mesh.faces.shape[0]) if getattr(mesh, "faces", None) is not None else 0,
         "watertight": bool(getattr(mesh, "is_watertight", False)),
+        "euler": int(getattr(mesh, "euler_number", 0)),
         "volume": float(getattr(mesh, "volume", 0.0)),
         "bounds": bounds,
     }
@@ -95,8 +98,15 @@ def _compare_with_expect(expect_item: dict, actual: dict) -> dict:
     }
 
 
-def run_regression(fixtures_dir: Path, output_dir: Path, expect_path: Path, strict_expect: bool) -> dict:
-    config = _default_config()
+def run_regression(
+    fixtures_dir: Path,
+    output_dir: Path,
+    expect_path: Path,
+    strict_expect: bool,
+    quality_mode: str,
+    voxel_pitch_mm: float,
+) -> dict:
+    config = _default_config(quality_mode, voxel_pitch_mm)
     config.validate()
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -154,11 +164,15 @@ def run_regression(fixtures_dir: Path, output_dir: Path, expect_path: Path, stri
                     )
 
     success_count = sum(1 for r in results if r.get("success"))
+    watertight_count = sum(1 for r in results if r.get("metrics", {}).get("watertight"))
     report = {
         "total": len(results),
         "success": success_count,
         "failed": len(results) - success_count,
+        "watertight": watertight_count,
         "strict_expect": strict_expect,
+        "quality_mode": quality_mode,
+        "voxel_pitch_mm": voxel_pitch_mm,
         "results": results,
     }
     return report
@@ -170,14 +184,24 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=Path("tests/artifacts/sfmesh_regression"))
     parser.add_argument("--expect", type=Path, default=Path("tests/fixtures/gerber/expect.json"))
     parser.add_argument("--strict-expect", action="store_true")
+    parser.add_argument("--quality-mode", choices=["fast", "watertight"], default="fast")
+    parser.add_argument("--voxel-pitch-mm", type=float, default=0.08)
     args = parser.parse_args()
 
-    report = run_regression(args.fixtures, args.output, args.expect, args.strict_expect)
+    report = run_regression(
+        args.fixtures,
+        args.output,
+        args.expect,
+        args.strict_expect,
+        args.quality_mode,
+        args.voxel_pitch_mm,
+    )
     args.output.mkdir(parents=True, exist_ok=True)
     summary_path = args.output / "summary.json"
     summary_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"Total: {report['total']}  Success: {report['success']}  Failed: {report['failed']}")
+    print(f"Watertight: {report['watertight']} / {report['total']}")
     print(f"Summary: {summary_path}")
     return 0 if report["failed"] == 0 else 1
 

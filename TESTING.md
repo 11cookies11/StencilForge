@@ -62,6 +62,12 @@ pytest
 python scripts/run_sfmesh_regression.py
 ```
 
+Run in watertight mode (requires `scipy` and `scikit-image`):
+
+```bash
+python scripts/run_sfmesh_regression.py --quality-mode watertight --voxel-pitch-mm 0.08
+```
+
 With expect baseline strict checking:
 
 ```bash
