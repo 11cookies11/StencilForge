@@ -50,6 +50,18 @@ python -m pip install pytest pytest-cov
 pytest
 ```
 
+### Sfmesh Regression
+
+```bash
+python scripts/run_sfmesh_regression.py
+```
+
+With expect baseline strict checking:
+
+```bash
+python scripts/run_sfmesh_regression.py --strict-expect
+```
+
 ## CI Workflows
 
 - `.github/workflows/tests.yml`
