@@ -30,6 +30,12 @@ First run (installs Playwright browsers before e2e):
 .\scripts\test_all.ps1 -InstallBrowsers
 ```
 
+Run one-command tests plus sfmesh fixture regression:
+
+```powershell
+.\scripts\test_all.ps1 -RunSfmeshRegression
+```
+
 ## Local Commands
 
 ### Frontend

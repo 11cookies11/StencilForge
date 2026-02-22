@@ -1,7 +1,8 @@
 param(
   [switch]$InstallBrowsers,
   [switch]$SkipPython,
-  [switch]$SkipFrontend
+  [switch]$SkipFrontend,
+  [switch]$RunSfmeshRegression
 )
 
 Set-StrictMode -Version Latest
@@ -28,6 +29,12 @@ try {
   if (-not $SkipPython) {
     Run-Step -Name "Python tests" -Action {
       python -m pytest -q
+    }
+
+    if ($RunSfmeshRegression) {
+      Run-Step -Name "sfmesh regression" -Action {
+        python scripts/run_sfmesh_regression.py
+      }
     }
   }
 
