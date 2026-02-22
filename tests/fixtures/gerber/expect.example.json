@@ -1,0 +1,10 @@
+﻿{
+  "case_001_basic/Test_deepseek.zip": {
+    "faces": 120000,
+    "volume": 12345.678,
+    "bounds": [[0.0, 0.0, 0.0], [100.0, 80.0, 2.0]],
+    "tol_faces": 5000,
+    "tol_volume": 50.0,
+    "tol_bounds": 0.05
+  }
+}
