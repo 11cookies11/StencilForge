@@ -6,10 +6,12 @@ import time
 from typing import Protocol
 
 import trimesh
+from shapely import constrained_delaunay_triangles
+from shapely.ops import unary_union
 
 from ..config import StencilConfig
 from .cadquery import export_cadquery_stl
-from .geometry import extrude_geometry
+from .geometry import ensure_valid, extrude_geometry, orient_geometry
 from .mesh import cleanup_mesh, translate_to_origin
 
 logger = logging.getLogger(__name__)
@@ -126,13 +128,80 @@ class TrimeshEngine:
 class SfMeshEngine:
     name = "sfmesh"
 
-    def __init__(self) -> None:
-        self._fallback = TrimeshEngine()
-
     def export(self, data: EngineExportInput) -> None:
-        # Placeholder adapter: keep interface stable while sfmesh core is built.
-        logger.info("sfmesh backend is in adapter mode; using trimesh implementation.")
-        self._fallback.export(data)
+        cfg = data.config
+
+        t0 = time.perf_counter()
+        mesh = _extrude_with_cdt(data.stencil_2d, cfg.thickness_mm)
+        logger.info("sfmesh base extrusion in %.3fs", time.perf_counter() - t0)
+
+        if data.locator_geom is not None and not data.locator_geom.is_empty and cfg.locator_height_mm > 0:
+            t0 = time.perf_counter()
+            locator_mesh = _extrude_with_cdt(data.locator_geom, cfg.locator_height_mm)
+            logger.info("sfmesh locator extrusion in %.3fs", time.perf_counter() - t0)
+            locator_mesh.apply_translation((0, 0, cfg.thickness_mm))
+            mesh = trimesh.util.concatenate([mesh, locator_mesh])
+
+        if (
+            data.locator_step_geom is not None
+            and not data.locator_step_geom.is_empty
+            and cfg.locator_step_height_mm > 0
+        ):
+            t0 = time.perf_counter()
+            step_mesh = _extrude_with_cdt(data.locator_step_geom, cfg.locator_step_height_mm)
+            logger.info("sfmesh locator step extrusion in %.3fs", time.perf_counter() - t0)
+            step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
+            mesh = trimesh.util.concatenate([mesh, step_mesh])
+
+        logger.info("Cleaning mesh...")
+        try:
+            t0 = time.perf_counter()
+            cleanup_mesh(mesh)
+            logger.info("Mesh cleanup in %.3fs", time.perf_counter() - t0)
+        except Exception as exc:
+            logger.warning("Mesh cleanup failed: %s", exc)
+
+        logger.info("Translating mesh to origin...")
+        try:
+            t0 = time.perf_counter()
+            translate_to_origin(mesh)
+            logger.info("Mesh translation in %.3fs", time.perf_counter() - t0)
+        except Exception as exc:
+            logger.warning("Mesh translation failed: %s", exc)
+
+        data.output_path.parent.mkdir(parents=True, exist_ok=True)
+        if mesh.is_empty or mesh.faces.size == 0:
+            raise ValueError("Generated mesh is empty; check outline/paste geometry.")
+
+        watertight = getattr(mesh, "is_watertight", None)
+        euler = getattr(mesh, "euler_number", None)
+        logger.info("Mesh stats: faces=%s watertight=%s euler=%s", mesh.faces.shape[0], watertight, euler)
+
+        t0 = time.perf_counter()
+        mesh.export(data.output_path, file_type="stl")
+        logger.info("STL export write (binary) in %.3fs", time.perf_counter() - t0)
+
+        try:
+            size = data.output_path.stat().st_size
+        except OSError:
+            size = 0
+        logger.info("STL size: %s bytes", size)
+        if size <= 0:
+            raise ValueError("Exported STL file is empty.")
+
+        try:
+            t0 = time.perf_counter()
+            check_mesh = trimesh.load_mesh(data.output_path, force="mesh")
+            faces = getattr(check_mesh, "faces", None)
+            face_count = int(faces.shape[0]) if faces is not None else 0
+            logger.info("STL reload check in %.3fs", time.perf_counter() - t0)
+            logger.info("STL check: faces=%s", face_count)
+            if face_count == 0:
+                raise ValueError("Exported STL has no faces; check geometry.")
+        except Exception as exc:
+            raise ValueError(f"Failed to validate exported STL: {exc}") from exc
+
+        logger.info("STL export complete")
 
 
 _ENGINES: dict[str, ModelEngine] = {
@@ -149,3 +218,101 @@ def get_model_engine(name: str) -> ModelEngine:
         supported = ", ".join(sorted(_ENGINES.keys()))
         raise ValueError(f"Unsupported model backend '{name}'. Supported: {supported}")
     return engine
+
+
+def _extrude_with_cdt(geometry, thickness_mm: float) -> trimesh.Trimesh:
+    geometry = ensure_valid(geometry)
+    geometry = orient_geometry(geometry)
+    if geometry.is_empty:
+        raise ValueError("Geometry is empty after preprocessing.")
+
+    polygons = []
+    if geometry.geom_type == "Polygon":
+        polygons = [geometry]
+    elif geometry.geom_type == "MultiPolygon":
+        polygons = [poly for poly in geometry.geoms if poly.area > 0]
+    else:
+        merged = unary_union([geometry])
+        if merged.geom_type == "Polygon":
+            polygons = [merged]
+        elif merged.geom_type == "MultiPolygon":
+            polygons = [poly for poly in merged.geoms if poly.area > 0]
+
+    meshes: list[trimesh.Trimesh] = []
+    for poly in polygons:
+        poly = ensure_valid(poly)
+        if poly.is_empty or poly.area <= 0:
+            continue
+        meshes.append(_extrude_polygon_with_cdt(poly, thickness_mm))
+
+    if not meshes:
+        raise ValueError("Failed to create STL mesh from geometry.")
+    mesh = trimesh.util.concatenate(meshes)
+    if mesh.is_empty or mesh.faces.size == 0:
+        raise ValueError("Failed to create non-empty STL mesh from geometry.")
+    return mesh
+
+
+def _extrude_polygon_with_cdt(poly, thickness_mm: float) -> trimesh.Trimesh:
+    triangles = constrained_delaunay_triangles(poly)
+    if triangles is None or triangles.is_empty:
+        return extrude_geometry(poly, thickness_mm)
+
+    tri_list = []
+    if triangles.geom_type == "Polygon":
+        tri_list = [triangles]
+    elif triangles.geom_type == "MultiPolygon":
+        tri_list = list(triangles.geoms)
+    else:
+        return extrude_geometry(poly, thickness_mm)
+
+    vertices = []
+    faces = []
+    vertex_index = {}
+
+    def add_vertex(x: float, y: float, z: float) -> int:
+        key = (float(x), float(y), float(z))
+        idx = vertex_index.get(key)
+        if idx is None:
+            idx = len(vertices)
+            vertices.append(key)
+            vertex_index[key] = idx
+        return idx
+
+    for tri in tri_list:
+        coords = list(tri.exterior.coords)
+        if len(coords) < 4:
+            continue
+        p0, p1, p2 = coords[0], coords[1], coords[2]
+        top = [
+            add_vertex(p0[0], p0[1], thickness_mm),
+            add_vertex(p1[0], p1[1], thickness_mm),
+            add_vertex(p2[0], p2[1], thickness_mm),
+        ]
+        bottom = [
+            add_vertex(p0[0], p0[1], 0.0),
+            add_vertex(p1[0], p1[1], 0.0),
+            add_vertex(p2[0], p2[1], 0.0),
+        ]
+        faces.append(top)
+        faces.append(bottom[::-1])
+
+    for ring in [poly.exterior, *poly.interiors]:
+        coords = list(ring.coords)
+        if len(coords) < 2:
+            continue
+        if coords[0] == coords[-1]:
+            coords = coords[:-1]
+        for i in range(len(coords)):
+            x1, y1 = coords[i]
+            x2, y2 = coords[(i + 1) % len(coords)]
+            v1 = add_vertex(x1, y1, 0.0)
+            v2 = add_vertex(x2, y2, 0.0)
+            v3 = add_vertex(x2, y2, thickness_mm)
+            v4 = add_vertex(x1, y1, thickness_mm)
+            faces.append([v1, v2, v3])
+            faces.append([v1, v3, v4])
+
+    if not faces:
+        return extrude_geometry(poly, thickness_mm)
+    return trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
