@@ -523,195 +523,7 @@
 
 <script>
 import AppIcon from "./components/AppIcon.vue";
-const DEFAULT_LOCALE = "en";
-const MESSAGES = {
-  "zh-CN": {
-    "app.tagline": "PCB 钢网与治具生成",
-    "language.label": "语言",
-    "language.zh": "简体中文",
-    "language.en": "English",
-    "window.minimize": "最小化",
-    "window.maximizeRestore": "最大化/还原",
-    "window.close": "关闭",
-    "tabs.upload": "上传",
-    "tabs.config": "配置",
-    "tabs.preview": "预览",
-    "tabs.export": "导出",
-    "upload.title": "上传 PCB 文件",
-    "upload.subtitle": "选择 Gerber 目录与输出 STL 路径。",
-    "upload.inputLabel": "输入目录 / ZIP",
-    "upload.inputPlaceholder": "Gerber 目录或 ZIP...",
-    "upload.inputFolder": "文件夹",
-    "upload.inputZip": "ZIP",
-    "upload.outputLabel": "输出 STL",
-    "upload.outputPlaceholder": "输出文件...",
-    "upload.browse": "浏览",
-    "upload.configLabel": "配置（可选）",
-    "upload.configPick": "选择",
-    "upload.generate": "生成 STL",
-    "upload.detectedTitle": "检测到的文件",
-    "upload.detectedEmpty": "暂无文件，请选择目录或导入 ZIP。",
-    "upload.detectedSome": "已检测到文件。",
-    "config.title": "配置",
-    "config.subtitle": "调整钢网生成参数。",
-    "config.thickness": "厚度 (mm)",
-    "config.outputMode": "输出模式",
-    "config.outputModeSolid": "Solid With Cutouts",
-    "config.outputModeHoles": "Holes Only",
-    "config.pasteOffset": "焊膏偏移 (mm)",
-    "config.outlineMargin": "外形边距 (mm)",
-    "config.outlineMergeTol": "外形合并容差 (mm)",
-    "config.arcSteps": "圆弧步数",
-    "config.curveResolution": "曲线分辨率",
-    "config.locatorEnabled": "启用 PCB 定位",
-    "config.locatorMode": "定位结构",
-    "config.locatorModeStep": "台阶",
-    "config.locatorModeWall": "外框墙",
-    "config.locatorHeight": "外框高度 (mm)",
-    "config.locatorWidth": "外框宽度 (mm)",
-    "config.locatorClearance": "定位间隙 (mm)",
-    "config.locatorStepHeight": "台阶高度 (mm)",
-    "config.locatorStepWidth": "台阶宽度 (mm)",
-    "config.locatorOpenSide": "开口方向",
-    "config.locatorOpenSideNone": "无",
-    "config.locatorOpenSideTop": "上",
-    "config.locatorOpenSideRight": "右",
-    "config.locatorOpenSideBottom": "下",
-    "config.locatorOpenSideLeft": "左",
-    "config.locatorOpenWidth": "开口宽度 (mm)",
-    "config.pasteRules": "焊膏层规则",
-    "config.outlineRules": "外形层规则",
-    "config.addRule": "添加规则",
-    "preview.title": "预览",
-    "preview.subtitle": "选择 STL 文件并打开 3D 预览。",
-    "preview.popupNote": "3D 预览在独立的 VTK 弹窗中打开。",
-    "preview.currentStl": "当前 STL: {value}",
-    "preview.notSet": "未设置",
-    "preview.pickStl": "选择 STL 预览",
-    "preview.open": "打开预览",
-    "export.title": "导出",
-    "export.subtitle": "下载生成的 STL 文件。",
-    "export.output": "输出: {value}",
-    "export.notSet": "未设置",
-    "export.download": "下载 STL",
-    "progress.title": "正在生成 STL 文件...",
-    "progress.subtitle": "正在处理 PCB 层级数据并构建 3D 模型，请不要关闭窗口。",
-    "progress.running": "进行中",
-    "progress.processing": "处理中",
-    "progress.eta": "预计剩余时间：计算中",
-    "progress.cancel": "取消",
-    "status.ready": "就绪",
-    "status.running": "生成中",
-    "status.success": "完成",
-    "status.error": "错误",
-    "log.idle": "空闲。",
-    "log.qtUnavailable": "Qt WebChannel 不可用。",
-    "log.needInput": "需要输入目录和输出 STL。",
-    "log.done": "完成: {value}",
-    "log.error": "错误: {value}",
-    "log.noOutput": "未设置输出 STL。",
-  },
-  en: {
-    "app.tagline": "PCB stencil and fixture generator",
-    "language.label": "Language",
-    "language.zh": "中文",
-    "language.en": "English",
-    "window.minimize": "Minimize",
-    "window.maximizeRestore": "Maximize/Restore",
-    "window.close": "Close",
-    "tabs.upload": "Upload",
-    "tabs.config": "Config",
-    "tabs.preview": "Preview",
-    "tabs.export": "Export",
-    "upload.title": "Upload PCB files",
-    "upload.subtitle": "Choose a Gerber folder and output STL path.",
-    "upload.inputLabel": "Input folder / ZIP",
-    "upload.inputPlaceholder": "Gerber folder or ZIP...",
-    "upload.inputFolder": "Folder",
-    "upload.inputZip": "ZIP",
-    "upload.outputLabel": "Output STL",
-    "upload.outputPlaceholder": "Output file...",
-    "upload.browse": "Browse",
-    "upload.configLabel": "Config (optional)",
-    "upload.configPick": "Choose",
-    "upload.generate": "Generate STL",
-    "upload.detectedTitle": "Detected files",
-    "upload.detectedEmpty": "No files yet. Select a folder or import a ZIP.",
-    "upload.detectedSome": "Files detected.",
-    "config.title": "Config",
-    "config.subtitle": "Adjust stencil generation parameters.",
-    "config.thickness": "Thickness (mm)",
-    "config.outputMode": "Output mode",
-    "config.outputModeSolid": "Solid With Cutouts",
-    "config.outputModeHoles": "Holes Only",
-    "config.pasteOffset": "Paste offset (mm)",
-    "config.outlineMargin": "Outline margin (mm)",
-    "config.outlineMergeTol": "Outline merge tolerance (mm)",
-    "config.arcSteps": "Arc steps",
-    "config.curveResolution": "Curve resolution",
-    "config.locatorEnabled": "Enable PCB locating",
-    "config.locatorMode": "Locator type",
-    "config.locatorModeStep": "Step",
-    "config.locatorModeWall": "Outer wall",
-    "config.locatorHeight": "Wall height (mm)",
-    "config.locatorWidth": "Wall width (mm)",
-    "config.locatorClearance": "Locator clearance (mm)",
-    "config.locatorStepHeight": "Step height (mm)",
-    "config.locatorStepWidth": "Step width (mm)",
-    "config.locatorOpenSide": "Open side",
-    "config.locatorOpenSideNone": "None",
-    "config.locatorOpenSideTop": "Top",
-    "config.locatorOpenSideRight": "Right",
-    "config.locatorOpenSideBottom": "Bottom",
-    "config.locatorOpenSideLeft": "Left",
-    "config.locatorOpenWidth": "Open width (mm)",
-    "config.pasteRules": "Paste layer rules",
-    "config.outlineRules": "Outline layer rules",
-    "config.addRule": "Add rule",
-    "preview.title": "Preview",
-    "preview.subtitle": "Pick an STL file and open the 3D preview.",
-    "preview.popupNote": "3D preview opens in a separate VTK window.",
-    "preview.currentStl": "Current STL: {value}",
-    "preview.notSet": "Not set",
-    "preview.pickStl": "Pick STL to preview",
-    "preview.open": "Open preview",
-    "export.title": "Export",
-    "export.subtitle": "Download the generated STL file.",
-    "export.output": "Output: {value}",
-    "export.notSet": "Not set",
-    "export.download": "Download STL",
-    "progress.title": "Generating STL file...",
-    "progress.subtitle": "Processing PCB layers and building the 3D model. Please keep the window open.",
-    "progress.running": "Running",
-    "progress.processing": "Processing",
-    "progress.eta": "ETA: calculating",
-    "progress.cancel": "Cancel",
-    "status.ready": "Ready",
-    "status.running": "Running",
-    "status.success": "Done",
-    "status.error": "Error",
-    "log.idle": "Idle.",
-    "log.qtUnavailable": "Qt WebChannel is unavailable.",
-    "log.needInput": "Input folder and output STL are required.",
-    "log.done": "Done: {value}",
-    "log.error": "Error: {value}",
-    "log.noOutput": "Output STL is not set.",
-  },
-};
-
-function getInitialLocale() {
-  try {
-    const saved = localStorage.getItem("stencilforge-locale");
-    if (saved === "en" || saved === "zh-CN") return saved;
-  } catch (error) {
-    void error;
-  }
-  if (typeof navigator !== "undefined") {
-    const lang = navigator.language || "";
-    if (lang.toLowerCase().startsWith("en")) return "en";
-  }
-  return DEFAULT_LOCALE;
-}
+import { getInitialLocale, t as translate } from "./i18n";
 
 export default {
   components: {
@@ -755,7 +567,7 @@ export default {
       progressStartAt: 0,
       progressHideTimer: null,
       progressPulseTimer: null,
-      log: (MESSAGES[locale] && MESSAGES[locale]["log.idle"]) || MESSAGES[DEFAULT_LOCALE]["log.idle"],
+      log: translate(locale, "log.idle"),
       logBuffer: [],
       logFlushTimer: null,
       lastProgress: 0,
@@ -794,13 +606,7 @@ export default {
   },
   methods: {
     t(key, vars = {}) {
-      const table = MESSAGES[this.locale] || MESSAGES[DEFAULT_LOCALE] || {};
-      const fallback = MESSAGES[DEFAULT_LOCALE] || {};
-      let message = table[key] || fallback[key] || key;
-      Object.keys(vars).forEach((name) => {
-        message = message.replaceAll(`{${name}}`, vars[name]);
-      });
-      return message;
+      return translate(this.locale, key, vars);
     },
     applyLocale(persist = true) {
       if (persist) {
@@ -1204,3 +1010,4 @@ export default {
   }
 }
 </style>
+
