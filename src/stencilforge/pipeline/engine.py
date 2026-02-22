@@ -7,6 +7,7 @@ from typing import Protocol
 
 import numpy as np
 import trimesh
+from shapely.geometry import MultiPolygon, Polygon
 from shapely import constrained_delaunay_triangles
 from shapely.ops import unary_union
 
@@ -133,12 +134,14 @@ class SfMeshEngine:
         cfg = data.config
 
         t0 = time.perf_counter()
-        mesh = _extrude_with_cdt(data.stencil_2d, cfg.thickness_mm)
+        base_geom = _prepare_sfmesh_geometry(data.stencil_2d, cfg, preserve_holes=True)
+        mesh = _extrude_with_cdt(base_geom, cfg.thickness_mm)
         logger.info("sfmesh base extrusion in %.3fs", time.perf_counter() - t0)
 
         if data.locator_geom is not None and not data.locator_geom.is_empty and cfg.locator_height_mm > 0:
             t0 = time.perf_counter()
-            locator_mesh = _extrude_with_cdt(data.locator_geom, cfg.locator_height_mm)
+            locator_geom = _prepare_sfmesh_geometry(data.locator_geom, cfg, preserve_holes=False)
+            locator_mesh = _extrude_with_cdt(locator_geom, cfg.locator_height_mm)
             logger.info("sfmesh locator extrusion in %.3fs", time.perf_counter() - t0)
             locator_mesh.apply_translation((0, 0, cfg.thickness_mm))
             mesh = trimesh.util.concatenate([mesh, locator_mesh])
@@ -149,19 +152,31 @@ class SfMeshEngine:
             and cfg.locator_step_height_mm > 0
         ):
             t0 = time.perf_counter()
-            step_mesh = _extrude_with_cdt(data.locator_step_geom, cfg.locator_step_height_mm)
+            step_geom = _prepare_sfmesh_geometry(data.locator_step_geom, cfg, preserve_holes=False)
+            step_mesh = _extrude_with_cdt(step_geom, cfg.locator_step_height_mm)
             logger.info("sfmesh locator step extrusion in %.3fs", time.perf_counter() - t0)
             step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
             mesh = trimesh.util.concatenate([mesh, step_mesh])
 
-        if cfg.sfmesh_quality_mode == "watertight":
+        if _should_attempt_watertight(mesh, cfg):
             t0 = time.perf_counter()
-            mesh = _rebuild_watertight_voxel(mesh, cfg.sfmesh_voxel_pitch_mm)
+            pitch_mm = _adaptive_voxel_pitch(mesh, cfg)
+            mesh = _rebuild_watertight_voxel(mesh, pitch_mm)
             logger.info(
                 "sfmesh watertight rebuild in %.3fs (pitch=%s mm)",
                 time.perf_counter() - t0,
-                cfg.sfmesh_voxel_pitch_mm,
+                pitch_mm,
             )
+        elif cfg.sfmesh_quality_mode in {"auto", "watertight"}:
+            logger.info(
+                "sfmesh watertight skipped: mode=%s faces=%s limit=%s watertight=%s",
+                cfg.sfmesh_quality_mode,
+                int(mesh.faces.shape[0]) if getattr(mesh, "faces", None) is not None else 0,
+                cfg.sfmesh_watertight_face_limit,
+                bool(getattr(mesh, "is_watertight", False)),
+            )
+
+        mesh = _maybe_decimate_mesh(mesh, cfg)
 
         logger.info("Cleaning mesh...")
         try:
@@ -357,6 +372,114 @@ def _append_side_faces(coords, thickness_mm: float, add_vertex, faces: list[list
         else:
             faces.append([v1, v2, v3])
             faces.append([v1, v3, v4])
+
+
+def _prepare_sfmesh_geometry(geometry, cfg: StencilConfig, preserve_holes: bool):
+    geometry = ensure_valid(geometry)
+    geometry = orient_geometry(geometry)
+    if geometry.is_empty:
+        return geometry
+    if cfg.sfmesh_simplify_tol_mm > 0:
+        geometry = geometry.simplify(cfg.sfmesh_simplify_tol_mm, preserve_topology=True)
+    geometry = ensure_valid(geometry)
+    if geometry.is_empty:
+        return geometry
+    return _filter_polygon_noise(
+        geometry,
+        min_polygon_area=cfg.sfmesh_min_polygon_area_mm2,
+        min_hole_area=cfg.sfmesh_min_hole_area_mm2 if preserve_holes else float("inf"),
+    )
+
+
+def _filter_polygon_noise(geometry, min_polygon_area: float, min_hole_area: float):
+    if geometry.is_empty:
+        return geometry
+    polygons: list[Polygon] = []
+    if isinstance(geometry, Polygon):
+        polygons = [_clean_single_polygon(geometry, min_hole_area)]
+    elif isinstance(geometry, MultiPolygon):
+        polygons = [_clean_single_polygon(poly, min_hole_area) for poly in geometry.geoms]
+    else:
+        unioned = unary_union([geometry])
+        if isinstance(unioned, Polygon):
+            polygons = [_clean_single_polygon(unioned, min_hole_area)]
+        elif isinstance(unioned, MultiPolygon):
+            polygons = [_clean_single_polygon(poly, min_hole_area) for poly in unioned.geoms]
+    kept = [poly for poly in polygons if poly is not None and not poly.is_empty and poly.area >= min_polygon_area]
+    if not kept:
+        return geometry
+    if len(kept) == 1:
+        return kept[0]
+    return MultiPolygon(kept)
+
+
+def _clean_single_polygon(poly: Polygon, min_hole_area: float) -> Polygon:
+    shell = list(poly.exterior.coords)
+    holes = []
+    for ring in poly.interiors:
+        ring_poly = Polygon(ring)
+        if ring_poly.area >= min_hole_area:
+            holes.append(list(ring.coords))
+    cleaned = Polygon(shell, holes=holes)
+    return ensure_valid(cleaned)
+
+
+def _should_attempt_watertight(mesh: trimesh.Trimesh, cfg: StencilConfig) -> bool:
+    if cfg.sfmesh_quality_mode == "fast":
+        return False
+    face_count = int(mesh.faces.shape[0]) if getattr(mesh, "faces", None) is not None else 0
+    if face_count <= 0:
+        return False
+    if face_count > cfg.sfmesh_watertight_face_limit:
+        return False
+    watertight = bool(getattr(mesh, "is_watertight", False))
+    if cfg.sfmesh_quality_mode == "auto":
+        return not watertight
+    return True
+
+
+def _adaptive_voxel_pitch(mesh: trimesh.Trimesh, cfg: StencilConfig) -> float:
+    pitch = float(cfg.sfmesh_voxel_pitch_mm)
+    if not cfg.sfmesh_adaptive_pitch_enabled:
+        return pitch
+    bounds = getattr(mesh, "bounds", None)
+    if bounds is None:
+        return pitch
+    extents = np.asarray(bounds[1]) - np.asarray(bounds[0])
+    longest = float(np.max(extents)) if extents.size else 0.0
+    if longest > 180:
+        pitch *= 3.0
+    elif longest > 120:
+        pitch *= 2.4
+    elif longest > 80:
+        pitch *= 2.0
+    elif longest > 50:
+        pitch *= 1.6
+    return float(np.clip(pitch, cfg.sfmesh_adaptive_pitch_min_mm, cfg.sfmesh_adaptive_pitch_max_mm))
+
+
+def _maybe_decimate_mesh(mesh: trimesh.Trimesh, cfg: StencilConfig) -> trimesh.Trimesh:
+    ratio = float(cfg.sfmesh_decimate_target_ratio)
+    if ratio >= 1.0:
+        return mesh
+    face_count = int(mesh.faces.shape[0]) if getattr(mesh, "faces", None) is not None else 0
+    if face_count < 2000:
+        return mesh
+    target_faces = max(500, int(face_count * ratio))
+    try:
+        decimated = mesh.simplify_quadric_decimation(target_faces)
+    except Exception as exc:
+        logger.warning("sfmesh decimation skipped: %s", exc)
+        return mesh
+    if decimated is None or decimated.is_empty or decimated.faces.size == 0:
+        return mesh
+    logger.info(
+        "sfmesh decimation: faces %s -> %s (ratio=%.3f)",
+        face_count,
+        int(decimated.faces.shape[0]),
+        ratio,
+    )
+    return decimated
 
 
 def _repair_mesh_topology(mesh: trimesh.Trimesh) -> None:
