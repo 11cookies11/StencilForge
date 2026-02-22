@@ -13,6 +13,20 @@ This project uses layered automated tests to reduce manual QA:
 3. Nightly E2E:
 - `npm run test:e2e` (Playwright)
 
+## Quick Start (One Command)
+
+From repository root:
+
+```powershell
+.\scripts\test_all.ps1
+```
+
+First run (installs Playwright browsers before e2e):
+
+```powershell
+.\scripts\test_all.ps1 -InstallBrowsers
+```
+
 ## Local Commands
 
 ### Frontend
