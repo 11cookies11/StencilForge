@@ -35,12 +35,14 @@ from PySide6.QtWidgets import (
 
 try:
     from .config import StencilConfig
+    from .i18n import dialog_labels, normalize_locale, preview_labels, text
     from .pipeline import generate_stencil
     from .title_bar import TitleBar
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from stencilforge.config import StencilConfig
+    from stencilforge.i18n import dialog_labels, normalize_locale, preview_labels, text
     from stencilforge.pipeline import generate_stencil
     from stencilforge.title_bar import TitleBar
 
@@ -172,63 +174,6 @@ def _config_to_dict(config: StencilConfig) -> dict:
     }
 
 
-_PREVIEW_I18N = {
-    "zh-CN": {
-        "title": "钢网预览",
-        "fit": "适配",
-        "reset": "重置",
-        "wireframe": "线框",
-        "axes": "坐标轴",
-        "no_preview_path": "预览 STL 路径为空。",
-        "preview_unavailable": "预览窗口未初始化。",
-    },
-    "en": {
-        "title": "Stencil preview",
-        "fit": "Fit",
-        "reset": "Reset",
-        "wireframe": "Wireframe",
-        "axes": "Axes",
-        "no_preview_path": "Preview STL path is empty.",
-        "preview_unavailable": "Preview window is not initialized.",
-    },
-}
-_DIALOG_I18N = {
-    "zh-CN": {
-        "error_title": "运行失败",
-        "error_body": "发生错误，任务已停止。",
-        "error_detail": "错误原因: {message}",
-        "error_log": "日志已保存到: {path}",
-        "error_open_log": "查看日志",
-    },
-    "en": {
-        "error_title": "Job Failed",
-        "error_body": "An error occurred and the job was stopped.",
-        "error_detail": "Error: {message}",
-        "error_log": "Log saved to: {path}",
-        "error_open_log": "Open Log",
-    },
-}
-
-
-def _normalize_locale(locale: str | None) -> str:
-    if not locale:
-        return "zh-CN"
-    lowered = locale.lower()
-    if lowered.startswith("en"):
-        return "en"
-    return "zh-CN"
-
-
-def _preview_labels(locale: str) -> dict:
-    key = _normalize_locale(locale)
-    return _PREVIEW_I18N.get(key, _PREVIEW_I18N["zh-CN"])
-
-
-def _dialog_labels(locale: str) -> dict:
-    key = _normalize_locale(locale)
-    return _DIALOG_I18N.get(key, _DIALOG_I18N["zh-CN"])
-
-
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
     matches = []
     for path in input_dir.rglob("*"):
@@ -289,7 +234,7 @@ class BackendBridge(QObject):
             return
         if self._preview_dialog is None or self._preview_ui is None:
             return
-        labels = _preview_labels(self._locale)
+        labels = preview_labels(self._locale)
         self._preview_dialog.setWindowTitle(labels["title"])
         title_bar = self._preview_ui.get("title_bar")
         if title_bar is not None and hasattr(title_bar, "_title"):
@@ -334,8 +279,11 @@ class BackendBridge(QObject):
     def _emit_log(self, message: str) -> None:
         self._log_line(message)
 
+    def _tr(self, key: str, **kwargs) -> str:
+        return text(self._locale, key, **kwargs)
+
     def _on_job_error(self, message: str) -> None:
-        labels = _dialog_labels(self._locale)
+        labels = dialog_labels(self._locale)
         details = [labels["error_detail"].format(message=message)]
         open_button = None
         if self._log_path:
@@ -358,7 +306,7 @@ class BackendBridge(QObject):
         try:
             from .geometry.outline_plot import show_outline_debug_plot
         except Exception as exc:
-            self._emit_log(f"无法加载调试绘图: {exc}")
+            self._emit_log(self._tr("ui.debug_plot_load_failed", error=exc))
             return
         debug = payload.get("debug")
         plot_cfg = payload.get("plot_cfg")
@@ -367,18 +315,18 @@ class BackendBridge(QObject):
         try:
             show_outline_debug_plot(debug, plot_cfg)
         except Exception as exc:
-            self._emit_log(f"调试绘图失败: {exc}")
+            self._emit_log(self._tr("ui.debug_plot_failed", error=exc))
 
     def _show_preview(self) -> None:
         if self._external_preview:
             if self._last_preview_path:
                 self._launch_external_preview(self._last_preview_path)
             else:
-                self._emit_log(_preview_labels(self._locale)["no_preview_path"])
+                self._emit_log(preview_labels(self._locale)["no_preview_path"])
             return
         self._ensure_preview_ready()
         if self._preview_dialog is None:
-            self._emit_log(_preview_labels(self._locale)["preview_unavailable"])
+            self._emit_log(preview_labels(self._locale)["preview_unavailable"])
             return
         self._preview_dialog.show()
         self._preview_dialog.raise_()
@@ -396,7 +344,7 @@ class BackendBridge(QObject):
     def loadConfig(self, path: str) -> None:
         path_obj = Path(path)
         if not path_obj.exists():
-            self._emit_log(f"未找到配置文件: {path}")
+            self._emit_log(self._tr("ui.config_not_found", path=path))
             self._log_line(f"Config not found: {path}")
             return
         self._config_path = path_obj
@@ -413,7 +361,7 @@ class BackendBridge(QObject):
 
     @Slot(str)
     def setLocale(self, locale: str) -> None:
-        self._locale = _normalize_locale(locale)
+        self._locale = normalize_locale(locale)
         self._apply_preview_locale()
 
     @Slot(str)
@@ -438,7 +386,7 @@ class BackendBridge(QObject):
     def pickSaveFile(self, default_name: str) -> str:
         filename, _ = QFileDialog.getSaveFileName(
             None,
-            "保存 STL",
+            self._tr("ui.pick_save_stl_title"),
             str(self._project_root / default_name),
             "STL Files (*.stl)",
         )
@@ -447,7 +395,7 @@ class BackendBridge(QObject):
     @Slot(result=str)
     def pickDirectory(self) -> str:
         directory = QFileDialog.getExistingDirectory(
-            None, "选择 Gerber 文件夹", str(self._project_root)
+            None, self._tr("ui.pick_directory_title"), str(self._project_root)
         )
         return directory
 
@@ -458,7 +406,7 @@ class BackendBridge(QObject):
         start_dir = user_dir if user_dir.exists() else fallback_dir
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "选择配置文件",
+            self._tr("ui.pick_config_title"),
             str(start_dir),
             "Config (*.json)",
         )
@@ -468,7 +416,7 @@ class BackendBridge(QObject):
     def pickZipFile(self) -> str:
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "选择 Gerber ZIP",
+            self._tr("ui.pick_zip_title"),
             str(self._project_root),
             "ZIP Files (*.zip)",
         )
@@ -478,7 +426,7 @@ class BackendBridge(QObject):
     def pickStlFile(self) -> str:
         filename, _ = QFileDialog.getOpenFileName(
             None,
-            "选择 STL",
+            self._tr("ui.pick_stl_title"),
             str(self._project_root),
             "STL Files (*.stl)",
         )
@@ -493,10 +441,10 @@ class BackendBridge(QObject):
         try:
             data = Path(path).read_bytes()
         except FileNotFoundError:
-            self._emit_log(f"文件不存在: {path}")
+            self._emit_log(self._tr("ui.file_not_found", path=path))
             return ""
         except OSError as exc:
-            self._emit_log(f"读取文件失败: {exc}")
+            self._emit_log(self._tr("ui.read_file_failed", error=exc))
             return ""
         return base64.b64encode(data).decode("ascii")
 
@@ -507,7 +455,7 @@ class BackendBridge(QObject):
     @Slot(str)
     def loadPreviewStl(self, path: str) -> None:
         if not path:
-            self._emit_log("预览 STL 路径为空。")
+            self._emit_log(self._tr("ui.preview_path_empty"))
             return
         self._last_preview_path = path
         if self._external_preview:
@@ -515,24 +463,24 @@ class BackendBridge(QObject):
             return
         self._ensure_preview_ready()
         if self._preview_viewer is None:
-            self._emit_log("预览视图未初始化。")
+            self._emit_log(self._tr("ui.preview_viewer_uninitialized"))
             return
         if not Path(path).exists():
-            self._emit_log(f"未找到 STL: {path}")
+            self._emit_log(self._tr("ui.stl_not_found", path=path))
             return
         self._preview_viewer.load_stl(path)
         self._show_preview()
 
     def _launch_external_preview(self, path: str) -> None:
         if not Path(path).exists():
-            self._emit_log(f"未找到 STL: {path}")
+            self._emit_log(self._tr("ui.stl_not_found", path=path))
             return
         try:
             env = os.environ.copy()
             env["STENCILFORGE_LOCALE"] = self._locale
             subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
-            self._emit_log(f"启动预览失败: {exc}")
+            self._emit_log(self._tr("ui.preview_launch_failed", error=exc))
 
     def _ensure_preview_ready(self) -> None:
         if self._external_preview or self._preview_dialog is not None:
@@ -548,7 +496,7 @@ class BackendBridge(QObject):
     def importZip(self, zip_path: str) -> str:
         path = Path(zip_path)
         if not path.exists():
-            self._emit_log(f"未找到 ZIP: {zip_path}")
+            self._emit_log(self._tr("ui.zip_not_found", path=zip_path))
             return ""
         temp_dir = Path(tempfile.mkdtemp(prefix="stencilforge_"))
         try:
@@ -557,14 +505,14 @@ class BackendBridge(QObject):
             self._temp_dirs.append(temp_dir)
             return str(temp_dir)
         except zipfile.BadZipFile:
-            self._emit_log("无效的 ZIP 文件。")
+            self._emit_log(self._tr("ui.zip_invalid"))
             return ""
 
     @Slot(str, str, str)
     def runJob(self, input_dir: str, output_stl: str, config_path: str) -> None:
         with self._job_lock:
             if self._job_running:
-                self._emit_log("任务已在运行。")
+                self._emit_log(self._tr("ui.job_already_running"))
                 return
             self._job_running = True
             self._job_cancel_requested = False
@@ -579,7 +527,7 @@ class BackendBridge(QObject):
                 self.jobProgress.emit(0)
                 resolved_input = self._resolve_input_dir(input_dir)
                 if not resolved_input:
-                    raise ValueError("无法解压 ZIP 输入。")
+                    raise ValueError(self._tr("ui.zip_extract_failed"))
                 config = self._config
                 if config_path:
                     config = StencilConfig.from_json(Path(config_path))
@@ -620,7 +568,7 @@ class BackendBridge(QObject):
                             if process.is_alive() and hasattr(process, "kill"):
                                 process.kill()
                                 process.join(5)
-                            raise _JobCanceledError("任务已取消。")
+                            raise _JobCanceledError(self._tr("ui.job_canceled"))
                         process.join(0.1)
                     result = None
                     try:
@@ -679,18 +627,18 @@ class BackendBridge(QObject):
         if path.is_file() and path.suffix.lower() == ".zip":
             extracted = self.importZip(str(path))
             if extracted:
-                self._emit_log(f"已解压 ZIP: {path.name}")
+                self._emit_log(self._tr("ui.zip_extracted", name=path.name))
             return extracted or ""
         return str(path)
 
     @Slot()
     def stopJob(self) -> None:
         if not self._job_running:
-            self._emit_log("当前没有运行中的任务。")
+            self._emit_log(self._tr("ui.no_running_job"))
             return
         self._job_cancel_requested = True
         if self._job_process is not None and self._job_process.is_alive():
-            self._emit_log("已请求停止，正在终止导出进程。")
+            self._emit_log(self._tr("ui.stop_requested_terminating"))
             pid = self._job_process.pid
             if pid:
                 try:
@@ -702,13 +650,13 @@ class BackendBridge(QObject):
                     )
                     if proc.returncode != 0:
                         detail = proc.stderr.strip() or proc.stdout.strip() or f"exit={proc.returncode}"
-                        self._emit_log(f"终止进程失败: {detail}")
+                        self._emit_log(self._tr("ui.terminate_failed", detail=detail))
                 except Exception as exc:
-                    self._emit_log(f"终止进程失败: {exc}")
+                    self._emit_log(self._tr("ui.terminate_failed", detail=exc))
             else:
-                self._emit_log("终止进程失败: 无法获取进程 ID。")
+                self._emit_log(self._tr("ui.terminate_pid_missing"))
         else:
-            self._emit_log("已请求停止，正在等待任务响应。")
+            self._emit_log(self._tr("ui.stop_requested_waiting"))
 
     @Slot()
     def windowMinimize(self) -> None:
@@ -878,10 +826,8 @@ def main() -> int:
     if html_path is None:
         candidates = _ui_dist_candidates(project_root)
         joined = "\n".join(str(path) for path in candidates)
-        raise FileNotFoundError(
-            "未找到 UI 构建产物，请确认安装包包含前端资源。\n"
-            f"已尝试路径:\n{joined}"
-        )
+        startup_locale = normalize_locale(os.environ.get("STENCILFORGE_LOCALE"))
+        raise FileNotFoundError(text(startup_locale, "ui.ui_dist_missing", paths=joined))
 
     window = MainWindow(drag_height=64, button_margin=190)
     window.setWindowTitle("StencilForge")
@@ -922,8 +868,9 @@ def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
         QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
     except Exception:
         pass
+    labels = preview_labels("zh-CN")
     dialog = QDialog()
-    dialog.setWindowTitle(_PREVIEW_I18N["zh-CN"]["title"])
+    dialog.setWindowTitle(labels["title"])
     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
     _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
     dialog.setStyleSheet(
@@ -934,13 +881,13 @@ def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
         "QToolButton:checked { background-color: #e2e8f0; }"
     )
     viewer = VtkStlViewer(dialog)
-    title_bar = TitleBar(dialog, _PREVIEW_I18N["zh-CN"]["title"])
+    title_bar = TitleBar(dialog, labels["title"])
     toolbar = QToolBar(dialog)
     toolbar.setMovable(False)
-    fit_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["fit"])
-    reset_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["reset"])
-    wire_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["wireframe"])
-    axes_action = toolbar.addAction(_PREVIEW_I18N["zh-CN"]["axes"])
+    fit_action = toolbar.addAction(labels["fit"])
+    reset_action = toolbar.addAction(labels["reset"])
+    wire_action = toolbar.addAction(labels["wireframe"])
+    axes_action = toolbar.addAction(labels["axes"])
     wire_action.setCheckable(True)
     axes_action.setCheckable(True)
     axes_action.setChecked(True)

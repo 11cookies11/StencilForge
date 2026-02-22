@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import sys
@@ -10,54 +10,25 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, 
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 try:
+    from .i18n import preview_labels, text
     from .title_bar import TitleBar
     from .vtk_viewer import VtkStlViewer
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
+    from stencilforge.i18n import preview_labels, text
     from stencilforge.title_bar import TitleBar
     from stencilforge.vtk_viewer import VtkStlViewer
 
 
-_PREVIEW_I18N = {
-    "zh-CN": {
-        "title": "钢网预览",
-        "fit": "适配",
-        "reset": "重置",
-        "wireframe": "线框",
-        "axes": "坐标轴",
-    },
-    "en": {
-        "title": "Stencil preview",
-        "fit": "Fit",
-        "reset": "Reset",
-        "wireframe": "Wireframe",
-        "axes": "Axes",
-    },
-}
-
-
-def _normalize_locale(locale: str | None) -> str:
-    if not locale:
-        return "zh-CN"
-    lowered = locale.lower()
-    if lowered.startswith("en"):
-        return "en"
-    return "zh-CN"
-
-
-def _preview_labels(locale: str | None) -> dict:
-    key = _normalize_locale(locale)
-    return _PREVIEW_I18N.get(key, _PREVIEW_I18N["zh-CN"])
-
-
 def main() -> int:
+    locale = os.environ.get("STENCILFORGE_LOCALE")
     if len(sys.argv) < 2:
-        print("Usage: python -m stencilforge.preview_app <stl_path>")
+        print(text(locale, "cli.preview_usage"))
         return 1
     stl_path = Path(sys.argv[1])
     if not stl_path.exists():
-        print(f"STL not found: {stl_path}")
+        print(text(locale, "cli.stl_not_found", path=stl_path))
         return 1
 
     os.environ.setdefault("QT_OPENGL", "software")
@@ -79,7 +50,7 @@ def main() -> int:
     except Exception:
         pass
 
-    labels = _preview_labels(os.environ.get("STENCILFORGE_LOCALE"))
+    labels = preview_labels(locale)
     app = QApplication(sys.argv)
     window = QMainWindow()
     window.setWindowTitle(labels["title"])
