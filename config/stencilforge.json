@@ -22,6 +22,8 @@
   "locator_open_width_mm": 0.0,
   "output_mode": "solid_with_cutouts",
   "model_backend": "cadquery",
+  "sfmesh_quality_mode": "fast",
+  "sfmesh_voxel_pitch_mm": 0.08,
   "stl_quality": "balanced",
   "stl_linear_deflection": 0.15,
   "stl_angular_deflection": 0.3,

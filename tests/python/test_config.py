@@ -10,6 +10,8 @@ def test_default_config_values() -> None:
     assert cfg.thickness_mm == 0.12
     assert cfg.output_mode == "solid_with_cutouts"
     assert cfg.model_backend == "cadquery"
+    assert cfg.sfmesh_quality_mode == "fast"
+    assert cfg.sfmesh_voxel_pitch_mm == 0.08
     assert cfg.stl_quality == "balanced"
     assert cfg.stl_linear_deflection == 0.05
     assert cfg.stl_angular_deflection == 0.1
@@ -44,6 +46,8 @@ def test_sfmesh_backend_is_valid() -> None:
         ({"thickness_mm": 0}, "thickness_mm must be > 0"),
         ({"output_mode": "bad_mode"}, "output_mode must be holes_only or solid_with_cutouts"),
         ({"model_backend": "bad_backend"}, "model_backend must be trimesh, cadquery, or sfmesh"),
+        ({"sfmesh_quality_mode": "bad_mode"}, "sfmesh_quality_mode must be fast or watertight"),
+        ({"sfmesh_voxel_pitch_mm": 0}, "sfmesh_voxel_pitch_mm must be > 0"),
         ({"stl_quality": "ultra"}, "stl_quality must be fast, balanced, or high_quality"),
         ({"locator_open_side": "middle"}, "locator_open_side must be none/top/right/bottom/left"),
     ],

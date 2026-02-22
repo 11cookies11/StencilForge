@@ -5,6 +5,7 @@ import logging
 import time
 from typing import Protocol
 
+import numpy as np
 import trimesh
 from shapely import constrained_delaunay_triangles
 from shapely.ops import unary_union
@@ -153,10 +154,20 @@ class SfMeshEngine:
             step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
             mesh = trimesh.util.concatenate([mesh, step_mesh])
 
+        if cfg.sfmesh_quality_mode == "watertight":
+            t0 = time.perf_counter()
+            mesh = _rebuild_watertight_voxel(mesh, cfg.sfmesh_voxel_pitch_mm)
+            logger.info(
+                "sfmesh watertight rebuild in %.3fs (pitch=%s mm)",
+                time.perf_counter() - t0,
+                cfg.sfmesh_voxel_pitch_mm,
+            )
+
         logger.info("Cleaning mesh...")
         try:
             t0 = time.perf_counter()
             cleanup_mesh(mesh)
+            _repair_mesh_topology(mesh)
             logger.info("Mesh cleanup in %.3fs", time.perf_counter() - t0)
         except Exception as exc:
             logger.warning("Mesh cleanup failed: %s", exc)
@@ -265,6 +276,17 @@ def _extrude_polygon_with_cdt(poly, thickness_mm: float) -> trimesh.Trimesh:
         tri_list = list(triangles.geoms)
     else:
         return extrude_geometry(poly, thickness_mm)
+    tri_list = [tri for tri in tri_list if tri.area > 0 and poly.covers(tri.representative_point())]
+    covered_area = sum(tri.area for tri in tri_list)
+    coverage = covered_area / poly.area if poly.area > 0 else 0.0
+    if coverage < 0.995:
+        logger.warning(
+            "sfmesh CDT coverage low: poly_area=%.6f kept=%.6f coverage=%.3f",
+            float(poly.area),
+            float(covered_area),
+            float(coverage),
+        )
+        return extrude_geometry(poly, thickness_mm)
 
     vertices = []
     faces = []
@@ -297,22 +319,93 @@ def _extrude_polygon_with_cdt(poly, thickness_mm: float) -> trimesh.Trimesh:
         faces.append(top)
         faces.append(bottom[::-1])
 
-    for ring in [poly.exterior, *poly.interiors]:
+    for ring in [poly.exterior]:
         coords = list(ring.coords)
         if len(coords) < 2:
             continue
         if coords[0] == coords[-1]:
             coords = coords[:-1]
-        for i in range(len(coords)):
-            x1, y1 = coords[i]
-            x2, y2 = coords[(i + 1) % len(coords)]
-            v1 = add_vertex(x1, y1, 0.0)
-            v2 = add_vertex(x2, y2, 0.0)
-            v3 = add_vertex(x2, y2, thickness_mm)
-            v4 = add_vertex(x1, y1, thickness_mm)
-            faces.append([v1, v2, v3])
-            faces.append([v1, v3, v4])
+        _append_side_faces(coords, thickness_mm, add_vertex, faces, reverse=False)
+
+    for ring in poly.interiors:
+        coords = list(ring.coords)
+        if len(coords) < 2:
+            continue
+        if coords[0] == coords[-1]:
+            coords = coords[:-1]
+        # Hole side walls need opposite winding from exterior wall.
+        _append_side_faces(coords, thickness_mm, add_vertex, faces, reverse=True)
 
     if not faces:
         return extrude_geometry(poly, thickness_mm)
     return trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+
+
+def _append_side_faces(coords, thickness_mm: float, add_vertex, faces: list[list[int]], reverse: bool) -> None:
+    if len(coords) < 2:
+        return
+    for i in range(len(coords)):
+        x1, y1 = coords[i]
+        x2, y2 = coords[(i + 1) % len(coords)]
+        v1 = add_vertex(x1, y1, 0.0)
+        v2 = add_vertex(x2, y2, 0.0)
+        v3 = add_vertex(x2, y2, thickness_mm)
+        v4 = add_vertex(x1, y1, thickness_mm)
+        if reverse:
+            faces.append([v1, v3, v2])
+            faces.append([v1, v4, v3])
+        else:
+            faces.append([v1, v2, v3])
+            faces.append([v1, v3, v4])
+
+
+def _repair_mesh_topology(mesh: trimesh.Trimesh) -> None:
+    # Strengthen sfmesh output topology before export.
+    try:
+        trimesh.repair.fix_winding(mesh)
+    except Exception:
+        pass
+    try:
+        trimesh.repair.fix_normals(mesh)
+    except Exception:
+        pass
+    try:
+        trimesh.repair.fix_inversion(mesh)
+    except Exception:
+        pass
+    try:
+        trimesh.repair.fill_holes(mesh)
+    except Exception:
+        pass
+    if hasattr(mesh, "merge_vertices"):
+        mesh.merge_vertices(digits_vertex=6)
+    if hasattr(mesh, "remove_duplicate_faces"):
+        mesh.remove_duplicate_faces()
+    if hasattr(mesh, "remove_degenerate_faces"):
+        mesh.remove_degenerate_faces()
+    if hasattr(mesh, "remove_unreferenced_vertices"):
+        mesh.remove_unreferenced_vertices()
+    # Snap tiny float noise after heavy operations.
+    if mesh.vertices is not None and len(mesh.vertices) > 0:
+        mesh.vertices = np.round(mesh.vertices, 6)
+
+
+def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh.Trimesh:
+    if mesh.is_empty or mesh.faces.size == 0:
+        return mesh
+    try:
+        voxel = mesh.voxelized(pitch=pitch_mm)
+        try:
+            voxel = voxel.fill()
+        except Exception:
+            pass
+        rebuilt = voxel.marching_cubes
+    except ModuleNotFoundError as exc:
+        logger.warning("sfmesh watertight mode fallback (missing dependency): %s", exc)
+        return mesh
+    except Exception as exc:
+        logger.warning("sfmesh watertight rebuild failed, fallback to fast mesh: %s", exc)
+        return mesh
+    if rebuilt is None or rebuilt.is_empty or rebuilt.faces.size == 0:
+        return mesh
+    return rebuilt

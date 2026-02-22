@@ -26,6 +26,8 @@ class StencilConfig:
     locator_open_width_mm: float
     output_mode: str
     model_backend: str
+    sfmesh_quality_mode: str
+    sfmesh_voxel_pitch_mm: float
     stl_quality: str
     stl_linear_deflection: float
     stl_angular_deflection: float
@@ -100,6 +102,8 @@ class StencilConfig:
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
         model_backend = str(data.get("model_backend", "cadquery"))
+        sfmesh_quality_mode = str(data.get("sfmesh_quality_mode", "fast"))
+        sfmesh_voxel_pitch_mm = float(data.get("sfmesh_voxel_pitch_mm", 0.08))
         stl_quality = str(data.get("stl_quality", "balanced"))
         stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
@@ -151,6 +155,8 @@ class StencilConfig:
             locator_open_width_mm=locator_open_width_mm,
             output_mode=output_mode,
             model_backend=model_backend,
+            sfmesh_quality_mode=sfmesh_quality_mode,
+            sfmesh_voxel_pitch_mm=sfmesh_voxel_pitch_mm,
             stl_quality=stl_quality,
             stl_linear_deflection=stl_linear_deflection,
             stl_angular_deflection=stl_angular_deflection,
@@ -193,6 +199,10 @@ class StencilConfig:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
         if self.model_backend not in {"trimesh", "cadquery", "sfmesh"}:
             raise ValueError("model_backend must be trimesh, cadquery, or sfmesh")
+        if self.sfmesh_quality_mode not in {"fast", "watertight"}:
+            raise ValueError("sfmesh_quality_mode must be fast or watertight")
+        if self.sfmesh_voxel_pitch_mm <= 0:
+            raise ValueError("sfmesh_voxel_pitch_mm must be > 0")
         if self.stl_linear_deflection <= 0:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:

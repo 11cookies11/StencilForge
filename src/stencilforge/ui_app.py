@@ -154,6 +154,8 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "locator_open_width_mm": config.locator_open_width_mm,
         "output_mode": config.output_mode,
         "model_backend": config.model_backend,
+        "sfmesh_quality_mode": config.sfmesh_quality_mode,
+        "sfmesh_voxel_pitch_mm": config.sfmesh_voxel_pitch_mm,
         "stl_linear_deflection": config.stl_linear_deflection,
         "stl_angular_deflection": config.stl_angular_deflection,
         "arc_steps": config.arc_steps,

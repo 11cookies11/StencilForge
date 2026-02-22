@@ -59,3 +59,33 @@ def test_sfmesh_engine_handles_polygon_with_hole(tmp_path: Path) -> None:
     assert out.exists()
     mesh = trimesh.load_mesh(out, force="mesh")
     assert int(mesh.faces.shape[0]) > 0
+
+
+def test_sfmesh_watertight_mode_exports_mesh(tmp_path: Path) -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "model_backend": "sfmesh",
+            "sfmesh_quality_mode": "watertight",
+            "sfmesh_voxel_pitch_mm": 0.05,
+            "thickness_mm": 0.12,
+        }
+    )
+    cfg.validate()
+
+    polygon = Polygon([(0, 0), (10, 0), (10, 5), (0, 5)])
+    out = tmp_path / "sfmesh_watertight.stl"
+
+    engine = get_model_engine("sfmesh")
+    engine.export(
+        EngineExportInput(
+            stencil_2d=polygon,
+            locator_geom=None,
+            locator_step_geom=None,
+            output_path=out,
+            config=cfg,
+        )
+    )
+
+    assert out.exists()
+    mesh = trimesh.load_mesh(out, force="mesh")
+    assert int(mesh.faces.shape[0]) > 0
