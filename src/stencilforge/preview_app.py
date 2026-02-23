@@ -104,13 +104,16 @@ def main() -> int:
 
 
 def _center_window(window: QMainWindow, target_size: tuple[int, int]) -> None:
-    window.resize(*target_size)
     screen = QGuiApplication.primaryScreen()
     if screen is None:
+        window.resize(*target_size)
         return
     geometry = screen.availableGeometry()
-    x = geometry.x() + max((geometry.width() - target_size[0]) // 2, 0)
-    y = geometry.y() + max((geometry.height() - target_size[1]) // 2, 0)
+    width = min(target_size[0], max(geometry.width(), 1))
+    height = min(target_size[1], max(geometry.height(), 1))
+    window.resize(width, height)
+    x = geometry.x() + max((geometry.width() - width) // 2, 0)
+    y = geometry.y() + max((geometry.height() - height) // 2, 0)
     window.move(x, y)
 
 

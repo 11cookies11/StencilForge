@@ -1000,10 +1000,17 @@ def _fit_to_screen(
         widget.resize(*max_size)
         return
     available = screen.availableGeometry()
-    width = min(int(available.width() * max_ratio[0]), max_size[0])
-    height = min(int(available.height() * max_ratio[1]), max_size[1])
-    width = max(width, min_size[0])
-    height = max(height, min_size[1])
+    avail_w = max(available.width(), 1)
+    avail_h = max(available.height(), 1)
+
+    # Keep requested minimums practical on small displays.
+    min_w = max(1, min(min_size[0], avail_w))
+    min_h = max(1, min(min_size[1], avail_h))
+
+    width = min(int(avail_w * max_ratio[0]), max_size[0], avail_w)
+    height = min(int(avail_h * max_ratio[1]), max_size[1], avail_h)
+    width = min(max(width, min_w), avail_w)
+    height = min(max(height, min_h), avail_h)
     widget.resize(width, height)
     x = available.x() + max((available.width() - width) // 2, 0)
     y = available.y() + max((available.height() - height) // 2, 0)
