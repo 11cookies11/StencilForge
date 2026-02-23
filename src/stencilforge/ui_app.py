@@ -155,22 +155,6 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "locator_open_width_mm": config.locator_open_width_mm,
         "output_mode": config.output_mode,
         "model_backend": config.model_backend,
-        "sfmesh_quality_mode": config.sfmesh_quality_mode,
-        "sfmesh_voxel_pitch_mm": config.sfmesh_voxel_pitch_mm,
-        "sfmesh_adaptive_pitch_enabled": config.sfmesh_adaptive_pitch_enabled,
-        "sfmesh_adaptive_pitch_min_mm": config.sfmesh_adaptive_pitch_min_mm,
-        "sfmesh_adaptive_pitch_max_mm": config.sfmesh_adaptive_pitch_max_mm,
-        "sfmesh_watertight_face_limit": config.sfmesh_watertight_face_limit,
-        "sfmesh_simplify_tol_mm": config.sfmesh_simplify_tol_mm,
-        "sfmesh_min_polygon_area_mm2": config.sfmesh_min_polygon_area_mm2,
-        "sfmesh_min_hole_area_mm2": config.sfmesh_min_hole_area_mm2,
-        "sfmesh_decimate_target_ratio": config.sfmesh_decimate_target_ratio,
-        "sfmesh_hole_protect_enabled": config.sfmesh_hole_protect_enabled,
-        "sfmesh_hole_protect_max_width_mm": config.sfmesh_hole_protect_max_width_mm,
-        "sfmesh_hole_pitch_divisor": config.sfmesh_hole_pitch_divisor,
-        "sfmesh_chunked_watertight_enabled": config.sfmesh_chunked_watertight_enabled,
-        "sfmesh_chunk_size_mm": config.sfmesh_chunk_size_mm,
-        "sfmesh_chunk_overlap_mm": config.sfmesh_chunk_overlap_mm,
         "stl_linear_deflection": config.stl_linear_deflection,
         "stl_angular_deflection": config.stl_angular_deflection,
         "arc_steps": config.arc_steps,
@@ -868,6 +852,12 @@ class MainWindow(QMainWindow):
                     right = pos.x() >= self.width() - border
                     top = pos.y() <= top_border
                     bottom = pos.y() >= self.height() - border
+                    # Keep web content scrollbars interactive while preserving
+                    # edge resize: reserve only the outermost 2px for right-edge resize.
+                    if right and (self._drag_height < pos.y() < self.height() - border):
+                        right_resize_strip = 2
+                        if pos.x() < self.width() - right_resize_strip:
+                            right = False
                     if top and left:
                         return True, HTTOPLEFT
                     if top and right:
@@ -1016,10 +1006,17 @@ def _fit_to_screen(
         widget.resize(*max_size)
         return
     available = screen.availableGeometry()
-    width = min(int(available.width() * max_ratio[0]), max_size[0])
-    height = min(int(available.height() * max_ratio[1]), max_size[1])
-    width = max(width, min_size[0])
-    height = max(height, min_size[1])
+    avail_w = max(available.width(), 1)
+    avail_h = max(available.height(), 1)
+
+    # Keep requested minimums practical on small displays.
+    min_w = max(1, min(min_size[0], avail_w))
+    min_h = max(1, min(min_size[1], avail_h))
+
+    width = min(int(avail_w * max_ratio[0]), max_size[0], avail_w)
+    height = min(int(avail_h * max_ratio[1]), max_size[1], avail_h)
+    width = min(max(width, min_w), avail_w)
+    height = min(max(height, min_h), avail_h)
     widget.resize(width, height)
     x = available.x() + max((available.width() - width) // 2, 0)
     y = available.y() + max((available.height() - height) // 2, 0)

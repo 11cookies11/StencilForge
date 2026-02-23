@@ -185,8 +185,25 @@
           <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("config.title") }}</h1>
           <p class="text-slate-500">{{ t("config.subtitle") }}</p>
         </div>
-        <div class="grid md:grid-cols-2 gap-6">
+        <div :class="['grid gap-6', showAdvancedConfig ? 'md:grid-cols-2' : 'grid-cols-1']">
           <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-slate-400">{{ t("config.recommendedHint") }}</p>
+              <div class="flex items-center gap-2">
+                <button
+                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  @click="restoreBasicDefaults"
+                >
+                  {{ t("config.restoreBasicDefaults") }}
+                </button>
+                <button
+                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                  @click="showAdvancedConfig = !showAdvancedConfig"
+                >
+                  {{ showAdvancedConfig ? t("config.hideAdvanced") : t("config.showAdvanced") }}
+                </button>
+              </div>
+            </div>
             <div class="grid grid-cols-2 gap-4">
               <label class="text-xs font-semibold text-slate-600">{{ t("config.thickness") }}
                 <input
@@ -198,24 +215,26 @@
                 />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.outputMode") }}
-                <select
+                <AppSelect
                   v-model="config.output_mode"
                   @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                >
-                  <option value="solid_with_cutouts">{{ t("config.outputModeSolid") }}</option>
-                  <option value="holes_only">{{ t("config.outputModeHoles") }}</option>
-                </select>
+                  class="mt-1"
+                  :options="[
+                    { value: 'solid_with_cutouts', label: t('config.outputModeSolid') },
+                    { value: 'holes_only', label: t('config.outputModeHoles') },
+                  ]"
+                />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.modelBackend") }}
-                <select
+                <AppSelect
                   v-model="config.model_backend"
                   @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                >
-                  <option value="cadquery">{{ t("config.modelBackendCadquery") }}</option>
-                  <option value="trimesh">{{ t("config.modelBackendTrimesh") }}</option>
-                </select>
+                  class="mt-1"
+                  :options="[
+                    { value: 'cadquery', label: t('config.modelBackendCadquery') },
+                    { value: 'trimesh', label: t('config.modelBackendTrimesh') },
+                  ]"
+                />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.pasteOffset") }}
                 <input
@@ -235,34 +254,6 @@
                   step="0.1"
                 />
               </label>
-              <label class="text-xs font-semibold text-slate-600">{{ t("config.outlineMergeTol") }}
-                <input
-                  v-model.number="config.outline_merge_tol_mm"
-                  @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                />
-              </label>
-              <label class="text-xs font-semibold text-slate-600">{{ t("config.arcSteps") }}
-                <input
-                  v-model.number="config.arc_steps"
-                  @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  type="number"
-                  step="1"
-                />
-              </label>
-              <label class="text-xs font-semibold text-slate-600">{{ t("config.curveResolution") }}
-                <input
-                  v-model.number="config.curve_resolution"
-                  @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  type="number"
-                  step="1"
-                />
-              </label>
             </div>
             <div class="pt-2 border-t border-slate-100 space-y-3">
               <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
@@ -276,14 +267,15 @@
               </label>
               <div class="grid grid-cols-2 gap-4">
                 <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorMode") }}
-                  <select
+                  <AppSelect
                     v-model="config.locator_mode"
                     @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  >
-                    <option value="step">{{ t("config.locatorModeStep") }}</option>
-                    <option value="wall">{{ t("config.locatorModeWall") }}</option>
-                  </select>
+                    class="mt-1"
+                    :options="[
+                      { value: 'step', label: t('config.locatorModeStep') },
+                      { value: 'wall', label: t('config.locatorModeWall') },
+                    ]"
+                  />
                 </label>
                 <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorHeight") }}
                   <input
@@ -315,54 +307,88 @@
                     min="0"
                   />
                 </label>
-                <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorStepHeight") }}
-                  <input
-                    v-model.number="config.locator_step_height_mm"
-                    @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                  />
-                </label>
-                <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorStepWidth") }}
-                  <input
-                    v-model.number="config.locator_step_width_mm"
-                    @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                  />
-                </label>
-                <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenSide") }}
-                  <select
-                    v-model="config.locator_open_side"
-                    @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  >
-                    <option value="none">{{ t("config.locatorOpenSideNone") }}</option>
-                    <option value="top">{{ t("config.locatorOpenSideTop") }}</option>
-                    <option value="right">{{ t("config.locatorOpenSideRight") }}</option>
-                    <option value="bottom">{{ t("config.locatorOpenSideBottom") }}</option>
-                    <option value="left">{{ t("config.locatorOpenSideLeft") }}</option>
-                  </select>
-                </label>
-                <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenWidth") }}
-                  <input
-                    v-model.number="config.locator_open_width_mm"
-                    @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                  />
-                </label>
               </div>
             </div>
           </div>
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
-            <div>
+          <div v-if="showAdvancedConfig" class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
+            <div class="space-y-5">
+              <div>
+                <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.advancedSection") }}</div>
+                <div class="grid grid-cols-2 gap-4">
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.outlineMergeTol") }}
+                    <input
+                      v-model.number="config.outline_merge_tol_mm"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.arcSteps") }}
+                    <input
+                      v-model.number="config.arc_steps"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="1"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.curveResolution") }}
+                    <input
+                      v-model.number="config.curve_resolution"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="1"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorStepHeight") }}
+                    <input
+                      v-model.number="config.locator_step_height_mm"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorStepWidth") }}
+                    <input
+                      v-model.number="config.locator_step_width_mm"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenSide") }}
+                    <AppSelect
+                      v-model="config.locator_open_side"
+                      @change="updateConfig"
+                      class="mt-1"
+                      :options="[
+                        { value: 'none', label: t('config.locatorOpenSideNone') },
+                        { value: 'top', label: t('config.locatorOpenSideTop') },
+                        { value: 'right', label: t('config.locatorOpenSideRight') },
+                        { value: 'bottom', label: t('config.locatorOpenSideBottom') },
+                        { value: 'left', label: t('config.locatorOpenSideLeft') },
+                      ]"
+                    />
+                  </label>
+                  <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenWidth") }}
+                    <input
+                      v-model.number="config.locator_open_width_mm"
+                      @change="updateConfig"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                    />
+                  </label>
+                </div>
+              </div>
               <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.pasteRules") }}</div>
               <div class="space-y-2">
                 <div class="flex gap-2" v-for="(pattern, index) in config.paste_patterns" :key="'paste-' + index">
@@ -387,7 +413,6 @@
                 <AppIcon name="add_circle" :size="16" />
                 {{ t("config.addRule") }}
               </button>
-            </div>
             <div>
               <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.outlineRules") }}</div>
               <div class="space-y-2">
@@ -416,6 +441,7 @@
             </div>
           </div>
         </div>
+      </div>
       </section>
 
       <section v-show="currentTab === 'preview'" class="space-y-6">
@@ -521,6 +547,7 @@
 
 <script>
 import AppIcon from "./components/AppIcon.vue";
+import AppSelect from "./components/AppSelect.vue";
 import { getInitialLocale, t as translate } from "./i18n";
 
 const LOCALE_OPTIONS = [
@@ -531,9 +558,44 @@ const LOCALE_OPTIONS = [
   { value: "es", labelKey: "language.es" },
 ];
 
+const DEFAULT_CONFIG = {
+  paste_patterns: ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"],
+  outline_patterns: ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"],
+  thickness_mm: 0.12,
+  paste_offset_mm: -0.05,
+  outline_margin_mm: 5.0,
+  outline_merge_tol_mm: 0.01,
+  locator_enabled: true,
+  locator_height_mm: 2.0,
+  locator_width_mm: 2.0,
+  locator_clearance_mm: 0.2,
+  locator_step_height_mm: 1.0,
+  locator_step_width_mm: 1.5,
+  locator_mode: "step",
+  locator_open_side: "none",
+  locator_open_width_mm: 0.0,
+  output_mode: "solid_with_cutouts",
+  model_backend: "trimesh",
+  arc_steps: 64,
+  curve_resolution: 16,
+};
+
+const BASIC_CONFIG_KEYS = [
+  "thickness_mm",
+  "output_mode",
+  "model_backend",
+  "paste_offset_mm",
+  "locator_enabled",
+  "locator_mode",
+  "locator_height_mm",
+  "locator_width_mm",
+  "locator_clearance_mm",
+];
+
 export default {
   components: {
     AppIcon,
+    AppSelect,
   },
   data() {
     const locale = getInitialLocale();
@@ -541,29 +603,9 @@ export default {
       locale,
       languageMenuOpen: false,
       currentTab: "upload",
+      showAdvancedConfig: false,
       backend: null,
-      config: {
-        paste_patterns: ["*gtp*", "*paste*top*"],
-        outline_patterns: ["*gko*", "*outline*", "*edge*cuts*"],
-        thickness_mm: 0.12,
-        paste_offset_mm: -0.05,
-        outline_margin_mm: 5.0,
-        outline_merge_tol_mm: 0.01,
-        locator_enabled: true,
-        locator_height_mm: 2.0,
-        locator_width_mm: 2.0,
-        locator_clearance_mm: 0.2,
-        locator_step_height_mm: 1.0,
-        locator_step_width_mm: 1.5,
-        locator_mode: "step",
-        locator_open_side: "none",
-        locator_open_width_mm: 0.0,
-        output_mode: "solid_with_cutouts",
-        model_backend: "trimesh",
-        sfmesh_quality_mode: "fast",
-        arc_steps: 64,
-        curve_resolution: 16,
-      },
+      config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)),
       inputDir: "",
       outputPath: "",
       configPath: "",
@@ -838,6 +880,14 @@ export default {
     addPattern(type) {
       const key = type === "paste" ? "paste_patterns" : "outline_patterns";
       this.config[key].push("*");
+      this.updateConfig();
+    },
+    restoreBasicDefaults() {
+      for (const key of BASIC_CONFIG_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(DEFAULT_CONFIG, key)) {
+          this.config[key] = DEFAULT_CONFIG[key];
+        }
+      }
       this.updateConfig();
     },
     removePattern(type, index) {
