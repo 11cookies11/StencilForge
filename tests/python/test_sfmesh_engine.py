@@ -144,3 +144,33 @@ def test_sfmesh_hole_protect_caps_pitch() -> None:
     mesh = trimesh.creation.box(extents=(100, 100, 1.0))
     pitch = _adaptive_voxel_pitch(mesh, cfg, critical_hole_width=0.6)
     assert pitch <= 0.2
+
+
+def test_sfmesh_chunked_watertight_exports_mesh(tmp_path: Path) -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "model_backend": "sfmesh",
+            "sfmesh_quality_mode": "watertight",
+            "sfmesh_voxel_pitch_mm": 0.2,
+            "sfmesh_chunked_watertight_enabled": True,
+            "sfmesh_chunk_size_mm": 8.0,
+            "sfmesh_chunk_overlap_mm": 1.0,
+            "thickness_mm": 0.12,
+        }
+    )
+    cfg.validate()
+    polygon = Polygon(shell=[(0, 0), (30, 0), (30, 20), (0, 20)], holes=[[(10, 7), (20, 7), (20, 13), (10, 13)]])
+    out = tmp_path / "sfmesh_chunked_watertight.stl"
+    engine = get_model_engine("sfmesh")
+    engine.export(
+        EngineExportInput(
+            stencil_2d=polygon,
+            locator_geom=None,
+            locator_step_geom=None,
+            output_path=out,
+            config=cfg,
+        )
+    )
+    assert out.exists()
+    mesh = trimesh.load_mesh(out, force="mesh")
+    assert int(mesh.faces.shape[0]) > 0

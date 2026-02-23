@@ -23,6 +23,9 @@ def test_default_config_values() -> None:
     assert cfg.sfmesh_hole_protect_enabled is True
     assert cfg.sfmesh_hole_protect_max_width_mm == 0.8
     assert cfg.sfmesh_hole_pitch_divisor == 3.0
+    assert cfg.sfmesh_chunked_watertight_enabled is True
+    assert cfg.sfmesh_chunk_size_mm == 70.0
+    assert cfg.sfmesh_chunk_overlap_mm == 1.0
     assert cfg.stl_quality == "balanced"
     assert cfg.stl_linear_deflection == 0.05
     assert cfg.stl_angular_deflection == 0.1
@@ -72,6 +75,8 @@ def test_sfmesh_backend_is_valid() -> None:
         ({"sfmesh_decimate_target_ratio": 0}, "sfmesh_decimate_target_ratio must be in \\(0, 1\\]"),
         ({"sfmesh_hole_protect_max_width_mm": 0}, "sfmesh_hole_protect_max_width_mm must be > 0"),
         ({"sfmesh_hole_pitch_divisor": 1}, "sfmesh_hole_pitch_divisor must be > 1"),
+        ({"sfmesh_chunk_size_mm": 0}, "sfmesh_chunk_size_mm must be > 0"),
+        ({"sfmesh_chunk_overlap_mm": -0.1}, "sfmesh_chunk_overlap_mm must be >= 0"),
         ({"stl_quality": "ultra"}, "stl_quality must be fast, balanced, or high_quality"),
         ({"locator_open_side": "middle"}, "locator_open_side must be none/top/right/bottom/left"),
     ],

@@ -39,6 +39,9 @@ class StencilConfig:
     sfmesh_hole_protect_enabled: bool
     sfmesh_hole_protect_max_width_mm: float
     sfmesh_hole_pitch_divisor: float
+    sfmesh_chunked_watertight_enabled: bool
+    sfmesh_chunk_size_mm: float
+    sfmesh_chunk_overlap_mm: float
     stl_quality: str
     stl_linear_deflection: float
     stl_angular_deflection: float
@@ -126,6 +129,9 @@ class StencilConfig:
         sfmesh_hole_protect_enabled = bool(data.get("sfmesh_hole_protect_enabled", True))
         sfmesh_hole_protect_max_width_mm = float(data.get("sfmesh_hole_protect_max_width_mm", 0.8))
         sfmesh_hole_pitch_divisor = float(data.get("sfmesh_hole_pitch_divisor", 3.0))
+        sfmesh_chunked_watertight_enabled = bool(data.get("sfmesh_chunked_watertight_enabled", True))
+        sfmesh_chunk_size_mm = float(data.get("sfmesh_chunk_size_mm", 70.0))
+        sfmesh_chunk_overlap_mm = float(data.get("sfmesh_chunk_overlap_mm", 1.0))
         stl_quality = str(data.get("stl_quality", "balanced"))
         stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
@@ -190,6 +196,9 @@ class StencilConfig:
             sfmesh_hole_protect_enabled=sfmesh_hole_protect_enabled,
             sfmesh_hole_protect_max_width_mm=sfmesh_hole_protect_max_width_mm,
             sfmesh_hole_pitch_divisor=sfmesh_hole_pitch_divisor,
+            sfmesh_chunked_watertight_enabled=sfmesh_chunked_watertight_enabled,
+            sfmesh_chunk_size_mm=sfmesh_chunk_size_mm,
+            sfmesh_chunk_overlap_mm=sfmesh_chunk_overlap_mm,
             stl_quality=stl_quality,
             stl_linear_deflection=stl_linear_deflection,
             stl_angular_deflection=stl_angular_deflection,
@@ -256,6 +265,10 @@ class StencilConfig:
             raise ValueError("sfmesh_hole_protect_max_width_mm must be > 0")
         if self.sfmesh_hole_pitch_divisor <= 1:
             raise ValueError("sfmesh_hole_pitch_divisor must be > 1")
+        if self.sfmesh_chunk_size_mm <= 0:
+            raise ValueError("sfmesh_chunk_size_mm must be > 0")
+        if self.sfmesh_chunk_overlap_mm < 0:
+            raise ValueError("sfmesh_chunk_overlap_mm must be >= 0")
         if self.stl_linear_deflection <= 0:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:

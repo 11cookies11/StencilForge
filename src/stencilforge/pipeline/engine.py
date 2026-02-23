@@ -162,7 +162,7 @@ class SfMeshEngine:
         if _should_attempt_watertight(mesh, cfg):
             t0 = time.perf_counter()
             pitch_mm = _adaptive_voxel_pitch(mesh, cfg, critical_hole_width)
-            mesh = _rebuild_watertight_voxel(mesh, pitch_mm)
+            mesh = _rebuild_watertight_voxel(mesh, pitch_mm, cfg)
             logger.info(
                 "sfmesh watertight rebuild in %.3fs (pitch=%s mm)",
                 time.perf_counter() - t0,
@@ -548,7 +548,17 @@ def _repair_mesh_topology(mesh: trimesh.Trimesh) -> None:
         mesh.vertices = np.round(mesh.vertices, 6)
 
 
-def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh.Trimesh:
+def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float, cfg: StencilConfig) -> trimesh.Trimesh:
+    if mesh.is_empty or mesh.faces.size == 0:
+        return mesh
+    if cfg.sfmesh_chunked_watertight_enabled:
+        chunked = _rebuild_watertight_chunked(mesh, pitch_mm, cfg)
+        if chunked is not None:
+            return chunked
+    return _rebuild_watertight_single(mesh, pitch_mm)
+
+
+def _rebuild_watertight_single(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh.Trimesh:
     if mesh.is_empty or mesh.faces.size == 0:
         return mesh
     target_bounds = np.array(mesh.bounds, dtype=float) if mesh.bounds is not None else None
@@ -575,6 +585,136 @@ def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh
     if target_bounds is not None:
         _fit_mesh_to_bounds(rebuilt, target_bounds)
     return rebuilt
+
+
+def _rebuild_watertight_chunked(
+    mesh: trimesh.Trimesh, pitch_mm: float, cfg: StencilConfig
+) -> trimesh.Trimesh | None:
+    bounds = np.array(mesh.bounds, dtype=float) if mesh.bounds is not None else None
+    if bounds is None:
+        return None
+    min_x, min_y = float(bounds[0][0]), float(bounds[0][1])
+    max_x, max_y = float(bounds[1][0]), float(bounds[1][1])
+    chunk_size = float(cfg.sfmesh_chunk_size_mm)
+    if (max_x - min_x) <= chunk_size and (max_y - min_y) <= chunk_size:
+        return None
+
+    overlap = float(cfg.sfmesh_chunk_overlap_mm)
+    x_edges = list(np.arange(min_x, max_x, chunk_size))
+    y_edges = list(np.arange(min_y, max_y, chunk_size))
+    if not x_edges:
+        x_edges = [min_x]
+    if not y_edges:
+        y_edges = [min_y]
+    if x_edges[-1] < max_x:
+        x_edges.append(max_x)
+    if y_edges[-1] < max_y:
+        y_edges.append(max_y)
+
+    chunk_meshes: list[trimesh.Trimesh] = []
+    chunk_total = 0
+    chunk_ok = 0
+    for xi in range(len(x_edges) - 1):
+        for yi in range(len(y_edges) - 1):
+            cx0 = x_edges[xi]
+            cx1 = x_edges[xi + 1]
+            cy0 = y_edges[yi]
+            cy1 = y_edges[yi + 1]
+            chunk_total += 1
+            sx0 = max(min_x, cx0 - overlap)
+            sx1 = min(max_x, cx1 + overlap)
+            sy0 = max(min_y, cy0 - overlap)
+            sy1 = min(max_y, cy1 + overlap)
+            part = _clip_mesh_xy(mesh, sx0, sy0, sx1, sy1)
+            if part is None:
+                part = _submesh_xy_intersection(mesh, sx0, sy0, sx1, sy1)
+            if part is None:
+                continue
+            rebuilt = _rebuild_watertight_single(part, pitch_mm)
+            if rebuilt is None or rebuilt.is_empty or rebuilt.faces.size == 0:
+                continue
+            cropped = _clip_mesh_xy(rebuilt, cx0, cy0, cx1, cy1)
+            if cropped is None:
+                cropped = _submesh_xy_intersection(rebuilt, cx0, cy0, cx1, cy1)
+            if cropped is None:
+                continue
+            chunk_meshes.append(cropped)
+            chunk_ok += 1
+
+    if not chunk_meshes:
+        logger.warning("sfmesh chunked watertight produced no chunks, fallback to single")
+        return None
+
+    merged = trimesh.util.concatenate(chunk_meshes)
+    _repair_mesh_topology(merged)
+    if not bool(getattr(merged, "is_watertight", False)):
+        # Chunk overlap may leave seam artifacts. Run a coarse global seal pass.
+        seal_pitch = min(cfg.sfmesh_adaptive_pitch_max_mm, max(pitch_mm, pitch_mm * 1.25))
+        logger.info(
+            "sfmesh chunked seam-seal pass: pitch %.4f -> %.4f",
+            pitch_mm,
+            seal_pitch,
+        )
+        sealed = _rebuild_watertight_single(merged, seal_pitch)
+        if sealed is not None and not sealed.is_empty and sealed.faces.size > 0:
+            merged = sealed
+            _repair_mesh_topology(merged)
+    logger.info(
+        "sfmesh chunked watertight: chunks=%s ok=%s size=%.1f overlap=%.3f",
+        chunk_total,
+        chunk_ok,
+        chunk_size,
+        overlap,
+    )
+    return merged
+
+
+def _submesh_xy_intersection(
+    mesh: trimesh.Trimesh, x0: float, y0: float, x1: float, y1: float
+) -> trimesh.Trimesh | None:
+    if mesh.is_empty or mesh.faces.size == 0:
+        return None
+    tris = mesh.vertices[mesh.faces]
+    tri_min = tris[:, :, :2].min(axis=1)
+    tri_max = tris[:, :, :2].max(axis=1)
+    mask = (
+        (tri_max[:, 0] >= x0)
+        & (tri_min[:, 0] <= x1)
+        & (tri_max[:, 1] >= y0)
+        & (tri_min[:, 1] <= y1)
+    )
+    idx = np.nonzero(mask)[0]
+    if idx.size == 0:
+        return None
+    sub = mesh.submesh([idx], append=True, repair=False)
+    if sub is None or sub.is_empty or sub.faces.size == 0:
+        return None
+    return sub
+
+
+def _clip_mesh_xy(mesh: trimesh.Trimesh, x0: float, y0: float, x1: float, y1: float) -> trimesh.Trimesh | None:
+    if mesh.is_empty or mesh.faces.size == 0:
+        return None
+    clipped = mesh.copy()
+    planes = [
+        (np.array([1.0, 0.0, 0.0]), np.array([x0, 0.0, 0.0])),   # x >= x0
+        (np.array([-1.0, 0.0, 0.0]), np.array([x1, 0.0, 0.0])),  # x <= x1
+        (np.array([0.0, 1.0, 0.0]), np.array([0.0, y0, 0.0])),   # y >= y0
+        (np.array([0.0, -1.0, 0.0]), np.array([0.0, y1, 0.0])),  # y <= y1
+    ]
+    try:
+        for normal, origin in planes:
+            clipped = trimesh.intersections.slice_mesh_plane(
+                clipped,
+                plane_normal=normal,
+                plane_origin=origin,
+                cap=False,
+            )
+            if clipped is None or clipped.is_empty or clipped.faces.size == 0:
+                return None
+    except Exception:
+        return None
+    return clipped
 
 
 def _fit_mesh_to_bounds(mesh: trimesh.Trimesh, target_bounds: np.ndarray) -> None:
