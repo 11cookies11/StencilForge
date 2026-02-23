@@ -215,24 +215,26 @@
                 />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.outputMode") }}
-                <select
+                <AppSelect
                   v-model="config.output_mode"
                   @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                >
-                  <option value="solid_with_cutouts">{{ t("config.outputModeSolid") }}</option>
-                  <option value="holes_only">{{ t("config.outputModeHoles") }}</option>
-                </select>
+                  class="mt-1"
+                  :options="[
+                    { value: 'solid_with_cutouts', label: t('config.outputModeSolid') },
+                    { value: 'holes_only', label: t('config.outputModeHoles') },
+                  ]"
+                />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.modelBackend") }}
-                <select
+                <AppSelect
                   v-model="config.model_backend"
                   @change="updateConfig"
-                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                >
-                  <option value="cadquery">{{ t("config.modelBackendCadquery") }}</option>
-                  <option value="trimesh">{{ t("config.modelBackendTrimesh") }}</option>
-                </select>
+                  class="mt-1"
+                  :options="[
+                    { value: 'cadquery', label: t('config.modelBackendCadquery') },
+                    { value: 'trimesh', label: t('config.modelBackendTrimesh') },
+                  ]"
+                />
               </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.pasteOffset") }}
                 <input
@@ -265,14 +267,15 @@
               </label>
               <div class="grid grid-cols-2 gap-4">
                 <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorMode") }}
-                  <select
+                  <AppSelect
                     v-model="config.locator_mode"
                     @change="updateConfig"
-                    class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                  >
-                    <option value="step">{{ t("config.locatorModeStep") }}</option>
-                    <option value="wall">{{ t("config.locatorModeWall") }}</option>
-                  </select>
+                    class="mt-1"
+                    :options="[
+                      { value: 'step', label: t('config.locatorModeStep') },
+                      { value: 'wall', label: t('config.locatorModeWall') },
+                    ]"
+                  />
                 </label>
                 <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorHeight") }}
                   <input
@@ -361,17 +364,18 @@
                     />
                   </label>
                   <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenSide") }}
-                    <select
+                    <AppSelect
                       v-model="config.locator_open_side"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
-                    >
-                      <option value="none">{{ t("config.locatorOpenSideNone") }}</option>
-                      <option value="top">{{ t("config.locatorOpenSideTop") }}</option>
-                      <option value="right">{{ t("config.locatorOpenSideRight") }}</option>
-                      <option value="bottom">{{ t("config.locatorOpenSideBottom") }}</option>
-                      <option value="left">{{ t("config.locatorOpenSideLeft") }}</option>
-                    </select>
+                      class="mt-1"
+                      :options="[
+                        { value: 'none', label: t('config.locatorOpenSideNone') },
+                        { value: 'top', label: t('config.locatorOpenSideTop') },
+                        { value: 'right', label: t('config.locatorOpenSideRight') },
+                        { value: 'bottom', label: t('config.locatorOpenSideBottom') },
+                        { value: 'left', label: t('config.locatorOpenSideLeft') },
+                      ]"
+                    />
                   </label>
                   <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorOpenWidth") }}
                     <input
@@ -543,6 +547,7 @@
 
 <script>
 import AppIcon from "./components/AppIcon.vue";
+import AppSelect from "./components/AppSelect.vue";
 import { getInitialLocale, t as translate } from "./i18n";
 
 const LOCALE_OPTIONS = [
@@ -590,6 +595,7 @@ const BASIC_CONFIG_KEYS = [
 export default {
   components: {
     AppIcon,
+    AppSelect,
   },
   data() {
     const locale = getInitialLocale();

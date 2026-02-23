@@ -852,6 +852,12 @@ class MainWindow(QMainWindow):
                     right = pos.x() >= self.width() - border
                     top = pos.y() <= top_border
                     bottom = pos.y() >= self.height() - border
+                    # Keep web content scrollbars interactive while preserving
+                    # edge resize: reserve only the outermost 2px for right-edge resize.
+                    if right and (self._drag_height < pos.y() < self.height() - border):
+                        right_resize_strip = 2
+                        if pos.x() < self.width() - right_resize_strip:
+                            right = False
                     if top and left:
                         return True, HTTOPLEFT
                     if top and right:
