@@ -100,4 +100,5 @@ python scripts/run_sfmesh_regression.py --strict-expect
 
 - i18n locale normalization, key parity, and placeholder parity.
 - Configuration defaulting and validation.
+- Pipeline fallback behavior: outline pattern matching, builtin outline fallback, and margin fallback.
 - Frontend language switching flow (E2E).
