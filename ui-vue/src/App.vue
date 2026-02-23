@@ -207,6 +207,34 @@
                   <option value="holes_only">{{ t("config.outputModeHoles") }}</option>
                 </select>
               </label>
+              <label class="text-xs font-semibold text-slate-600">{{ t("config.modelBackend") }}
+                <select
+                  v-model="config.model_backend"
+                  @change="updateConfig"
+                  class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                >
+                  <option value="sfmesh">{{ t("config.modelBackendSfmesh") }}</option>
+                  <option value="cadquery">{{ t("config.modelBackendCadquery") }}</option>
+                  <option value="trimesh">{{ t("config.modelBackendTrimesh") }}</option>
+                </select>
+              </label>
+              <label class="text-xs font-semibold text-slate-600">{{ t("config.sfmeshQualityMode") }}
+                <select
+                  v-model="config.sfmesh_quality_mode"
+                  @change="updateConfig"
+                  :disabled="config.model_backend !== 'sfmesh'"
+                  class="mt-1 w-full h-9 px-2 text-sm border rounded-lg"
+                  :class="
+                    config.model_backend === 'sfmesh'
+                      ? 'bg-slate-50 border-slate-200'
+                      : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                  "
+                >
+                  <option value="fast">{{ t("config.sfmeshQualityFast") }}</option>
+                  <option value="auto">{{ t("config.sfmeshQualityAuto") }}</option>
+                  <option value="watertight">{{ t("config.sfmeshQualityWatertight") }}</option>
+                </select>
+              </label>
               <label class="text-xs font-semibold text-slate-600">{{ t("config.pasteOffset") }}
                 <input
                   v-model.number="config.paste_offset_mm"
@@ -549,6 +577,8 @@ export default {
         locator_open_side: "none",
         locator_open_width_mm: 0.0,
         output_mode: "solid_with_cutouts",
+        model_backend: "cadquery",
+        sfmesh_quality_mode: "fast",
         arc_steps: 64,
         curve_resolution: 16,
       },
@@ -1010,4 +1040,3 @@ export default {
   }
 }
 </style>
-
