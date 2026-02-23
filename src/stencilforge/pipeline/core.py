@@ -17,6 +17,23 @@ from .qfn import regenerate_qfn_paste
 
 logger = logging.getLogger(__name__)
 
+_PASTE_FALLBACK_PATTERNS = [
+    "*gtp*",
+    "*.gtp",
+    "*gbp*",
+    "*.gbp",
+    "*paste*top*",
+    "*top*paste*",
+    "*paste*bottom*",
+    "*bottom*paste*",
+    "*tcream*",
+    "*bcream*",
+    "*cream*top*",
+    "*cream*bottom*",
+    "*smt*top*",
+    "*smt*bottom*",
+]
+
 
 def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) -> dict | None:
     if not logging.getLogger().handlers:
@@ -30,7 +47,18 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
 
     paste_files = _find_files(input_dir, config.paste_patterns)
     if not paste_files:
-        raise FileNotFoundError("No paste layer files found in input directory.")
+        paste_files = _find_files(input_dir, _PASTE_FALLBACK_PATTERNS)
+        if paste_files:
+            logger.warning(
+                "Paste layer fallback matched %s file(s) using builtin patterns.",
+                len(paste_files),
+            )
+    if not paste_files:
+        seen = [p.name for p in sorted(input_dir.rglob("*")) if p.is_file()]
+        preview = ", ".join(seen[:20]) if seen else "(no files)"
+        raise FileNotFoundError(
+            f"No paste layer files found in input directory. Seen: {preview}"
+        )
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
 
     t0 = time.perf_counter()

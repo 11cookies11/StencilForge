@@ -240,6 +240,9 @@ _ENGINES: dict[str, ModelEngine] = {
 
 def get_model_engine(name: str) -> ModelEngine:
     key = (name or "").strip().lower()
+    if key == "sfmesh":
+        logger.warning("Backend 'sfmesh' is deprecated and mapped to 'trimesh'.")
+        key = "trimesh"
     engine = _ENGINES.get(key)
     if engine is None:
         supported = ", ".join(sorted(_ENGINES.keys()))

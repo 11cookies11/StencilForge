@@ -494,6 +494,13 @@ class BackendBridge(QObject):
         try:
             env = os.environ.copy()
             env["STENCILFORGE_LOCALE"] = self._locale
+            # Local dev run uses src-layout; ensure child process can import stencilforge.
+            if not getattr(sys, "frozen", False):
+                project_root = _resolve_project_root()
+                src_root = project_root / "src"
+                existing = env.get("PYTHONPATH", "")
+                prefix = str(src_root)
+                env["PYTHONPATH"] = f"{prefix}{os.pathsep}{existing}" if existing else prefix
             subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
             self._emit_log(self._tr("ui.preview_launch_failed", error=exc))
@@ -546,7 +553,17 @@ class BackendBridge(QObject):
                     raise ValueError(self._tr("ui.zip_extract_failed"))
                 config = self._config
                 if config_path:
-                    config = StencilConfig.from_json(Path(config_path))
+                    file_config = StencilConfig.from_json(Path(config_path))
+                    merged = _config_to_dict(file_config)
+                    merged.update(_config_to_dict(self._config))
+                    config = StencilConfig.from_dict(merged)
+                    if file_config.model_backend != self._config.model_backend:
+                        self._log_line(
+                            "UI backend takes precedence over config path backend: "
+                            f"{file_config.model_backend} -> {self._config.model_backend}"
+                        )
+                    self._log_line("Runtime config merged: file + UI (UI precedence).")
+                self._log_line(f"Effective backend: {config.model_backend}")
                 self._log_line(f"Resolved input: {resolved_input}")
                 if config.model_backend == "cadquery":
                     ctx = mp.get_context("spawn")

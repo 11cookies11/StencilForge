@@ -115,7 +115,9 @@ class StencilConfig:
         locator_open_side = str(data.get("locator_open_side", "none"))
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
-        model_backend = str(data.get("model_backend", "cadquery"))
+        model_backend = str(data.get("model_backend", "trimesh")).strip().lower()
+        if model_backend == "sfmesh":
+            model_backend = "trimesh"
         sfmesh_quality_mode = str(data.get("sfmesh_quality_mode", "fast"))
         sfmesh_voxel_pitch_mm = float(data.get("sfmesh_voxel_pitch_mm", 0.08))
         sfmesh_adaptive_pitch_enabled = bool(data.get("sfmesh_adaptive_pitch_enabled", True))
@@ -239,8 +241,8 @@ class StencilConfig:
             raise ValueError("qfn_max_pad_width_mm must be > 0")
         if self.output_mode not in {"holes_only", "solid_with_cutouts"}:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
-        if self.model_backend not in {"trimesh", "cadquery", "sfmesh"}:
-            raise ValueError("model_backend must be trimesh, cadquery, or sfmesh")
+        if self.model_backend not in {"trimesh", "cadquery"}:
+            raise ValueError("model_backend must be trimesh or cadquery")
         if self.sfmesh_quality_mode not in {"fast", "auto", "watertight"}:
             raise ValueError("sfmesh_quality_mode must be fast, auto, or watertight")
         if self.sfmesh_voxel_pitch_mm <= 0:

@@ -35,3 +35,6 @@ gko_outline.gko
 gko_outline_raw.png
 dist-installer/
 build-logs/
+
+# Test artifacts
+tests/artifacts/

@@ -9,7 +9,7 @@ def test_default_config_values() -> None:
     cfg = StencilConfig.from_dict({})
     assert cfg.thickness_mm == 0.12
     assert cfg.output_mode == "solid_with_cutouts"
-    assert cfg.model_backend == "cadquery"
+    assert cfg.model_backend == "trimesh"
     assert cfg.sfmesh_quality_mode == "fast"
     assert cfg.sfmesh_voxel_pitch_mm == 0.08
     assert cfg.sfmesh_adaptive_pitch_enabled is True
@@ -49,8 +49,9 @@ def test_stl_quality_preset_does_not_override_explicit_values() -> None:
     assert cfg.stl_angular_deflection == 0.6
 
 
-def test_sfmesh_backend_is_valid() -> None:
+def test_sfmesh_backend_maps_to_trimesh() -> None:
     cfg = StencilConfig.from_dict({"model_backend": "sfmesh"})
+    assert cfg.model_backend == "trimesh"
     cfg.validate()
 
 
@@ -59,7 +60,7 @@ def test_sfmesh_backend_is_valid() -> None:
     [
         ({"thickness_mm": 0}, "thickness_mm must be > 0"),
         ({"output_mode": "bad_mode"}, "output_mode must be holes_only or solid_with_cutouts"),
-        ({"model_backend": "bad_backend"}, "model_backend must be trimesh, cadquery, or sfmesh"),
+        ({"model_backend": "bad_backend"}, "model_backend must be trimesh or cadquery"),
         ({"sfmesh_quality_mode": "bad_mode"}, "sfmesh_quality_mode must be fast, auto, or watertight"),
         ({"sfmesh_voxel_pitch_mm": 0}, "sfmesh_voxel_pitch_mm must be > 0"),
         ({"sfmesh_adaptive_pitch_min_mm": 0}, "sfmesh_adaptive_pitch_min_mm must be > 0"),
