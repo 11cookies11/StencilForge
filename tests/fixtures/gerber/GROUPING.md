@@ -21,5 +21,6 @@ This file records the initial auto-grouping for fixture ZIPs.
   - Test_all_in_one.zip
 
 Notes:
+
 - Source ZIPs are kept in tests/fixtures/gerber root to avoid data loss.
 - Current grouping is heuristic and can be adjusted after first pipeline runs.
