@@ -184,24 +184,26 @@
         <div class="text-center space-y-2">
           <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("config.title") }}</h1>
           <p class="text-slate-500">{{ t("config.subtitle") }}</p>
-          <p class="text-xs text-slate-400">{{ t("config.recommendedHint") }}</p>
-          <div class="pt-2 flex items-center justify-center gap-2">
-            <button
-              class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              @click="restoreBasicDefaults"
-            >
-              {{ t("config.restoreBasicDefaults") }}
-            </button>
-            <button
-              class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-blue-600 hover:bg-blue-50"
-              @click="showAdvancedConfig = !showAdvancedConfig"
-            >
-              {{ showAdvancedConfig ? t("config.hideAdvanced") : t("config.showAdvanced") }}
-            </button>
-          </div>
         </div>
-        <div class="grid md:grid-cols-2 gap-6">
+        <div :class="['grid gap-6', showAdvancedConfig ? 'md:grid-cols-2' : 'grid-cols-1']">
           <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs text-slate-400">{{ t("config.recommendedHint") }}</p>
+              <div class="flex items-center gap-2">
+                <button
+                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  @click="restoreBasicDefaults"
+                >
+                  {{ t("config.restoreBasicDefaults") }}
+                </button>
+                <button
+                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                  @click="showAdvancedConfig = !showAdvancedConfig"
+                >
+                  {{ showAdvancedConfig ? t("config.hideAdvanced") : t("config.showAdvanced") }}
+                </button>
+              </div>
+            </div>
             <div class="grid grid-cols-2 gap-4">
               <label class="text-xs font-semibold text-slate-600">{{ t("config.thickness") }}
                 <input
@@ -305,8 +307,8 @@
               </div>
             </div>
           </div>
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
-            <div v-if="showAdvancedConfig" class="space-y-5">
+          <div v-if="showAdvancedConfig" class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
+            <div class="space-y-5">
               <div>
                 <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.advancedSection") }}</div>
                 <div class="grid grid-cols-2 gap-4">
@@ -383,7 +385,6 @@
                   </label>
                 </div>
               </div>
-              <div>
               <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.pasteRules") }}</div>
               <div class="space-y-2">
                 <div class="flex gap-2" v-for="(pattern, index) in config.paste_patterns" :key="'paste-' + index">
@@ -408,7 +409,6 @@
                 <AppIcon name="add_circle" :size="16" />
                 {{ t("config.addRule") }}
               </button>
-            </div>
             <div>
               <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.outlineRules") }}</div>
               <div class="space-y-2">
@@ -435,12 +435,9 @@
                 {{ t("config.addRule") }}
               </button>
             </div>
-            </div>
-            <div v-else class="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-              {{ t("config.advancedHiddenHint") }}
-            </div>
           </div>
         </div>
+      </div>
       </section>
 
       <section v-show="currentTab === 'preview'" class="space-y-6">
