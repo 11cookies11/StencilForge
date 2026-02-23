@@ -1,0 +1,6 @@
+numpy<2.0
+pcb-tools==0.1.6
+shapely==2.1.2
+trimesh==4.10.1
+pytest==9.0.2
+pytest-cov==7.0.0
