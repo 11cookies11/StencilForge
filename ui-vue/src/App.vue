@@ -677,6 +677,13 @@ export default {
             this.config = cfg;
           }
         });
+        if (!this.outputPath && this.backend.defaultOutputPath) {
+          this.backend.defaultOutputPath("stencil.stl", (path) => {
+            if (path && !this.outputPath) {
+              this.outputPath = path;
+            }
+          });
+        }
         this.backend.windowUsesNativeHitTest((value) => {
           this.useNativeTitlebar = !!value;
         });

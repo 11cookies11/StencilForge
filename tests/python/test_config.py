@@ -10,6 +10,8 @@ def test_default_config_values() -> None:
     assert cfg.thickness_mm == 0.12
     assert cfg.output_mode == "solid_with_cutouts"
     assert cfg.model_backend == "trimesh"
+    assert "*gko*" in cfg.outline_patterns
+    assert "*gtp*" in cfg.paste_patterns
     assert cfg.sfmesh_quality_mode == "fast"
     assert cfg.sfmesh_voxel_pitch_mm == 0.08
     assert cfg.sfmesh_adaptive_pitch_enabled is True

@@ -34,6 +34,18 @@ _PASTE_FALLBACK_PATTERNS = [
     "*smt*bottom*",
 ]
 
+_OUTLINE_FALLBACK_PATTERNS = [
+    "*gko*",
+    "*.gko",
+    "*gm1*",
+    "*.gm1",
+    "*boardoutline*",
+    "*outline*",
+    "*edge*cuts*",
+    "*edge-cuts*",
+    "*edgecuts*",
+]
+
 
 def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) -> dict | None:
     if not logging.getLogger().handlers:
@@ -82,7 +94,28 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
 
     outline_geom = None
     outline_debug: dict | None = None
+    logger.info("Outline patterns: %s", ", ".join(config.outline_patterns) if config.outline_patterns else "(none)")
     outline_files = _find_files(input_dir, config.outline_patterns)
+    if not outline_files:
+        outline_files = _find_files(input_dir, _OUTLINE_FALLBACK_PATTERNS)
+        if outline_files:
+            logger.warning(
+                "Outline fallback matched %s file(s) using builtin patterns.",
+                len(outline_files),
+            )
+    if outline_files:
+        logger.info(
+            "Outline matches (%s): %s",
+            len(outline_files),
+            ", ".join(path.name for path in outline_files),
+        )
+    else:
+        scanned = [p.name for p in sorted(input_dir.rglob("*")) if p.is_file()]
+        logger.warning(
+            "No outline files matched patterns. scanned=%s sample=%s",
+            len(scanned),
+            ", ".join(scanned[:20]) if scanned else "(no files)",
+        )
     if outline_files:
         t0 = time.perf_counter()
         outline_geom = geometry_service.load_outline_geometry(outline_files[0])

@@ -2,6 +2,7 @@
 
 import base64
 import ctypes
+import json
 import logging
 import os
 import multiprocessing as mp
@@ -216,6 +217,8 @@ class BackendBridge(QObject):
         self._project_root = project_root
         self._config_path = StencilConfig.default_path(project_root)
         self._config = StencilConfig.load_default(project_root)
+        self._ui_state_path = _resolve_ui_state_path(project_root)
+        self._ui_state = _load_ui_state(self._ui_state_path)
         self._job_lock = threading.Lock()
         self._job_running = False
         self._temp_dirs: list[Path] = []
@@ -276,23 +279,35 @@ class BackendBridge(QObject):
             pass
 
     def _ensure_log_handler(self) -> None:
-        if not self._log_path:
-            return
         root_logger = logging.getLogger()
-        for handler in root_logger.handlers:
-            if isinstance(handler, logging.FileHandler):
-                try:
-                    if Path(handler.baseFilename) == self._log_path:
-                        return
-                except Exception:
-                    continue
         formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
-        handler = logging.FileHandler(self._log_path, encoding="utf-8")
-        handler.setFormatter(formatter)
-        root_logger.addHandler(handler)
+        if self._log_path:
+            has_file_handler = False
+            for handler in root_logger.handlers:
+                if isinstance(handler, logging.FileHandler):
+                    try:
+                        if Path(handler.baseFilename) == self._log_path:
+                            has_file_handler = True
+                            break
+                    except Exception:
+                        continue
+            if not has_file_handler:
+                handler = logging.FileHandler(self._log_path, encoding="utf-8")
+                handler.setFormatter(formatter)
+                root_logger.addHandler(handler)
+
+        has_stream_handler = any(
+            isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler)
+            for handler in root_logger.handlers
+        )
+        if not has_stream_handler:
+            stream_handler = logging.StreamHandler(stream=sys.stdout)
+            stream_handler.setFormatter(formatter)
+            root_logger.addHandler(stream_handler)
         root_logger.setLevel(logging.INFO)
 
     def _emit_log(self, message: str) -> None:
+        self.jobLog.emit(message)
         self._log_line(message)
 
     def _tr(self, key: str, **kwargs) -> str:
@@ -364,6 +379,7 @@ class BackendBridge(QObject):
             self._log_line(f"Config not found: {path}")
             return
         self._config_path = path_obj
+        self._remember_path("config_dir", path)
         self._config = StencilConfig.from_json(path_obj)
         self._log_line(f"Config loaded: {path_obj}")
         self.configChanged.emit(_config_to_dict(self._config))
@@ -400,52 +416,71 @@ class BackendBridge(QObject):
 
     @Slot(str, result=str)
     def pickSaveFile(self, default_name: str) -> str:
+        start_dir = self._remembered_dir("output_dir") or _default_export_dir()
+        start_dir.mkdir(parents=True, exist_ok=True)
+        initial = start_dir / default_name
         filename, _ = QFileDialog.getSaveFileName(
             None,
             self._tr("ui.pick_save_stl_title"),
-            str(self._project_root / default_name),
+            str(initial),
             "STL Files (*.stl)",
         )
+        self._remember_path("output_dir", filename)
         return filename
+
+    @Slot(str, result=str)
+    def defaultOutputPath(self, default_name: str) -> str:
+        start_dir = self._remembered_dir("output_dir") or _default_export_dir()
+        start_dir.mkdir(parents=True, exist_ok=True)
+        return str(start_dir / default_name)
 
     @Slot(result=str)
     def pickDirectory(self) -> str:
+        start_dir = self._remembered_dir("input_dir") or self._project_root
         directory = QFileDialog.getExistingDirectory(
-            None, self._tr("ui.pick_directory_title"), str(self._project_root)
+            None, self._tr("ui.pick_directory_title"), str(start_dir)
         )
+        self._remember_path("input_dir", directory)
         return directory
 
     @Slot(result=str)
     def pickConfigFile(self) -> str:
         user_dir = StencilConfig.default_path(self._project_root).parent
         fallback_dir = self._project_root / "config"
-        start_dir = user_dir if user_dir.exists() else fallback_dir
+        start_dir = self._remembered_dir("config_dir")
+        if start_dir is None:
+            start_dir = user_dir if user_dir.exists() else fallback_dir
         filename, _ = QFileDialog.getOpenFileName(
             None,
             self._tr("ui.pick_config_title"),
             str(start_dir),
             "Config (*.json)",
         )
+        self._remember_path("config_dir", filename)
         return filename
 
     @Slot(result=str)
     def pickZipFile(self) -> str:
+        start_dir = self._remembered_dir("zip_dir") or self._remembered_dir("input_dir") or self._project_root
         filename, _ = QFileDialog.getOpenFileName(
             None,
             self._tr("ui.pick_zip_title"),
-            str(self._project_root),
+            str(start_dir),
             "ZIP Files (*.zip)",
         )
+        self._remember_path("zip_dir", filename)
         return filename
 
     @Slot(result=str)
     def pickStlFile(self) -> str:
+        start_dir = self._remembered_dir("preview_dir") or self._remembered_dir("output_dir") or _default_export_dir()
         filename, _ = QFileDialog.getOpenFileName(
             None,
             self._tr("ui.pick_stl_title"),
-            str(self._project_root),
+            str(start_dir),
             "STL Files (*.stl)",
         )
+        self._remember_path("preview_dir", filename)
         return filename
 
     @Slot(str, result=str)
@@ -474,6 +509,7 @@ class BackendBridge(QObject):
             self._emit_log(self._tr("ui.preview_path_empty"))
             return
         self._last_preview_path = path
+        self._remember_path("preview_dir", path)
         if self._external_preview:
             self._launch_external_preview(path)
             return
@@ -551,6 +587,10 @@ class BackendBridge(QObject):
                 resolved_input = self._resolve_input_dir(input_dir)
                 if not resolved_input:
                     raise ValueError(self._tr("ui.zip_extract_failed"))
+                self._remember_path("input_dir", resolved_input)
+                self._remember_path("output_dir", output_stl)
+                if config_path:
+                    self._remember_path("config_dir", config_path)
                 config = self._config
                 if config_path:
                     file_config = StencilConfig.from_json(Path(config_path))
@@ -652,6 +692,26 @@ class BackendBridge(QObject):
                     self._job_cancel_requested = False
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _remembered_dir(self, key: str) -> Path | None:
+        raw = self._ui_state.get(key)
+        if not raw:
+            return None
+        path = Path(str(raw)).expanduser()
+        if path.exists():
+            return path
+        parent = path.parent
+        return parent if parent.exists() else None
+
+    def _remember_path(self, key: str, selected_path: str) -> None:
+        if not selected_path:
+            return
+        path = Path(selected_path).expanduser()
+        directory = path if path.is_dir() else path.parent
+        if not directory:
+            return
+        self._ui_state[key] = str(directory)
+        _save_ui_state(self._ui_state_path, self._ui_state)
 
     def _resolve_input_dir(self, input_dir: str) -> str:
         if not input_dir:
@@ -1005,6 +1065,34 @@ def _resolve_log_path(project_root: Path) -> Path | None:
     if user_dir:
         return user_dir / "stencilforge.log"
     return None
+
+
+def _resolve_ui_state_path(project_root: Path) -> Path:
+    return StencilConfig.default_path(project_root).parent / "ui_state.json"
+
+
+def _load_ui_state(path: Path) -> dict[str, str]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_ui_state(path: Path, state: dict[str, str]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _default_export_dir() -> Path:
+    home = Path.home()
+    documents = home / "Documents"
+    base = documents if documents.exists() else home
+    return base / "StencilForge" / "Exports"
 
 
 def _resolve_icon_path(project_root: Path) -> Path | None:

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+DEFAULT_PASTE_PATTERNS = ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"]
+DEFAULT_OUTLINE_PATTERNS = ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"]
+
 
 @dataclass(frozen=True)
 class StencilConfig:
@@ -100,8 +103,8 @@ class StencilConfig:
 
     @staticmethod
     def from_dict(data: dict) -> "StencilConfig":
-        paste_patterns = _ensure_list(data.get("paste_patterns", []))
-        outline_patterns = _ensure_list(data.get("outline_patterns", []))
+        paste_patterns = _ensure_list(data.get("paste_patterns", [])) or list(DEFAULT_PASTE_PATTERNS)
+        outline_patterns = _ensure_list(data.get("outline_patterns", [])) or list(DEFAULT_OUTLINE_PATTERNS)
         thickness_mm = float(data.get("thickness_mm", 0.12))
         paste_offset_mm = float(data.get("paste_offset_mm", -0.05))
         outline_margin_mm = float(data.get("outline_margin_mm", 5.0))
