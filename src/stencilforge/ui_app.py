@@ -154,6 +154,22 @@ def _config_to_dict(config: StencilConfig) -> dict:
         "locator_open_width_mm": config.locator_open_width_mm,
         "output_mode": config.output_mode,
         "model_backend": config.model_backend,
+        "sfmesh_quality_mode": config.sfmesh_quality_mode,
+        "sfmesh_voxel_pitch_mm": config.sfmesh_voxel_pitch_mm,
+        "sfmesh_adaptive_pitch_enabled": config.sfmesh_adaptive_pitch_enabled,
+        "sfmesh_adaptive_pitch_min_mm": config.sfmesh_adaptive_pitch_min_mm,
+        "sfmesh_adaptive_pitch_max_mm": config.sfmesh_adaptive_pitch_max_mm,
+        "sfmesh_watertight_face_limit": config.sfmesh_watertight_face_limit,
+        "sfmesh_simplify_tol_mm": config.sfmesh_simplify_tol_mm,
+        "sfmesh_min_polygon_area_mm2": config.sfmesh_min_polygon_area_mm2,
+        "sfmesh_min_hole_area_mm2": config.sfmesh_min_hole_area_mm2,
+        "sfmesh_decimate_target_ratio": config.sfmesh_decimate_target_ratio,
+        "sfmesh_hole_protect_enabled": config.sfmesh_hole_protect_enabled,
+        "sfmesh_hole_protect_max_width_mm": config.sfmesh_hole_protect_max_width_mm,
+        "sfmesh_hole_pitch_divisor": config.sfmesh_hole_pitch_divisor,
+        "sfmesh_chunked_watertight_enabled": config.sfmesh_chunked_watertight_enabled,
+        "sfmesh_chunk_size_mm": config.sfmesh_chunk_size_mm,
+        "sfmesh_chunk_overlap_mm": config.sfmesh_chunk_overlap_mm,
         "stl_linear_deflection": config.stl_linear_deflection,
         "stl_angular_deflection": config.stl_angular_deflection,
         "arc_steps": config.arc_steps,
@@ -478,6 +494,13 @@ class BackendBridge(QObject):
         try:
             env = os.environ.copy()
             env["STENCILFORGE_LOCALE"] = self._locale
+            # Local dev run uses src-layout; ensure child process can import stencilforge.
+            if not getattr(sys, "frozen", False):
+                project_root = _resolve_project_root()
+                src_root = project_root / "src"
+                existing = env.get("PYTHONPATH", "")
+                prefix = str(src_root)
+                env["PYTHONPATH"] = f"{prefix}{os.pathsep}{existing}" if existing else prefix
             subprocess.Popen([sys.executable, "-m", "stencilforge.preview_app", path], env=env)
         except Exception as exc:
             self._emit_log(self._tr("ui.preview_launch_failed", error=exc))
@@ -530,7 +553,17 @@ class BackendBridge(QObject):
                     raise ValueError(self._tr("ui.zip_extract_failed"))
                 config = self._config
                 if config_path:
-                    config = StencilConfig.from_json(Path(config_path))
+                    file_config = StencilConfig.from_json(Path(config_path))
+                    merged = _config_to_dict(file_config)
+                    merged.update(_config_to_dict(self._config))
+                    config = StencilConfig.from_dict(merged)
+                    if file_config.model_backend != self._config.model_backend:
+                        self._log_line(
+                            "UI backend takes precedence over config path backend: "
+                            f"{file_config.model_backend} -> {self._config.model_backend}"
+                        )
+                    self._log_line("Runtime config merged: file + UI (UI precedence).")
+                self._log_line(f"Effective backend: {config.model_backend}")
                 self._log_line(f"Resolved input: {resolved_input}")
                 if config.model_backend == "cadquery":
                     ctx = mp.get_context("spawn")

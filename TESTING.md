@@ -30,6 +30,12 @@ First run (installs Playwright browsers before e2e):
 .\scripts\test_all.ps1 -InstallBrowsers
 ```
 
+Run one-command tests plus sfmesh fixture regression:
+
+```powershell
+.\scripts\test_all.ps1 -RunSfmeshRegression
+```
+
 ## Local Commands
 
 ### Frontend
@@ -48,6 +54,36 @@ npm run build
 ```bash
 python -m pip install pytest pytest-cov
 pytest
+```
+
+### Sfmesh Regression
+
+```bash
+python scripts/run_sfmesh_regression.py
+```
+
+Run in auto mode (fast first, then watertight fallback if needed):
+
+```bash
+python scripts/run_sfmesh_regression.py --quality-mode auto
+```
+
+Run in watertight mode (requires `scipy` and `scikit-image`):
+
+```bash
+python scripts/run_sfmesh_regression.py --quality-mode watertight --voxel-pitch-mm 0.08
+```
+
+Run in parallel with cache enabled (default):
+
+```bash
+python scripts/run_sfmesh_regression.py --jobs 4
+```
+
+With expect baseline strict checking:
+
+```bash
+python scripts/run_sfmesh_regression.py --strict-expect
 ```
 
 ## CI Workflows

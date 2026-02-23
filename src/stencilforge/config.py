@@ -26,6 +26,22 @@ class StencilConfig:
     locator_open_width_mm: float
     output_mode: str
     model_backend: str
+    sfmesh_quality_mode: str
+    sfmesh_voxel_pitch_mm: float
+    sfmesh_adaptive_pitch_enabled: bool
+    sfmesh_adaptive_pitch_min_mm: float
+    sfmesh_adaptive_pitch_max_mm: float
+    sfmesh_watertight_face_limit: int
+    sfmesh_simplify_tol_mm: float
+    sfmesh_min_polygon_area_mm2: float
+    sfmesh_min_hole_area_mm2: float
+    sfmesh_decimate_target_ratio: float
+    sfmesh_hole_protect_enabled: bool
+    sfmesh_hole_protect_max_width_mm: float
+    sfmesh_hole_pitch_divisor: float
+    sfmesh_chunked_watertight_enabled: bool
+    sfmesh_chunk_size_mm: float
+    sfmesh_chunk_overlap_mm: float
     stl_quality: str
     stl_linear_deflection: float
     stl_angular_deflection: float
@@ -99,7 +115,25 @@ class StencilConfig:
         locator_open_side = str(data.get("locator_open_side", "none"))
         locator_open_width_mm = float(data.get("locator_open_width_mm", 0.0))
         output_mode = str(data.get("output_mode", "solid_with_cutouts"))
-        model_backend = str(data.get("model_backend", "cadquery"))
+        model_backend = str(data.get("model_backend", "trimesh")).strip().lower()
+        if model_backend == "sfmesh":
+            model_backend = "trimesh"
+        sfmesh_quality_mode = str(data.get("sfmesh_quality_mode", "fast"))
+        sfmesh_voxel_pitch_mm = float(data.get("sfmesh_voxel_pitch_mm", 0.08))
+        sfmesh_adaptive_pitch_enabled = bool(data.get("sfmesh_adaptive_pitch_enabled", True))
+        sfmesh_adaptive_pitch_min_mm = float(data.get("sfmesh_adaptive_pitch_min_mm", 0.08))
+        sfmesh_adaptive_pitch_max_mm = float(data.get("sfmesh_adaptive_pitch_max_mm", 0.24))
+        sfmesh_watertight_face_limit = int(data.get("sfmesh_watertight_face_limit", 250000))
+        sfmesh_simplify_tol_mm = float(data.get("sfmesh_simplify_tol_mm", 0.0))
+        sfmesh_min_polygon_area_mm2 = float(data.get("sfmesh_min_polygon_area_mm2", 0.0))
+        sfmesh_min_hole_area_mm2 = float(data.get("sfmesh_min_hole_area_mm2", 0.0))
+        sfmesh_decimate_target_ratio = float(data.get("sfmesh_decimate_target_ratio", 1.0))
+        sfmesh_hole_protect_enabled = bool(data.get("sfmesh_hole_protect_enabled", True))
+        sfmesh_hole_protect_max_width_mm = float(data.get("sfmesh_hole_protect_max_width_mm", 0.8))
+        sfmesh_hole_pitch_divisor = float(data.get("sfmesh_hole_pitch_divisor", 3.0))
+        sfmesh_chunked_watertight_enabled = bool(data.get("sfmesh_chunked_watertight_enabled", True))
+        sfmesh_chunk_size_mm = float(data.get("sfmesh_chunk_size_mm", 70.0))
+        sfmesh_chunk_overlap_mm = float(data.get("sfmesh_chunk_overlap_mm", 1.0))
         stl_quality = str(data.get("stl_quality", "balanced"))
         stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
@@ -151,6 +185,22 @@ class StencilConfig:
             locator_open_width_mm=locator_open_width_mm,
             output_mode=output_mode,
             model_backend=model_backend,
+            sfmesh_quality_mode=sfmesh_quality_mode,
+            sfmesh_voxel_pitch_mm=sfmesh_voxel_pitch_mm,
+            sfmesh_adaptive_pitch_enabled=sfmesh_adaptive_pitch_enabled,
+            sfmesh_adaptive_pitch_min_mm=sfmesh_adaptive_pitch_min_mm,
+            sfmesh_adaptive_pitch_max_mm=sfmesh_adaptive_pitch_max_mm,
+            sfmesh_watertight_face_limit=sfmesh_watertight_face_limit,
+            sfmesh_simplify_tol_mm=sfmesh_simplify_tol_mm,
+            sfmesh_min_polygon_area_mm2=sfmesh_min_polygon_area_mm2,
+            sfmesh_min_hole_area_mm2=sfmesh_min_hole_area_mm2,
+            sfmesh_decimate_target_ratio=sfmesh_decimate_target_ratio,
+            sfmesh_hole_protect_enabled=sfmesh_hole_protect_enabled,
+            sfmesh_hole_protect_max_width_mm=sfmesh_hole_protect_max_width_mm,
+            sfmesh_hole_pitch_divisor=sfmesh_hole_pitch_divisor,
+            sfmesh_chunked_watertight_enabled=sfmesh_chunked_watertight_enabled,
+            sfmesh_chunk_size_mm=sfmesh_chunk_size_mm,
+            sfmesh_chunk_overlap_mm=sfmesh_chunk_overlap_mm,
             stl_quality=stl_quality,
             stl_linear_deflection=stl_linear_deflection,
             stl_angular_deflection=stl_angular_deflection,
@@ -193,6 +243,34 @@ class StencilConfig:
             raise ValueError("output_mode must be holes_only or solid_with_cutouts")
         if self.model_backend not in {"trimesh", "cadquery"}:
             raise ValueError("model_backend must be trimesh or cadquery")
+        if self.sfmesh_quality_mode not in {"fast", "auto", "watertight"}:
+            raise ValueError("sfmesh_quality_mode must be fast, auto, or watertight")
+        if self.sfmesh_voxel_pitch_mm <= 0:
+            raise ValueError("sfmesh_voxel_pitch_mm must be > 0")
+        if self.sfmesh_adaptive_pitch_min_mm <= 0:
+            raise ValueError("sfmesh_adaptive_pitch_min_mm must be > 0")
+        if self.sfmesh_adaptive_pitch_max_mm <= 0:
+            raise ValueError("sfmesh_adaptive_pitch_max_mm must be > 0")
+        if self.sfmesh_adaptive_pitch_min_mm > self.sfmesh_adaptive_pitch_max_mm:
+            raise ValueError("sfmesh_adaptive_pitch_min_mm must be <= sfmesh_adaptive_pitch_max_mm")
+        if self.sfmesh_watertight_face_limit <= 0:
+            raise ValueError("sfmesh_watertight_face_limit must be > 0")
+        if self.sfmesh_simplify_tol_mm < 0:
+            raise ValueError("sfmesh_simplify_tol_mm must be >= 0")
+        if self.sfmesh_min_polygon_area_mm2 < 0:
+            raise ValueError("sfmesh_min_polygon_area_mm2 must be >= 0")
+        if self.sfmesh_min_hole_area_mm2 < 0:
+            raise ValueError("sfmesh_min_hole_area_mm2 must be >= 0")
+        if not 0 < self.sfmesh_decimate_target_ratio <= 1:
+            raise ValueError("sfmesh_decimate_target_ratio must be in (0, 1]")
+        if self.sfmesh_hole_protect_max_width_mm <= 0:
+            raise ValueError("sfmesh_hole_protect_max_width_mm must be > 0")
+        if self.sfmesh_hole_pitch_divisor <= 1:
+            raise ValueError("sfmesh_hole_pitch_divisor must be > 1")
+        if self.sfmesh_chunk_size_mm <= 0:
+            raise ValueError("sfmesh_chunk_size_mm must be > 0")
+        if self.sfmesh_chunk_overlap_mm < 0:
+            raise ValueError("sfmesh_chunk_overlap_mm must be >= 0")
         if self.stl_linear_deflection <= 0:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:
