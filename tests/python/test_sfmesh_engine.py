@@ -7,7 +7,7 @@ from shapely.geometry import Polygon
 import trimesh
 
 from stencilforge.config import StencilConfig
-from stencilforge.pipeline.engine import EngineExportInput, get_model_engine
+from stencilforge.pipeline.engine import EngineExportInput, _adaptive_voxel_pitch, get_model_engine
 
 
 def test_sfmesh_engine_exports_stl_binary(tmp_path: Path) -> None:
@@ -127,3 +127,20 @@ def test_sfmesh_auto_mode_exports_mesh(tmp_path: Path) -> None:
     assert out.exists()
     mesh = trimesh.load_mesh(out, force="mesh")
     assert int(mesh.faces.shape[0]) > 0
+
+
+def test_sfmesh_hole_protect_caps_pitch() -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "model_backend": "sfmesh",
+            "sfmesh_voxel_pitch_mm": 0.24,
+            "sfmesh_adaptive_pitch_enabled": True,
+            "sfmesh_hole_protect_enabled": True,
+            "sfmesh_hole_pitch_divisor": 3.0,
+            "sfmesh_hole_protect_max_width_mm": 0.8,
+        }
+    )
+    cfg.validate()
+    mesh = trimesh.creation.box(extents=(100, 100, 1.0))
+    pitch = _adaptive_voxel_pitch(mesh, cfg, critical_hole_width=0.6)
+    assert pitch <= 0.2

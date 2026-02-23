@@ -20,6 +20,9 @@ def test_default_config_values() -> None:
     assert cfg.sfmesh_min_polygon_area_mm2 == 0.0
     assert cfg.sfmesh_min_hole_area_mm2 == 0.0
     assert cfg.sfmesh_decimate_target_ratio == 1.0
+    assert cfg.sfmesh_hole_protect_enabled is True
+    assert cfg.sfmesh_hole_protect_max_width_mm == 0.8
+    assert cfg.sfmesh_hole_pitch_divisor == 3.0
     assert cfg.stl_quality == "balanced"
     assert cfg.stl_linear_deflection == 0.05
     assert cfg.stl_angular_deflection == 0.1
@@ -67,6 +70,8 @@ def test_sfmesh_backend_is_valid() -> None:
         ({"sfmesh_min_polygon_area_mm2": -1}, "sfmesh_min_polygon_area_mm2 must be >= 0"),
         ({"sfmesh_min_hole_area_mm2": -1}, "sfmesh_min_hole_area_mm2 must be >= 0"),
         ({"sfmesh_decimate_target_ratio": 0}, "sfmesh_decimate_target_ratio must be in \\(0, 1\\]"),
+        ({"sfmesh_hole_protect_max_width_mm": 0}, "sfmesh_hole_protect_max_width_mm must be > 0"),
+        ({"sfmesh_hole_pitch_divisor": 1}, "sfmesh_hole_pitch_divisor must be > 1"),
         ({"stl_quality": "ultra"}, "stl_quality must be fast, balanced, or high_quality"),
         ({"locator_open_side": "middle"}, "locator_open_side must be none/top/right/bottom/left"),
     ],

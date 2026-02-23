@@ -36,6 +36,9 @@ class StencilConfig:
     sfmesh_min_polygon_area_mm2: float
     sfmesh_min_hole_area_mm2: float
     sfmesh_decimate_target_ratio: float
+    sfmesh_hole_protect_enabled: bool
+    sfmesh_hole_protect_max_width_mm: float
+    sfmesh_hole_pitch_divisor: float
     stl_quality: str
     stl_linear_deflection: float
     stl_angular_deflection: float
@@ -120,6 +123,9 @@ class StencilConfig:
         sfmesh_min_polygon_area_mm2 = float(data.get("sfmesh_min_polygon_area_mm2", 0.0))
         sfmesh_min_hole_area_mm2 = float(data.get("sfmesh_min_hole_area_mm2", 0.0))
         sfmesh_decimate_target_ratio = float(data.get("sfmesh_decimate_target_ratio", 1.0))
+        sfmesh_hole_protect_enabled = bool(data.get("sfmesh_hole_protect_enabled", True))
+        sfmesh_hole_protect_max_width_mm = float(data.get("sfmesh_hole_protect_max_width_mm", 0.8))
+        sfmesh_hole_pitch_divisor = float(data.get("sfmesh_hole_pitch_divisor", 3.0))
         stl_quality = str(data.get("stl_quality", "balanced"))
         stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
         stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
@@ -181,6 +187,9 @@ class StencilConfig:
             sfmesh_min_polygon_area_mm2=sfmesh_min_polygon_area_mm2,
             sfmesh_min_hole_area_mm2=sfmesh_min_hole_area_mm2,
             sfmesh_decimate_target_ratio=sfmesh_decimate_target_ratio,
+            sfmesh_hole_protect_enabled=sfmesh_hole_protect_enabled,
+            sfmesh_hole_protect_max_width_mm=sfmesh_hole_protect_max_width_mm,
+            sfmesh_hole_pitch_divisor=sfmesh_hole_pitch_divisor,
             stl_quality=stl_quality,
             stl_linear_deflection=stl_linear_deflection,
             stl_angular_deflection=stl_angular_deflection,
@@ -243,6 +252,10 @@ class StencilConfig:
             raise ValueError("sfmesh_min_hole_area_mm2 must be >= 0")
         if not 0 < self.sfmesh_decimate_target_ratio <= 1:
             raise ValueError("sfmesh_decimate_target_ratio must be in (0, 1]")
+        if self.sfmesh_hole_protect_max_width_mm <= 0:
+            raise ValueError("sfmesh_hole_protect_max_width_mm must be > 0")
+        if self.sfmesh_hole_pitch_divisor <= 1:
+            raise ValueError("sfmesh_hole_pitch_divisor must be > 1")
         if self.stl_linear_deflection <= 0:
             raise ValueError("stl_linear_deflection must be > 0")
         if self.stl_angular_deflection <= 0:

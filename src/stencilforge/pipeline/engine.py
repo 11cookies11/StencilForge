@@ -158,9 +158,10 @@ class SfMeshEngine:
             step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
             mesh = trimesh.util.concatenate([mesh, step_mesh])
 
+        critical_hole_width = _critical_hole_width_mm(base_geom, cfg.sfmesh_hole_protect_max_width_mm)
         if _should_attempt_watertight(mesh, cfg):
             t0 = time.perf_counter()
-            pitch_mm = _adaptive_voxel_pitch(mesh, cfg)
+            pitch_mm = _adaptive_voxel_pitch(mesh, cfg, critical_hole_width)
             mesh = _rebuild_watertight_voxel(mesh, pitch_mm)
             logger.info(
                 "sfmesh watertight rebuild in %.3fs (pitch=%s mm)",
@@ -438,7 +439,30 @@ def _should_attempt_watertight(mesh: trimesh.Trimesh, cfg: StencilConfig) -> boo
     return True
 
 
-def _adaptive_voxel_pitch(mesh: trimesh.Trimesh, cfg: StencilConfig) -> float:
+def _critical_hole_width_mm(geometry, max_width_mm: float) -> float | None:
+    if geometry is None or geometry.is_empty:
+        return None
+    polygons: list[Polygon] = []
+    if isinstance(geometry, Polygon):
+        polygons = [geometry]
+    elif isinstance(geometry, MultiPolygon):
+        polygons = list(geometry.geoms)
+    min_width = None
+    for poly in polygons:
+        for ring in poly.interiors:
+            hole = Polygon(ring)
+            if hole.is_empty:
+                continue
+            width = min(float(hole.bounds[2] - hole.bounds[0]), float(hole.bounds[3] - hole.bounds[1]))
+            if width <= 0:
+                continue
+            if width > max_width_mm:
+                continue
+            min_width = width if min_width is None else min(min_width, width)
+    return min_width
+
+
+def _adaptive_voxel_pitch(mesh: trimesh.Trimesh, cfg: StencilConfig, critical_hole_width: float | None = None) -> float:
     pitch = float(cfg.sfmesh_voxel_pitch_mm)
     if not cfg.sfmesh_adaptive_pitch_enabled:
         return pitch
@@ -455,7 +479,18 @@ def _adaptive_voxel_pitch(mesh: trimesh.Trimesh, cfg: StencilConfig) -> float:
         pitch *= 2.0
     elif longest > 50:
         pitch *= 1.6
-    return float(np.clip(pitch, cfg.sfmesh_adaptive_pitch_min_mm, cfg.sfmesh_adaptive_pitch_max_mm))
+    pitch = float(np.clip(pitch, cfg.sfmesh_adaptive_pitch_min_mm, cfg.sfmesh_adaptive_pitch_max_mm))
+    if cfg.sfmesh_hole_protect_enabled and critical_hole_width is not None:
+        cap = max(cfg.sfmesh_adaptive_pitch_min_mm, critical_hole_width / cfg.sfmesh_hole_pitch_divisor)
+        if pitch > cap:
+            logger.info(
+                "sfmesh hole-protect pitch cap: %.4f -> %.4f (critical_hole=%.4f mm)",
+                pitch,
+                cap,
+                critical_hole_width,
+            )
+            pitch = cap
+    return pitch
 
 
 def _maybe_decimate_mesh(mesh: trimesh.Trimesh, cfg: StencilConfig) -> trimesh.Trimesh:
