@@ -516,6 +516,7 @@ def _repair_mesh_topology(mesh: trimesh.Trimesh) -> None:
 def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh.Trimesh:
     if mesh.is_empty or mesh.faces.size == 0:
         return mesh
+    target_bounds = np.array(mesh.bounds, dtype=float) if mesh.bounds is not None else None
     try:
         voxel = mesh.voxelized(pitch=pitch_mm)
         try:
@@ -531,4 +532,24 @@ def _rebuild_watertight_voxel(mesh: trimesh.Trimesh, pitch_mm: float) -> trimesh
         return mesh
     if rebuilt is None or rebuilt.is_empty or rebuilt.faces.size == 0:
         return mesh
+    # marching_cubes vertices are in voxel index coordinates; map them back.
+    try:
+        rebuilt.apply_transform(voxel.transform)
+    except Exception:
+        pass
+    if target_bounds is not None:
+        _fit_mesh_to_bounds(rebuilt, target_bounds)
     return rebuilt
+
+
+def _fit_mesh_to_bounds(mesh: trimesh.Trimesh, target_bounds: np.ndarray) -> None:
+    if mesh.is_empty or mesh.vertices is None or len(mesh.vertices) == 0:
+        return
+    cur_bounds = np.array(mesh.bounds, dtype=float)
+    cur_extents = cur_bounds[1] - cur_bounds[0]
+    tgt_extents = target_bounds[1] - target_bounds[0]
+    scale = np.ones(3, dtype=float)
+    for i in range(3):
+        if cur_extents[i] > 1e-12 and tgt_extents[i] > 0:
+            scale[i] = tgt_extents[i] / cur_extents[i]
+    mesh.vertices = (mesh.vertices - cur_bounds[0]) * scale + target_bounds[0]

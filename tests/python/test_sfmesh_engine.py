@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from shapely.geometry import Polygon
 import trimesh
 
@@ -89,6 +90,12 @@ def test_sfmesh_watertight_mode_exports_mesh(tmp_path: Path) -> None:
     assert out.exists()
     mesh = trimesh.load_mesh(out, force="mesh")
     assert int(mesh.faces.shape[0]) > 0
+    bounds = mesh.bounds
+    assert bounds is not None
+    extents = bounds[1] - bounds[0]
+    assert float(extents[0]) == pytest.approx(10.0, rel=0.05, abs=0.2)
+    assert float(extents[1]) == pytest.approx(5.0, rel=0.05, abs=0.2)
+    assert float(extents[2]) == pytest.approx(0.12, rel=0.2, abs=0.1)
 
 
 def test_sfmesh_auto_mode_exports_mesh(tmp_path: Path) -> None:
