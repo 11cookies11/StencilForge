@@ -1,5 +1,9 @@
 param(
-    [string]$Version = "0.1.8.0"
+    [string]$Version = "0.1.8.0",
+    [string]$SignCertPath = $env:MSIX_SIGN_CERT_PATH,
+    [string]$SignCertPassword = $env:MSIX_SIGN_CERT_PASSWORD,
+    [string]$SignCertBase64 = $env:MSIX_SIGN_CERT_BASE64,
+    [string]$SignTimestampUrl = $env:MSIX_SIGN_TIMESTAMP_URL
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +18,43 @@ function Normalize-Version([string]$Value) {
         return "$clean.0"
     }
     return $clean
+}
+
+function Resolve-SdkToolPath([string]$ToolName) {
+    $toolPath = $null
+    $toolCmd = Get-Command $ToolName -ErrorAction SilentlyContinue
+    if ($toolCmd) {
+        $toolPath = $toolCmd.Source
+        if (-not $toolPath) {
+            $toolPath = $toolCmd.Path
+        }
+        if (-not $toolPath) {
+            $toolPath = $toolCmd.Definition
+        }
+    }
+
+    $kitRoots = @(
+        "C:\Program Files (x86)\Windows Kits\10\bin",
+        "C:\Program Files\Windows Kits\10\bin"
+    )
+
+    if (-not $toolPath) {
+        foreach ($root in $kitRoots) {
+            if (-not (Test-Path $root)) {
+                continue
+            }
+            $candidate = Get-ChildItem $root -Recurse -Filter $ToolName |
+                Where-Object { $_.FullName -match ("\\x64\\" + [regex]::Escape($ToolName) + "$") } |
+                Sort-Object FullName -Descending |
+                Select-Object -First 1
+            if ($candidate) {
+                $toolPath = $candidate.FullName
+                break
+            }
+        }
+    }
+
+    return $toolPath
 }
 
 $Version = Normalize-Version $Version
@@ -89,38 +130,7 @@ make_wide(310, 150).save(assets / "Wide310x150Logo.png")
 make_square(50).save(assets / "StoreLogo.png")
 '@ -replace "__ASSETS__", ($assetsRoot -replace "\\", "\\\\") | .\.venv\Scripts\python -
 
-$makeappxPath = $null
-$makeappxCmd = Get-Command makeappx.exe -ErrorAction SilentlyContinue
-if ($makeappxCmd) {
-    $makeappxPath = $makeappxCmd.Source
-    if (-not $makeappxPath) {
-        $makeappxPath = $makeappxCmd.Path
-    }
-    if (-not $makeappxPath) {
-        $makeappxPath = $makeappxCmd.Definition
-    }
-}
-
-$kitRoots = @(
-    "C:\Program Files (x86)\Windows Kits\10\bin",
-    "C:\Program Files\Windows Kits\10\bin"
-)
-
-if (-not $makeappxPath) {
-    foreach ($root in $kitRoots) {
-        if (-not (Test-Path $root)) {
-            continue
-        }
-        $makeappx = Get-ChildItem $root -Recurse -Filter makeappx.exe |
-            Where-Object { $_.FullName -match "\\x64\\makeappx.exe$" } |
-            Sort-Object FullName -Descending |
-            Select-Object -First 1
-        if ($makeappx) {
-            $makeappxPath = $makeappx.FullName
-            break
-        }
-    }
-}
+$makeappxPath = Resolve-SdkToolPath "makeappx.exe"
 
 if (-not $makeappxPath) {
     throw "makeappx.exe not found. Install Windows SDK (Windows 10/11) to build MSIX."
@@ -132,3 +142,47 @@ if (Test-Path $outputMsix) {
 
 & $makeappxPath pack /d $stageRoot /p $outputMsix /o | Out-Host
 Write-Host "MSIX output: $outputMsix"
+
+$tempPfxPath = $null
+$signingEnabled = -not [string]::IsNullOrWhiteSpace($SignCertPath) -or -not [string]::IsNullOrWhiteSpace($SignCertBase64)
+
+if ($signingEnabled) {
+    if ([string]::IsNullOrWhiteSpace($SignCertPath) -and -not [string]::IsNullOrWhiteSpace($SignCertBase64)) {
+        $tempPfxPath = Join-Path $env:TEMP ("stencilforge-msix-signing-" + [Guid]::NewGuid().ToString() + ".pfx")
+        [IO.File]::WriteAllBytes($tempPfxPath, [Convert]::FromBase64String($SignCertBase64))
+        $SignCertPath = $tempPfxPath
+    }
+
+    if ([string]::IsNullOrWhiteSpace($SignCertPassword)) {
+        throw "MSIX signing requested but MSIX_SIGN_CERT_PASSWORD is empty."
+    }
+
+    if (-not (Test-Path $SignCertPath)) {
+        throw "MSIX signing certificate not found: $SignCertPath"
+    }
+
+    $signtoolPath = Resolve-SdkToolPath "signtool.exe"
+    if (-not $signtoolPath) {
+        throw "signtool.exe not found. Install Windows SDK (Windows 10/11) to sign MSIX."
+    }
+
+    $signArgs = @("sign", "/fd", "SHA256", "/f", $SignCertPath, "/p", $SignCertPassword)
+    if (-not [string]::IsNullOrWhiteSpace($SignTimestampUrl)) {
+        $signArgs += @("/tr", $SignTimestampUrl, "/td", "SHA256")
+    }
+    $signArgs += $outputMsix
+
+    try {
+        & $signtoolPath @signArgs | Out-Host
+    }
+    finally {
+        if ($tempPfxPath -and (Test-Path $tempPfxPath)) {
+            Remove-Item $tempPfxPath -Force
+        }
+    }
+
+    Write-Host "MSIX signing: enabled"
+}
+else {
+    Write-Host "MSIX signing: disabled (unsigned package)"
+}

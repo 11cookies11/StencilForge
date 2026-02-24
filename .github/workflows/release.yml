@@ -50,6 +50,24 @@ jobs:
       - name: Build MSIX package
         run: .\scripts\build_msix.ps1 -Version ${{ github.ref_name }}
 
+      - name: Verify MSIX is unsigned (non-installable by default)
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem "dist-msix\*.msix" | Select-Object -First 1
+          if (-not $msix) { throw "No MSIX file found in dist-msix." }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($msix.FullName)
+          try {
+            $signature = $zip.Entries | Where-Object { $_.FullName -eq "AppxSignature.p7x" }
+            if ($signature) {
+              throw "MSIX is signed. This pipeline requires unsigned MSIX so it is not installable by default."
+            }
+          }
+          finally {
+            $zip.Dispose()
+          }
+
       - name: Install Inno Setup
         run: choco install innosetup -y
 
