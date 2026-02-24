@@ -63,7 +63,7 @@ jobs:
         run: .\scripts\build_msix.ps1 -Version ${{ github.ref_name }}
 
       - name: Verify MSIX is unsigned (non-installable by default)
-        if: ${{ secrets.MSIX_SIGN_CERT_BASE64 == '' }}
+        if: ${{ env.MSIX_SIGN_CERT_BASE64 == '' }}
         shell: pwsh
         run: |
           $msix = Get-ChildItem "dist-msix\*.msix" | Select-Object -First 1
