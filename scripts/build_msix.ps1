@@ -63,7 +63,7 @@ function Resolve-SdkToolPath([string]$ToolName) {
 $Version = Normalize-Version $Version
 $IdentityName = if ([string]::IsNullOrWhiteSpace($IdentityName)) { "AD7477BB.StencilForge" } else { $IdentityName }
 $IdentityPublisher = if ([string]::IsNullOrWhiteSpace($IdentityPublisher)) { "CN=7FE71472-71A6-4A5E-8C37-0123AD823583" } else { $IdentityPublisher }
-$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "Gao Jiawen" } else { $PublisherDisplayName }
+$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "高嘉文" } else { $PublisherDisplayName }
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $distRoot = Join-Path $projectRoot "dist\StencilForge"
