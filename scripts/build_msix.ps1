@@ -1,5 +1,8 @@
 param(
     [string]$Version = "0.1.8.0",
+    [string]$IdentityName = $env:MSIX_IDENTITY_NAME,
+    [string]$IdentityPublisher = $env:MSIX_IDENTITY_PUBLISHER,
+    [string]$PublisherDisplayName = $env:MSIX_PUBLISHER_DISPLAY_NAME,
     [string]$SignCertPath = $env:MSIX_SIGN_CERT_PATH,
     [string]$SignCertPassword = $env:MSIX_SIGN_CERT_PASSWORD,
     [string]$SignCertBase64 = $env:MSIX_SIGN_CERT_BASE64,
@@ -58,6 +61,10 @@ function Resolve-SdkToolPath([string]$ToolName) {
 }
 
 $Version = Normalize-Version $Version
+$IdentityName = if ([string]::IsNullOrWhiteSpace($IdentityName)) { "AD7477BB.StencilForge" } else { $IdentityName }
+$IdentityPublisher = if ([string]::IsNullOrWhiteSpace($IdentityPublisher)) { "CN=7FE71472-71A6-4A5E-8C37-0123AD823583" } else { $IdentityPublisher }
+$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "Gao Jiawen" } else { $PublisherDisplayName }
+
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $distRoot = Join-Path $projectRoot "dist\StencilForge"
 if (-not (Test-Path $distRoot)) {
@@ -82,9 +89,12 @@ if (-not (Test-Path $manifestTemplate)) {
     throw "Missing manifest template: $manifestTemplate"
 }
 
-Get-Content -Path $manifestTemplate -Raw |
-    ForEach-Object { $_ -replace "__VERSION__", $Version } |
-    Set-Content -Path $manifestTarget -Encoding utf8
+$manifestContent = Get-Content -Path $manifestTemplate -Raw
+$manifestContent = $manifestContent.Replace("__VERSION__", $Version)
+$manifestContent = $manifestContent.Replace("__IDENTITY_NAME__", $IdentityName)
+$manifestContent = $manifestContent.Replace("__IDENTITY_PUBLISHER__", $IdentityPublisher)
+$manifestContent = $manifestContent.Replace("__PUBLISHER_DISPLAY_NAME__", $PublisherDisplayName)
+Set-Content -Path $manifestTarget -Value $manifestContent -Encoding utf8
 
 @'
 from pathlib import Path

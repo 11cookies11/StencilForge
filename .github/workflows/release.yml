@@ -11,6 +11,18 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    env:
+      MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+      MSIX_IDENTITY_PUBLISHER: ${{ vars.MSIX_IDENTITY_PUBLISHER }}
+      MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+      MSIX_PACKAGE_FAMILY_NAME: ${{ vars.MSIX_PACKAGE_FAMILY_NAME }}
+      MSIX_PACKAGE_SID: ${{ vars.MSIX_PACKAGE_SID }}
+      MSIX_STORE_ID: ${{ vars.MSIX_STORE_ID }}
+      MSIX_STORE_DEEP_LINK: ${{ vars.MSIX_STORE_DEEP_LINK }}
+      MSIX_STORE_WEB_URL: ${{ vars.MSIX_STORE_WEB_URL }}
+      MSIX_SIGN_CERT_BASE64: ${{ secrets.MSIX_SIGN_CERT_BASE64 }}
+      MSIX_SIGN_CERT_PASSWORD: ${{ secrets.MSIX_SIGN_CERT_PASSWORD }}
+      MSIX_SIGN_TIMESTAMP_URL: ${{ vars.MSIX_SIGN_TIMESTAMP_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,6 +63,7 @@ jobs:
         run: .\scripts\build_msix.ps1 -Version ${{ github.ref_name }}
 
       - name: Verify MSIX is unsigned (non-installable by default)
+        if: ${{ secrets.MSIX_SIGN_CERT_BASE64 == '' }}
         shell: pwsh
         run: |
           $msix = Get-ChildItem "dist-msix\*.msix" | Select-Object -First 1
