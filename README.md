@@ -22,6 +22,10 @@
   <img alt="VTK" src="https://img.shields.io/badge/VTK-9.3-8a2be2">
 </p>
 
+<p align="center">
+  <img alt="StencilForge logo" src="assets/store/logo_1080x1080.png" width="220">
+</p>
+
 ```text
 +--------------------------------------------------+
 |  StencilForge                                    |

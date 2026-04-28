@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "0.1.8.0",
     [string]$IdentityName = $env:MSIX_IDENTITY_NAME,
     [string]$IdentityPublisher = $env:MSIX_IDENTITY_PUBLISHER,
@@ -63,7 +63,7 @@ function Resolve-SdkToolPath([string]$ToolName) {
 $Version = Normalize-Version $Version
 $IdentityName = if ([string]::IsNullOrWhiteSpace($IdentityName)) { "AD7477BB.StencilForge" } else { $IdentityName }
 $IdentityPublisher = if ([string]::IsNullOrWhiteSpace($IdentityPublisher)) { "CN=7FE71472-71A6-4A5E-8C37-0123AD823583" } else { $IdentityPublisher }
-$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "高嘉文" } else { $PublisherDisplayName }
+$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "StencilForge" } else { $PublisherDisplayName }
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $distRoot = Join-Path $projectRoot "dist\StencilForge"
@@ -100,45 +100,38 @@ Set-Content -Path $manifestTarget -Value $manifestContent -Encoding utf8
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageOps
 except Exception as exc:
     raise SystemExit("Pillow is required to generate MSIX assets.") from exc
 
 assets = Path(r"__ASSETS__")
 assets.mkdir(parents=True, exist_ok=True)
+source_dir = Path(r"__SOURCE__")
 
-def make_square(size):
-    img = Image.new("RGBA", (size, size), (37, 99, 235, 255))
-    draw = ImageDraw.Draw(img)
-    text = "SF"
-    font = ImageFont.load_default()
-    if hasattr(draw, "textbbox"):
-        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-        text_w, text_h = right - left, bottom - top
-    else:
-        text_w, text_h = draw.textsize(text, font=font)
-    draw.text(((size - text_w) / 2, (size - text_h) / 2), text, fill=(255, 255, 255, 255), font=font)
-    return img
+def load_source(name):
+    path = source_dir / name
+    if not path.exists():
+        raise SystemExit(f"Missing source asset: {path}")
+    return Image.open(path).convert("RGBA")
 
-def make_wide(width, height):
-    img = Image.new("RGBA", (width, height), (37, 99, 235, 255))
-    draw = ImageDraw.Draw(img)
-    text = "StencilForge"
-    font = ImageFont.load_default()
-    if hasattr(draw, "textbbox"):
-        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-        text_w, text_h = right - left, bottom - top
-    else:
-        text_w, text_h = draw.textsize(text, font=font)
-    draw.text(((width - text_w) / 2, (height - text_h) / 2), text, fill=(255, 255, 255, 255), font=font)
-    return img
+def fit_to_canvas(source, size):
+    canvas = Image.new("RGBA", size, (255, 255, 255, 0))
+    fitted = ImageOps.contain(source, size, Image.Resampling.LANCZOS)
+    x = (size[0] - fitted.width) // 2
+    y = (size[1] - fitted.height) // 2
+    canvas.paste(fitted, (x, y), fitted)
+    return canvas
 
-make_square(44).save(assets / "Square44x44Logo.png")
-make_square(150).save(assets / "Square150x150Logo.png")
-make_square(310).save(assets / "Square310x310Logo.png")
-make_wide(310, 150).save(assets / "Wide310x150Logo.png")
-make_square(50).save(assets / "StoreLogo.png")
-'@ -replace "__ASSETS__", ($assetsRoot -replace "\\", "\\\\") | .\.venv\Scripts\python -
+square_source = load_source("logo_1080x1080.png")
+wide_source = load_source("logo_1920x1080.png")
+store_source = load_source("logo_300x300.png")
+
+fit_to_canvas(square_source, (44, 44)).save(assets / "Square44x44Logo.png")
+fit_to_canvas(square_source, (150, 150)).save(assets / "Square150x150Logo.png")
+fit_to_canvas(square_source, (310, 310)).save(assets / "Square310x310Logo.png")
+fit_to_canvas(wide_source, (310, 150)).save(assets / "Wide310x150Logo.png")
+fit_to_canvas(store_source, (50, 50)).save(assets / "StoreLogo.png")
+'@ -replace "__ASSETS__", ($assetsRoot -replace "\\", "\\\\") -replace "__SOURCE__", ((Join-Path $projectRoot "assets\store") -replace "\\", "\\\\") | python -
 
 $makeappxPath = Resolve-SdkToolPath "makeappx.exe"
 
