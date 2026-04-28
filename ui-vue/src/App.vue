@@ -1,84 +1,22 @@
-﻿<template>
+<template>
   <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800 pb-32">
-    <header
-      class="sticky top-0 z-40 bg-white border-b border-slate-200 h-16 app-titlebar"
-      @mousedown="onTitlebarMouseDown"
-      @dblclick="onTitlebarDoubleClick"
-    >
-      <div class="w-full h-full flex items-center justify-between px-4 sm:px-6">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <AppIcon name="view_in_ar" class="text-white" :size="20" />
-          </div>
-          <span class="text-xl font-bold tracking-tight text-slate-900">StencilForge</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <div class="text-xs text-slate-400 hidden sm:block">{{ t("app.tagline") }}</div>
-          <div
-            class="relative titlebar-interactive"
-            ref="languageMenu"
-            @mousedown.stop
-            @click.stop
-            @dblclick.stop
-          >
-            <button
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-slate-900 bg-slate-100 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              type="button"
-              :aria-label="t('language.label')"
-              :aria-expanded="languageMenuOpen ? 'true' : 'false'"
-              @mousedown.stop
-              @dblclick.stop
-              @click="toggleLanguageMenu"
-            >
-              <AppIcon name="language" class="text-slate-500" :size="20" />
-              <span>{{ currentLocaleLabel }}</span>
-              <AppIcon
-                name="expand_more"
-                class="text-slate-400 transition-transform"
-                :class="languageMenuOpen ? 'rotate-180' : ''"
-                :size="18"
-              />
-            </button>
-            <div
-              v-if="languageMenuOpen"
-              class="absolute right-0 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-xl ring-1 ring-black/5 focus:outline-none border border-slate-200 z-50"
-              role="menu"
-              :aria-label="t('language.label')"
-            >
-              <div class="p-1.5 space-y-0.5">
-                <button
-                  v-for="option in localeOptions"
-                  :key="option.value"
-                  class="w-full text-left flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-                  :class="
-                    locale === option.value
-                      ? 'text-primary bg-blue-50'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                  "
-                  type="button"
-                  role="menuitem"
-                  @click="setLocaleFromMenu(option.value)"
-                >
-                  <span>{{ t(option.labelKey) }}</span>
-                  <AppIcon v-if="locale === option.value" name="check" :size="18" />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 window-controls">
-            <button class="window-btn" @click="windowMinimize" @dblclick.stop :title="t('window.minimize')">
-              <AppIcon name="remove" :size="18" />
-            </button>
-            <button class="window-btn" @click="windowMaximizeRestore" @dblclick.stop :title="t('window.maximizeRestore')">
-              <AppIcon name="crop_square" :size="18" />
-            </button>
-            <button class="window-btn window-btn-close" @click="windowClose" @dblclick.stop :title="t('window.close')">
-              <AppIcon name="close" :size="18" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
+    <AppHeader
+      :app-title="'StencilForge'"
+      :tagline="t('app.tagline')"
+      :locale="locale"
+      :locale-options="localeOptions"
+      :current-locale-label="currentLocaleLabel"
+      :language-label="t('language.label')"
+      :minimize-title="t('window.minimize')"
+      :maximize-restore-title="t('window.maximizeRestore')"
+      :close-title="t('window.close')"
+      @titlebar-mouse-down="onTitlebarMouseDown"
+      @titlebar-double-click="onTitlebarDoubleClick"
+      @select-locale="setLocale"
+      @window-minimize="windowMinimize"
+      @window-maximize-restore="windowMaximizeRestore"
+      @window-close="windowClose"
+    />
 
     <main class="flex-1 w-full max-w-7xl mx-auto px-6 md:px-8 py-10 pt-12 pb-32">
       <section v-show="currentTab === 'upload'" class="space-y-8">
@@ -547,6 +485,7 @@
 
 <script>
 import AppIcon from "./components/AppIcon.vue";
+import AppHeader from "./components/AppHeader.vue";
 import AppSelect from "./components/AppSelect.vue";
 import { getInitialLocale, t as translate } from "./i18n";
 
@@ -595,13 +534,13 @@ const BASIC_CONFIG_KEYS = [
 export default {
   components: {
     AppIcon,
+    AppHeader,
     AppSelect,
   },
   data() {
     const locale = getInitialLocale();
     return {
       locale,
-      languageMenuOpen: false,
       currentTab: "upload",
       showAdvancedConfig: false,
       backend: null,
@@ -628,11 +567,14 @@ export default {
   },
   computed: {
     localeOptions() {
-      return LOCALE_OPTIONS;
+      return LOCALE_OPTIONS.map((item) => ({
+        ...item,
+        label: this.t(item.labelKey),
+      }));
     },
     currentLocaleLabel() {
       const current = this.localeOptions.find((item) => item.value === this.locale);
-      return current ? this.t(current.labelKey) : this.t("language.en");
+      return current ? current.label : this.t("language.en");
     },
     statusLabel() {
       const map = {
@@ -650,13 +592,7 @@ export default {
   },
   mounted() {
     this.applyLocale(false);
-    document.addEventListener("click", this.onDocumentClick);
-    document.addEventListener("keydown", this.onDocumentKeydown);
     this.connectBackend();
-  },
-  beforeUnmount() {
-    document.removeEventListener("click", this.onDocumentClick);
-    document.removeEventListener("keydown", this.onDocumentKeydown);
   },
   methods: {
     t(key, vars = {}) {
@@ -674,29 +610,11 @@ export default {
         document.documentElement.lang = this.locale;
       }
     },
-    setLocale() {
+    setLocale(nextLocale = this.locale) {
+      this.locale = nextLocale;
       this.applyLocale(true);
       if (this.backend && this.backend.setLocale) {
         this.backend.setLocale(this.locale);
-      }
-    },
-    setLocaleFromMenu(nextLocale) {
-      this.locale = nextLocale;
-      this.setLocale();
-      this.languageMenuOpen = false;
-    },
-    toggleLanguageMenu() {
-      this.languageMenuOpen = !this.languageMenuOpen;
-    },
-    onDocumentClick(event) {
-      if (!this.languageMenuOpen) return;
-      const root = this.$refs.languageMenu;
-      if (!root || root.contains(event.target)) return;
-      this.languageMenuOpen = false;
-    },
-    onDocumentKeydown(event) {
-      if (event.key === "Escape" && this.languageMenuOpen) {
-        this.languageMenuOpen = false;
       }
     },
     navClass(tab) {
