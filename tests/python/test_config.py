@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
+from dataclasses import fields
+
 import pytest
 
 from stencilforge.config import StencilConfig
@@ -55,6 +58,78 @@ def test_sfmesh_backend_maps_to_trimesh() -> None:
     cfg = StencilConfig.from_dict({"model_backend": "sfmesh"})
     assert cfg.model_backend == "trimesh"
     cfg.validate()
+
+
+def test_ui_vtk_entry_point_module_exists() -> None:
+    assert importlib.util.find_spec("stencilforge.ui_vtk_app") is not None
+
+
+def test_config_to_dict_round_trips_all_fields() -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "paste_patterns": ["*abc*"],
+            "outline_patterns": ["*def*"],
+            "thickness_mm": 0.2,
+            "paste_offset_mm": -0.02,
+            "outline_margin_mm": 4.2,
+            "locator_enabled": False,
+            "locator_height_mm": 3.0,
+            "locator_width_mm": 2.5,
+            "locator_clearance_mm": 0.3,
+            "locator_step_height_mm": 1.2,
+            "locator_step_width_mm": 1.7,
+            "locator_mode": "wall",
+            "locator_open_side": "top",
+            "locator_open_width_mm": 0.4,
+            "output_mode": "holes_only",
+            "model_backend": "cadquery",
+            "sfmesh_quality_mode": "auto",
+            "sfmesh_voxel_pitch_mm": 0.1,
+            "sfmesh_adaptive_pitch_enabled": False,
+            "sfmesh_adaptive_pitch_min_mm": 0.09,
+            "sfmesh_adaptive_pitch_max_mm": 0.22,
+            "sfmesh_watertight_face_limit": 123456,
+            "sfmesh_simplify_tol_mm": 0.01,
+            "sfmesh_min_polygon_area_mm2": 0.02,
+            "sfmesh_min_hole_area_mm2": 0.03,
+            "sfmesh_decimate_target_ratio": 0.8,
+            "sfmesh_hole_protect_enabled": False,
+            "sfmesh_hole_protect_max_width_mm": 0.7,
+            "sfmesh_hole_pitch_divisor": 4.0,
+            "sfmesh_chunked_watertight_enabled": False,
+            "sfmesh_chunk_size_mm": 60.0,
+            "sfmesh_chunk_overlap_mm": 0.5,
+            "stl_quality": "high_quality",
+            "stl_linear_deflection": 0.03,
+            "stl_angular_deflection": 0.04,
+            "stl_tolerance": 0.001,
+            "arc_steps": 72,
+            "curve_resolution": 18,
+            "qfn_regen_enabled": False,
+            "qfn_min_feature_mm": 0.7,
+            "qfn_confidence_threshold": 0.8,
+            "qfn_max_pad_width_mm": 1.1,
+            "outline_fill_rule": "legacy",
+            "outline_close_strategy": "graph",
+            "outline_merge_tol_mm": 0.02,
+            "outline_snap_eps_mm": 0.002,
+            "outline_arc_max_chord_error_mm": 0.015,
+            "outline_gap_bridge_mm": 0.06,
+            "cadquery_simplify_tol_mm": 0.01,
+            "cadquery_short_edge_min_mm": 0.0002,
+            "cadquery_quantize_mm": 0.00002,
+            "ui_debug_plot_outline": True,
+            "ui_debug_plot_max_segments": 1234,
+            "ui_debug_plot_max_offset_vectors": 456,
+            "ui_debug_plot_offset_min_mm": 0.05,
+        }
+    )
+
+    data = cfg.to_dict()
+    assert set(data) == {field.name for field in fields(StencilConfig)}
+    assert data["outline_gap_bridge_mm"] == 0.06
+    assert data["cadquery_quantize_mm"] == 0.00002
+    assert StencilConfig.from_dict(data) == cfg
 
 
 @pytest.mark.parametrize(

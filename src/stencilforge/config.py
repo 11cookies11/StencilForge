@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -228,6 +228,9 @@ class StencilConfig:
             ui_debug_plot_max_offset_vectors=ui_debug_plot_max_offset_vectors,
             ui_debug_plot_offset_min_mm=ui_debug_plot_offset_min_mm,
         )
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
     def validate(self) -> None:
         if self.thickness_mm <= 0:

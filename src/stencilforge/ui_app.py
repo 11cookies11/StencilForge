@@ -12,7 +12,6 @@ import tempfile
 import threading
 import zipfile
 from datetime import datetime
-from dataclasses import asdict
 from ctypes import Structure
 from ctypes import wintypes
 from fnmatch import fnmatch
@@ -135,44 +134,6 @@ def _apply_snap_styles(hwnd: int) -> None:
         0,
         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
     )
-
-
-def _config_to_dict(config: StencilConfig) -> dict:
-    return {
-        "paste_patterns": list(config.paste_patterns),
-        "outline_patterns": list(config.outline_patterns),
-        "thickness_mm": config.thickness_mm,
-        "paste_offset_mm": config.paste_offset_mm,
-        "outline_margin_mm": config.outline_margin_mm,
-        "locator_enabled": config.locator_enabled,
-        "locator_height_mm": config.locator_height_mm,
-        "locator_width_mm": config.locator_width_mm,
-        "locator_clearance_mm": config.locator_clearance_mm,
-        "locator_step_height_mm": config.locator_step_height_mm,
-        "locator_step_width_mm": config.locator_step_width_mm,
-        "locator_mode": config.locator_mode,
-        "locator_open_side": config.locator_open_side,
-        "locator_open_width_mm": config.locator_open_width_mm,
-        "output_mode": config.output_mode,
-        "model_backend": config.model_backend,
-        "stl_linear_deflection": config.stl_linear_deflection,
-        "stl_angular_deflection": config.stl_angular_deflection,
-        "arc_steps": config.arc_steps,
-        "curve_resolution": config.curve_resolution,
-        "qfn_regen_enabled": config.qfn_regen_enabled,
-        "qfn_min_feature_mm": config.qfn_min_feature_mm,
-        "qfn_confidence_threshold": config.qfn_confidence_threshold,
-        "qfn_max_pad_width_mm": config.qfn_max_pad_width_mm,
-        "outline_fill_rule": config.outline_fill_rule,
-        "outline_close_strategy": config.outline_close_strategy,
-        "outline_merge_tol_mm": config.outline_merge_tol_mm,
-        "outline_snap_eps_mm": config.outline_snap_eps_mm,
-        "outline_arc_max_chord_error_mm": config.outline_arc_max_chord_error_mm,
-        "ui_debug_plot_outline": config.ui_debug_plot_outline,
-        "ui_debug_plot_max_segments": config.ui_debug_plot_max_segments,
-        "ui_debug_plot_max_offset_vectors": config.ui_debug_plot_max_offset_vectors,
-        "ui_debug_plot_offset_min_mm": config.ui_debug_plot_offset_min_mm,
-    }
 
 
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
@@ -353,7 +314,7 @@ class BackendBridge(QObject):
 
     @Slot(result=dict)
     def getConfig(self) -> dict:
-        return _config_to_dict(self._config)
+        return self._config.to_dict()
 
     @Slot(str)
     def loadConfig(self, path: str) -> None:
@@ -366,19 +327,35 @@ class BackendBridge(QObject):
         self._remember_path("config_dir", path)
         self._config = StencilConfig.from_json(path_obj)
         self._log_line(f"Config loaded: {path_obj}")
-        self.configChanged.emit(_config_to_dict(self._config))
+        self.configChanged.emit(self._config.to_dict())
 
     @Slot(dict)
     def setConfig(self, partial: dict) -> None:
-        data = _config_to_dict(self._config)
+        data = self._config.to_dict()
         data.update(partial or {})
         self._config = StencilConfig.from_dict(data)
-        self.configChanged.emit(_config_to_dict(self._config))
+        self.configChanged.emit(self._config.to_dict())
 
     @Slot(str)
     def setLocale(self, locale: str) -> None:
         self._locale = normalize_locale(locale)
         self._apply_preview_locale()
+
+    def _runtime_config_for_job(self, config_path: str) -> StencilConfig:
+        if not config_path:
+            return self._config
+
+        file_config = StencilConfig.from_json(Path(config_path))
+        merged = file_config.to_dict()
+        merged.update(self._config.to_dict())
+        config = StencilConfig.from_dict(merged)
+        if file_config.model_backend != self._config.model_backend:
+            self._log_line(
+                "UI backend takes precedence over config path backend: "
+                f"{file_config.model_backend} -> {self._config.model_backend}"
+            )
+        self._log_line("Runtime config merged: file + UI (UI precedence).")
+        return config
 
     @Slot(str)
     def scanFiles(self, input_dir: str) -> None:
@@ -575,18 +552,7 @@ class BackendBridge(QObject):
                 self._remember_path("output_dir", output_stl)
                 if config_path:
                     self._remember_path("config_dir", config_path)
-                config = self._config
-                if config_path:
-                    file_config = StencilConfig.from_json(Path(config_path))
-                    merged = _config_to_dict(file_config)
-                    merged.update(_config_to_dict(self._config))
-                    config = StencilConfig.from_dict(merged)
-                    if file_config.model_backend != self._config.model_backend:
-                        self._log_line(
-                            "UI backend takes precedence over config path backend: "
-                            f"{file_config.model_backend} -> {self._config.model_backend}"
-                        )
-                    self._log_line("Runtime config merged: file + UI (UI precedence).")
+                config = self._runtime_config_for_job(config_path)
                 self._log_line(f"Effective backend: {config.model_backend}")
                 self._log_line(f"Resolved input: {resolved_input}")
                 if config.model_backend == "cadquery":
@@ -594,7 +560,7 @@ class BackendBridge(QObject):
                     result_queue: mp.Queue[dict] = ctx.Queue()
                     process = ctx.Process(
                         target=_run_generate_stencil_subprocess,
-                        args=(resolved_input, output_stl, asdict(config), result_queue),
+                        args=(resolved_input, output_stl, config.to_dict(), result_queue),
                     )
                     self._job_process = process
                     process.start()
