@@ -60,12 +60,32 @@ function Resolve-SdkToolPath([string]$ToolName) {
     return $toolPath
 }
 
-$Version = Normalize-Version $Version
-$IdentityName = if ([string]::IsNullOrWhiteSpace($IdentityName)) { "AD7477BB.StencilForge" } else { $IdentityName }
-$IdentityPublisher = if ([string]::IsNullOrWhiteSpace($IdentityPublisher)) { "CN=7FE71472-71A6-4A5E-8C37-0123AD823583" } else { $IdentityPublisher }
-$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) { "StencilForge" } else { $PublisherDisplayName }
-
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$brandingPath = Join-Path $projectRoot "packaging\branding.json"
+$branding = if (Test-Path $brandingPath) {
+    Get-Content -Path $brandingPath -Raw | ConvertFrom-Json
+} else {
+    throw "Missing branding file: $brandingPath"
+}
+
+$Version = Normalize-Version $Version
+$IdentityName = if ([string]::IsNullOrWhiteSpace($IdentityName)) {
+    if ($branding.msix_identity_name) { [string]$branding.msix_identity_name } else { "AD7477BB.StencilForge" }
+} else {
+    $IdentityName
+}
+$IdentityPublisher = if ([string]::IsNullOrWhiteSpace($IdentityPublisher)) {
+    if ($branding.msix_identity_publisher) { [string]$branding.msix_identity_publisher } else { "CN=7FE71472-71A6-4A5E-8C37-0123AD823583" }
+} else {
+    $IdentityPublisher
+}
+$AppName = if ($branding.app_name) { [string]$branding.app_name } else { "StencilForge" }
+$AppDescription = if ($branding.app_description) { [string]$branding.app_description } else { "PCB stencil and fixture generator" }
+$PublisherDisplayName = if ([string]::IsNullOrWhiteSpace($PublisherDisplayName)) {
+    if ($branding.publisher_display_name) { [string]$branding.publisher_display_name } else { $AppName }
+} else {
+    $PublisherDisplayName
+}
 $distRoot = Join-Path $projectRoot "dist\StencilForge"
 if (-not (Test-Path $distRoot)) {
     throw "Missing dist output: $distRoot. Run scripts/build_windows.ps1 first."
@@ -93,6 +113,8 @@ $manifestContent = Get-Content -Path $manifestTemplate -Raw
 $manifestContent = $manifestContent.Replace("__VERSION__", $Version)
 $manifestContent = $manifestContent.Replace("__IDENTITY_NAME__", $IdentityName)
 $manifestContent = $manifestContent.Replace("__IDENTITY_PUBLISHER__", $IdentityPublisher)
+$manifestContent = $manifestContent.Replace("__APP_NAME__", $AppName)
+$manifestContent = $manifestContent.Replace("__APP_DESCRIPTION__", $AppDescription)
 $manifestContent = $manifestContent.Replace("__PUBLISHER_DISPLAY_NAME__", $PublisherDisplayName)
 Set-Content -Path $manifestTarget -Value $manifestContent -Encoding utf8
 

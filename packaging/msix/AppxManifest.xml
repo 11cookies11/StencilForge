@@ -10,7 +10,7 @@
     Version="__VERSION__"
     ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>StencilForge</DisplayName>
+    <DisplayName>__APP_NAME__</DisplayName>
     <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -22,10 +22,10 @@
     <Resource Language="zh-cn" />
   </Resources>
   <Applications>
-    <Application Id="StencilForge" Executable="StencilForge.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="__APP_NAME__" Executable="StencilForge.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="StencilForge"
-        Description="PCB stencil and fixture generator"
+        DisplayName="__APP_NAME__"
+        Description="__APP_DESCRIPTION__"
         BackgroundColor="transparent"
         Square44x44Logo="Assets\Square44x44Logo.png"
         Square150x150Logo="Assets\Square150x150Logo.png">

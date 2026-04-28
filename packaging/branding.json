@@ -1,0 +1,7 @@
+{
+  "app_name": "StencilForge",
+  "app_description": "PCB stencil and fixture generator",
+  "publisher_display_name": "StencilForge",
+  "msix_identity_name": "AD7477BB.StencilForge",
+  "msix_identity_publisher": "CN=7FE71472-71A6-4A5E-8C37-0123AD823583"
+}
