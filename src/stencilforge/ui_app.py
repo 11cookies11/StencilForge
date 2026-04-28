@@ -2,7 +2,6 @@
 
 import base64
 import ctypes
-import json
 import logging
 import os
 import multiprocessing as mp
@@ -18,7 +17,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QCoreApplication
-from PySide6.QtGui import QCursor, QGuiApplication, QSurfaceFormat, QIcon, QDesktopServices
+from PySide6.QtGui import QCursor, QSurfaceFormat, QIcon, QDesktopServices
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -38,6 +37,18 @@ try:
     from .i18n import dialog_labels, normalize_locale, preview_labels, text
     from .pipeline import generate_stencil
     from .title_bar import TitleBar
+    from .ui_support import (
+        default_export_dir,
+        fit_to_screen,
+        load_ui_state,
+        resolve_icon_path,
+        resolve_log_path,
+        resolve_project_root,
+        resolve_ui_dist,
+        resolve_ui_state_path,
+        save_ui_state,
+        ui_dist_candidates,
+    )
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -45,6 +56,18 @@ except ImportError:
     from stencilforge.i18n import dialog_labels, normalize_locale, preview_labels, text
     from stencilforge.pipeline import generate_stencil
     from stencilforge.title_bar import TitleBar
+    from stencilforge.ui_support import (
+        default_export_dir,
+        fit_to_screen,
+        load_ui_state,
+        resolve_icon_path,
+        resolve_log_path,
+        resolve_project_root,
+        resolve_ui_dist,
+        resolve_ui_state_path,
+        save_ui_state,
+        ui_dist_candidates,
+    )
 
 
 def _run_generate_stencil_subprocess(
@@ -162,8 +185,8 @@ class BackendBridge(QObject):
         self._project_root = project_root
         self._config_path = StencilConfig.default_path(project_root)
         self._config = StencilConfig.load_default(project_root)
-        self._ui_state_path = _resolve_ui_state_path(project_root)
-        self._ui_state = _load_ui_state(self._ui_state_path)
+        self._ui_state_path = resolve_ui_state_path(project_root)
+        self._ui_state = load_ui_state(self._ui_state_path)
         self._job_lock = threading.Lock()
         self._job_running = False
         self._temp_dirs: list[Path] = []
@@ -176,7 +199,7 @@ class BackendBridge(QObject):
         self._job_process: mp.Process | None = None
         self._external_preview = sys.platform == "win32" and not getattr(sys, "frozen", False)
         self._locale = "zh-CN"
-        self._log_path = _resolve_log_path(project_root)
+        self._log_path = resolve_log_path(project_root)
         self._ensure_log_handler()
         self.jobError.connect(self._on_job_error)
         self.showOutlineDebug.connect(self._on_show_outline_debug)
@@ -377,7 +400,7 @@ class BackendBridge(QObject):
 
     @Slot(str, result=str)
     def pickSaveFile(self, default_name: str) -> str:
-        start_dir = self._remembered_dir("output_dir") or _default_export_dir()
+        start_dir = self._remembered_dir("output_dir") or default_export_dir()
         start_dir.mkdir(parents=True, exist_ok=True)
         initial = start_dir / default_name
         filename, _ = QFileDialog.getSaveFileName(
@@ -391,7 +414,7 @@ class BackendBridge(QObject):
 
     @Slot(str, result=str)
     def defaultOutputPath(self, default_name: str) -> str:
-        start_dir = self._remembered_dir("output_dir") or _default_export_dir()
+        start_dir = self._remembered_dir("output_dir") or default_export_dir()
         start_dir.mkdir(parents=True, exist_ok=True)
         return str(start_dir / default_name)
 
@@ -434,7 +457,7 @@ class BackendBridge(QObject):
 
     @Slot(result=str)
     def pickStlFile(self) -> str:
-        start_dir = self._remembered_dir("preview_dir") or self._remembered_dir("output_dir") or _default_export_dir()
+        start_dir = self._remembered_dir("preview_dir") or self._remembered_dir("output_dir") or default_export_dir()
         filename, _ = QFileDialog.getOpenFileName(
             None,
             self._tr("ui.pick_stl_title"),
@@ -493,7 +516,7 @@ class BackendBridge(QObject):
             env["STENCILFORGE_LOCALE"] = self._locale
             # Local dev run uses src-layout; ensure child process can import stencilforge.
             if not getattr(sys, "frozen", False):
-                project_root = _resolve_project_root()
+                project_root = resolve_project_root()
                 src_root = project_root / "src"
                 existing = env.get("PYTHONPATH", "")
                 prefix = str(src_root)
@@ -661,7 +684,7 @@ class BackendBridge(QObject):
         if not directory:
             return
         self._ui_state[key] = str(directory)
-        _save_ui_state(self._ui_state_path, self._ui_state)
+        save_ui_state(self._ui_state_path, self._ui_state)
 
     def _resolve_input_dir(self, input_dir: str) -> str:
         if not input_dir:
@@ -866,14 +889,14 @@ def main() -> int:
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
 
     app = QApplication(sys.argv)
-    project_root = _resolve_project_root()
-    icon_path = _resolve_icon_path(project_root)
+    project_root = resolve_project_root()
+    icon_path = resolve_icon_path(project_root)
     if icon_path is not None:
         icon = QIcon(str(icon_path))
         app.setWindowIcon(icon)
-    html_path = _resolve_ui_dist(project_root)
+    html_path = resolve_ui_dist(project_root)
     if html_path is None:
-        candidates = _ui_dist_candidates(project_root)
+        candidates = ui_dist_candidates(project_root)
         joined = "\n".join(str(path) for path in candidates)
         startup_locale = normalize_locale(os.environ.get("STENCILFORGE_LOCALE"))
         raise FileNotFoundError(text(startup_locale, "ui.ui_dist_missing", paths=joined))
@@ -901,7 +924,7 @@ def main() -> int:
     window.setCentralWidget(view)
     backend.attach_window(window)
 
-    _fit_to_screen(window, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
+    fit_to_screen(window, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
     window.show()
     return app.exec()
 
@@ -921,7 +944,7 @@ def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
     dialog = QDialog()
     dialog.setWindowTitle(labels["title"])
     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-    _fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
+    fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
     dialog.setStyleSheet(
         "QDialog { background-color: #f8fafc; }"
         "QToolBar { background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }"
@@ -959,126 +982,6 @@ def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
         "wire_action": wire_action,
         "axes_action": axes_action,
     }
-
-
-def _fit_to_screen(
-    widget: QDialog | QMainWindow,
-    max_ratio: tuple[float, float],
-    max_size: tuple[int, int],
-    min_size: tuple[int, int],
-) -> None:
-    screen = QGuiApplication.primaryScreen()
-    if screen is None:
-        widget.resize(*max_size)
-        return
-    available = screen.availableGeometry()
-    avail_w = max(available.width(), 1)
-    avail_h = max(available.height(), 1)
-
-    # Keep requested minimums practical on small displays.
-    min_w = max(1, min(min_size[0], avail_w))
-    min_h = max(1, min(min_size[1], avail_h))
-
-    width = min(int(avail_w * max_ratio[0]), max_size[0], avail_w)
-    height = min(int(avail_h * max_ratio[1]), max_size[1], avail_h)
-    width = min(max(width, min_w), avail_w)
-    height = min(max(height, min_h), avail_h)
-    widget.resize(width, height)
-    x = available.x() + max((available.width() - width) // 2, 0)
-    y = available.y() + max((available.height() - height) // 2, 0)
-    widget.move(x, y)
-
-
-def _resolve_project_root() -> Path:
-    if getattr(sys, "frozen", False):
-        exe_dir = Path(sys.executable).resolve().parent
-        return exe_dir
-    return Path(__file__).resolve().parents[2]
-
-
-def _ui_dist_candidates(project_root: Path) -> list[Path]:
-    base = Path(getattr(sys, "_MEIPASS", project_root))
-    exe_dir = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else project_root
-    return [
-        base / "ui-vue" / "dist" / "index.html",
-        exe_dir / "ui-vue" / "dist" / "index.html",
-        project_root / "ui-vue" / "dist" / "index.html",
-        project_root / "dist" / "index.html",
-    ]
-
-
-def _resolve_ui_dist(project_root: Path) -> Path | None:
-    for candidate in _ui_dist_candidates(project_root):
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def _resolve_log_path(project_root: Path) -> Path | None:
-    if getattr(sys, "frozen", False):
-        exe_dir = Path(sys.executable).resolve().parent
-        candidate = exe_dir / "stencilforge.log"
-        try:
-            candidate.parent.mkdir(parents=True, exist_ok=True)
-            candidate.touch(exist_ok=True)
-            return candidate
-        except OSError:
-            pass
-    user_dir = StencilConfig.default_path(project_root).parent
-    if user_dir:
-        return user_dir / "stencilforge.log"
-    return None
-
-
-def _resolve_ui_state_path(project_root: Path) -> Path:
-    return StencilConfig.default_path(project_root).parent / "ui_state.json"
-
-
-def _load_ui_state(path: Path) -> dict[str, str]:
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def _save_ui_state(path: Path, state: dict[str, str]) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError:
-        pass
-
-
-def _default_export_dir() -> Path:
-    home = Path.home()
-    documents = home / "Documents"
-    base = documents if documents.exists() else home
-    return base / "StencilForge" / "Exports"
-
-
-def _resolve_icon_path(project_root: Path) -> Path | None:
-    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
-    candidates = [
-        project_root / "assets" / icon_name,
-        project_root / "assets" / "icon.svg",
-    ]
-    if getattr(sys, "frozen", False):
-        base = Path(getattr(sys, "_MEIPASS", project_root))
-        exe_dir = Path(sys.executable).resolve().parent
-        candidates.extend(
-            [
-                base / "assets" / icon_name,
-                base / "assets" / "icon.svg",
-                exe_dir / "assets" / icon_name,
-                exe_dir / "assets" / "icon.svg",
-            ]
-        )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QCoreApplication
-from PySide6.QtGui import QGuiApplication, QSurfaceFormat, QIcon
+from PySide6.QtGui import QSurfaceFormat, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
@@ -13,12 +13,14 @@ try:
     from .i18n import preview_labels, text
     from .title_bar import TitleBar
     from .vtk_viewer import VtkStlViewer
+    from .ui_support import center_window, resolve_icon_path, resolve_project_root
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[1]))
     from stencilforge.i18n import preview_labels, text
     from stencilforge.title_bar import TitleBar
     from stencilforge.vtk_viewer import VtkStlViewer
+    from stencilforge.ui_support import center_window, resolve_icon_path, resolve_project_root
 
 
 def main() -> int:
@@ -56,9 +58,9 @@ def main() -> int:
     window.setWindowTitle(labels["title"])
     window.setWindowFlag(Qt.FramelessWindowHint, True)
     window.setWindowFlag(Qt.Window, True)
-    _center_window(window, target_size=(980, 760))
-    project_root = Path(__file__).resolve().parents[2]
-    icon_path = _resolve_icon_path(project_root)
+    center_window(window, target_size=(980, 760))
+    project_root = resolve_project_root()
+    icon_path = resolve_icon_path(project_root)
     if icon_path is not None:
         icon = QIcon(str(icon_path))
         app.setWindowIcon(icon)
@@ -101,44 +103,5 @@ def main() -> int:
     window.show()
     viewer.load_stl(str(stl_path))
     return app.exec()
-
-
-def _center_window(window: QMainWindow, target_size: tuple[int, int]) -> None:
-    screen = QGuiApplication.primaryScreen()
-    if screen is None:
-        window.resize(*target_size)
-        return
-    geometry = screen.availableGeometry()
-    width = min(target_size[0], max(geometry.width(), 1))
-    height = min(target_size[1], max(geometry.height(), 1))
-    window.resize(width, height)
-    x = geometry.x() + max((geometry.width() - width) // 2, 0)
-    y = geometry.y() + max((geometry.height() - height) // 2, 0)
-    window.move(x, y)
-
-
-def _resolve_icon_path(project_root: Path) -> Path | None:
-    icon_name = "icon.ico" if sys.platform == "win32" else "icon.svg"
-    candidates = [
-        project_root / "assets" / icon_name,
-        project_root / "assets" / "icon.svg",
-    ]
-    if getattr(sys, "frozen", False):
-        base = Path(getattr(sys, "_MEIPASS", project_root))
-        exe_dir = Path(sys.executable).resolve().parent
-        candidates.extend(
-            [
-                base / "assets" / icon_name,
-                base / "assets" / "icon.svg",
-                exe_dir / "assets" / icon_name,
-                exe_dir / "assets" / "icon.svg",
-            ]
-        )
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
