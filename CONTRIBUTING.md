@@ -2,21 +2,21 @@
 
 Language: English | [简体中文](CONTRIBUTING.zh-CN.md)
 
-Thanks for taking the time to contribute!
+Thanks for taking the time to contribute.
 
 ## Before you start
 
 - Search existing issues and pull requests first.
-- Keep discussions respectful (see `CODE_OF_CONDUCT.md`).
+- Keep discussions respectful. See `CODE_OF_CONDUCT.md`.
 
 ## Workflow
 
-1. Open an issue describing the change (bug / feature / docs).
-2. If it’s accepted, open a pull request referencing the issue.
+1. Open an issue describing the change.
+2. If the change is accepted, open a pull request that references the issue.
 
-## Commit messages & PR titles
+## Commit messages and PR titles
 
-This template recommends using the Conventional Commits style:
+This project follows Conventional Commits:
 
 `<type>(optional scope): <description>`
 
@@ -24,26 +24,31 @@ Common types:
 
 - `feat`: a new feature
 - `fix`: a bug fix
-- `chore`: maintenance tasks (deps, tooling, refactors without behavior change)
-- `docs`: documentation only changes
+- `chore`: maintenance, dependency updates, tooling, and refactors without behavior changes
+- `docs`: documentation only
+- `refactor`: code restructuring without behavior changes
+- `test`: tests
+- `ci`: CI changes
 
-Bilingual commit messages (recommended):
+Bilingual commit messages are recommended:
 
-- Keep the subject in English (best compatibility with tools)
-- Add a short Chinese summary in the commit body
+- Keep the subject in English for tool compatibility.
+- Add a short Chinese summary in the body.
 
 Examples:
 
-- `feat: add export endpoint` + body: `增加导出接口`
-- `chore: bump dependencies` + body: `升级依赖`
+- `feat: add export endpoint`
+- `chore: bump dependencies`
 
-Optional: enable the commit message template:
+Optional: enable the commit message template with:
 
-- `git config commit.template .gitmessage`
+```bash
+git config commit.template .gitmessage
+```
 
 ## Pull request checklist
 
 - Clear description of what changed and why
-- Tests updated/added (if applicable)
-- Docs updated (if applicable)
+- Tests updated or added, if applicable
+- Docs updated, if applicable
 - Small, focused diffs whenever possible

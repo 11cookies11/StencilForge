@@ -1,4 +1,4 @@
-# StencilForge 🛠️
+# StencilForge
 
 <p align="left">
   <a href="https://github.com/11cookies11/StencilForge">
@@ -26,30 +26,21 @@
   <img alt="StencilForge logo" src="assets/store/logo_1080x1080.png" width="220">
 </p>
 
-```text
-+--------------------------------------------------+
-|  StencilForge                                    |
-|  PCB Stencil + Fixture Generator (Gerber -> STL) |
-+--------------------------------------------------+
-```
+StencilForge is a desktop tool for generating PCB stencil STL models from Gerber inputs.
 
-Language: English | [简体中文](README.zh-CN.md)
+## Overview
 
-## Overview ✨
+StencilForge converts Gerber and Excellon exports into 3D STL models for PCB stencils and locator fixtures. It supports a desktop UI, configurable geometry processing, and both CadQuery and Trimesh backends.
 
-StencilForge converts Gerber + Excellon exports into 3D STL models for
-PCB stencils and locator fixtures. It targets common EDA exports while
-keeping the pipeline generic and configurable.
+## Highlights
 
-## Highlights 🚀
-
-- Fast Gerber -> STL pipeline
+- Fast Gerber to STL pipeline
 - CadQuery or Trimesh backend
 - Stencil cutouts with configurable offsets
 - Locator structure: step or wall
-- VTK preview window (no WebGL)
+- VTK preview window without WebGL
 
-## Gallery 🖼️
+## Gallery
 
 **Printed stencil**
 ![Printed stencil](assets/images/实物照片.jpg)
@@ -60,9 +51,9 @@ keeping the pipeline generic and configurable.
 **STL preview**
 ![STL preview](assets/images/预览照片.png)
 
-## Quick start ⚡
+## Quick start
 
-1. Create a venv and install deps: `pip install -r requirements.txt`
+1. Create a virtual environment and install dependencies: `pip install -r requirements.txt`
 2. Install the package: `pip install -e .`
 3. Update `config/stencilforge.json` as needed
 4. Run:
@@ -71,7 +62,7 @@ keeping the pipeline generic and configurable.
 stencilforge <gerber_dir> <output_stl>
 ```
 
-## UI (Vue + PySide6 + Qt WebEngine) 🧭
+## UI
 
 Build the UI:
 
@@ -87,40 +78,40 @@ Launch the desktop UI:
 stencilforge-ui
 ```
 
-## Config parameters 🧰
+## Config parameters
 
-- `paste_patterns`: paste layer file patterns (top paste default)
-- `outline_patterns`: board outline patterns
+- `paste_patterns`: paste layer file patterns
+- `outline_patterns`: board outline layer patterns
 - `thickness_mm`: stencil thickness
-- `paste_offset_mm`: shrink/expand opening (negative shrinks)
+- `paste_offset_mm`: aperture offset, negative values shrink openings
 - `outline_margin_mm`: fallback outline margin when no outline file exists
 - `output_mode`: `holes_only` or `solid_with_cutouts`
 - `model_backend`: `trimesh` or `cadquery`
-- `locator_enabled`: enable locator structure
-- `locator_mode`: `step` (recess) or `wall` (frame)
-- `locator_height_mm`: wall height
-- `locator_width_mm`: wall width
-- `locator_clearance_mm`: clearance gap
-- `locator_step_height_mm`: step height (PCB recess)
-- `locator_step_width_mm`: step width (expands outward)
+- `locator_enabled`: enable the locator structure
+- `locator_mode`: `step` or `wall`
+- `locator_height_mm`: locator wall height
+- `locator_width_mm`: locator wall width
+- `locator_clearance_mm`: locator clearance gap
+- `locator_step_height_mm`: locator step height
+- `locator_step_width_mm`: locator step width
 - `locator_open_side`: open side (`none/top/right/bottom/left`)
 - `locator_open_width_mm`: open width
-- `stl_linear_deflection`: STL linear deflection (mm, smaller = finer)
-- `stl_angular_deflection`: STL angular deflection (radians)
-- `arc_steps`: number of steps to approximate arcs
-- `curve_resolution`: buffer resolution for circles
-- `qfn_regen_enabled`: enable QFN paste regeneration
-- `qfn_min_feature_mm`: minimum printable feature for FDM
-- `qfn_confidence_threshold`: confidence threshold to modify apertures
-- `qfn_max_pad_width_mm`: max pad width to consider as QFN pad
+- `stl_linear_deflection`: STL linear deflection in mm
+- `stl_angular_deflection`: STL angular deflection in radians
+- `arc_steps`: number of arc approximation steps
+- `curve_resolution`: circle buffer resolution
+- `qfn_regen_enabled`: enable QFN aperture regeneration
+- `qfn_min_feature_mm`: minimum printable feature size
+- `qfn_confidence_threshold`: confidence threshold for QFN regeneration
+- `qfn_max_pad_width_mm`: maximum pad width considered for QFN
 
-## Conventions (recommended) 📌
+## Conventions
 
-- Changelog: `CHANGELOG.md` (Keep a Changelog style)
-- Commit messages & PR titles: Conventional Commits (e.g. `feat:`, `fix:`, `chore:`)
+- Changelog: `CHANGELOG.md`
+- Commit messages and PR titles: Conventional Commits
 - Community docs: `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`
-- Issue / PR templates: `.github/`
+- Issue and PR templates: `.github/`
 
-## License 📄
+## License
 
 GPL-3.0-only. See `LICENSE`.
