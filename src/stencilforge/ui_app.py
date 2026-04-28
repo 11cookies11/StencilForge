@@ -215,6 +215,7 @@ class BackendBridge(QObject):
 
     def attach_window(self, window: QMainWindow) -> None:
         self._window = window
+        self._apply_window_locale()
 
     def _apply_preview_locale(self) -> None:
         if self._external_preview:
@@ -235,6 +236,10 @@ class BackendBridge(QObject):
             action = self._preview_ui.get(key)
             if action is not None:
                 action.setText(labels[action_name])
+
+    def _apply_window_locale(self) -> None:
+        if self._window is not None:
+            self._window.setWindowTitle(self._tr("app.title"))
 
     def _log_line(self, message: str) -> None:
         if not self._log_path:
@@ -363,6 +368,7 @@ class BackendBridge(QObject):
     def setLocale(self, locale: str) -> None:
         self._locale = normalize_locale(locale)
         self._apply_preview_locale()
+        self._apply_window_locale()
 
     def _runtime_config_for_job(self, config_path: str) -> StencilConfig:
         if not config_path:
@@ -902,7 +908,7 @@ def main() -> int:
         raise FileNotFoundError(text(startup_locale, "ui.ui_dist_missing", paths=joined))
 
     window = MainWindow(drag_height=64, button_margin=190)
-    window.setWindowTitle("StencilForge")
+    window.setWindowTitle(text(normalize_locale(os.environ.get("STENCILFORGE_LOCALE")), "app.title"))
     if icon_path is not None:
         window.setWindowIcon(QIcon(str(icon_path)))
     window.setWindowFlag(Qt.FramelessWindowHint, True)

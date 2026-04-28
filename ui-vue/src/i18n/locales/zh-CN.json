@@ -1,4 +1,5 @@
 {
+  "app.title": "StencilForge",
   "app.tagline": "PCB 钢网与治具生成器",
   "language.label": "语言",
   "language.zh": "简体中文",

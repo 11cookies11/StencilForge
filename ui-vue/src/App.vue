@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col bg-slate-50 text-slate-800 pb-32">
     <AppHeader
-      :app-title="'StencilForge'"
+      :app-title="t('app.title')"
       :tagline="t('app.tagline')"
       :locale="locale"
       :locale-options="localeOptions"

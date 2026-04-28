@@ -89,7 +89,7 @@ export default {
   props: {
     appTitle: {
       type: String,
-      default: "StencilForge",
+      default: "",
     },
     tagline: {
       type: String,

@@ -1,4 +1,5 @@
 {
+  "app.title": "StencilForge",
   "app.tagline": "PCB ステンシルと治具の生成ツール",
   "language.label": "言語",
   "language.zh": "簡体字中国語",

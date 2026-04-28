@@ -1,4 +1,5 @@
 {
+  "app.title": "StencilForge",
   "app.tagline": "Generador de plantillas y fijaciones para PCB",
   "language.label": "Idioma",
   "language.zh": "Chino simplificado",

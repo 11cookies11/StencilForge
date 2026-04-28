@@ -1,4 +1,5 @@
 {
+  "app.title": "StencilForge",
   "app.tagline": "PCB stencil and fixture generator",
   "language.label": "Language",
   "language.zh": "Simplified Chinese",
