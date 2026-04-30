@@ -487,14 +487,14 @@
 import AppIcon from "./components/AppIcon.vue";
 import AppHeader from "./components/AppHeader.vue";
 import AppSelect from "./components/AppSelect.vue";
-import { getInitialLocale, t as translate } from "./i18n";
+import { getInitialLocale, getLocaleDisplayName, t as translate } from "./i18n";
 
 const LOCALE_OPTIONS = [
-  { value: "zh-CN", labelKey: "language.zh" },
-  { value: "en", labelKey: "language.en" },
-  { value: "ja", labelKey: "language.ja" },
-  { value: "de", labelKey: "language.de" },
-  { value: "es", labelKey: "language.es" },
+  { value: "zh-CN" },
+  { value: "en" },
+  { value: "ja" },
+  { value: "de" },
+  { value: "es" },
 ];
 
 const DEFAULT_CONFIG = {
@@ -569,12 +569,11 @@ export default {
     localeOptions() {
       return LOCALE_OPTIONS.map((item) => ({
         ...item,
-        label: this.t(item.labelKey),
+        label: getLocaleDisplayName(item.value),
       }));
     },
     currentLocaleLabel() {
-      const current = this.localeOptions.find((item) => item.value === this.locale);
-      return current ? current.label : this.t("language.en");
+      return getLocaleDisplayName(this.locale);
     },
     statusLabel() {
       const map = {

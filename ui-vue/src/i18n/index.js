@@ -6,6 +6,13 @@ import zhCN from "./locales/zh-CN.json";
 
 export const DEFAULT_LOCALE = "en";
 export const SUPPORTED_LOCALES = ["zh-CN", "en", "ja", "de", "es"];
+export const LOCALE_DISPLAY_NAMES = {
+  "zh-CN": "简体中文",
+  en: "English",
+  ja: "日本語",
+  de: "Deutsch",
+  es: "Español",
+};
 
 const MESSAGES = {
   "zh-CN": zhCN,
@@ -39,6 +46,11 @@ export function getInitialLocale() {
     return normalizeLocale(lang);
   }
   return DEFAULT_LOCALE;
+}
+
+export function getLocaleDisplayName(locale) {
+  const normalized = normalizeLocale(locale);
+  return LOCALE_DISPLAY_NAMES[normalized] || LOCALE_DISPLAY_NAMES[DEFAULT_LOCALE];
 }
 
 export function t(locale, key, vars = {}) {
