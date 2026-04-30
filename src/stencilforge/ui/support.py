@@ -119,9 +119,10 @@ def fit_to_screen(
     if screen is None:
         widget.resize(*max_size)
         return
+    screen_geometry = screen.geometry()
     available = screen.availableGeometry()
-    avail_w = max(available.width(), 1)
-    avail_h = max(available.height(), 1)
+    avail_w = max(screen_geometry.width(), 1)
+    avail_h = max(screen_geometry.height(), 1)
     safe_w = max(avail_w - edge_margin * 2, 1)
     safe_h = max(avail_h - edge_margin * 2, 1)
 

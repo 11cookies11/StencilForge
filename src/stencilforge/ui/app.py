@@ -494,6 +494,20 @@ class BackendBridge(QObject):
         self._show_preview()
 
     @Slot(str)
+    def openPreviewOrPick(self, path: str) -> None:
+        if path:
+            self.loadPreviewStl(path)
+            return
+        if self._last_preview_path and Path(self._last_preview_path).exists():
+            self._show_preview()
+            return
+        picked = self.pickStlFile()
+        if picked:
+            self.loadPreviewStl(picked)
+            return
+        self._emit_log(preview_labels(self._locale)["no_preview_path"])
+
+    @Slot(str)
     def loadPreviewStl(self, path: str) -> None:
         if not path:
             self._emit_log(self._tr("ui.preview_path_empty"))
@@ -512,6 +526,28 @@ class BackendBridge(QObject):
             return
         self._preview_viewer.load_stl(path)
         self._show_preview()
+
+    @Slot()
+    def openTargetFolder(self) -> None:
+        target = self._remembered_dir("output_dir") or default_export_dir()
+        if not target.exists():
+            self._emit_log(self._tr("ui.preview_open_folder_failed", path=str(target)))
+            return
+        if not self._open_folder(target):
+            self._emit_log(self._tr("ui.preview_open_folder_failed", path=str(target)))
+
+    def _open_folder(self, target: Path) -> bool:
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(target))
+                return True
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", str(target)])
+                return True
+            subprocess.Popen(["xdg-open", str(target)])
+            return True
+        except Exception:
+            return QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
 
     def _launch_external_preview(self, path: str) -> None:
         if not Path(path).exists():
@@ -888,6 +924,8 @@ def main() -> int:
         startup_locale = normalize_locale(os.environ.get("STENCILFORGE_LOCALE"))
         raise FileNotFoundError(text(startup_locale, "ui.ui_dist_missing", paths=joined))
 
+    startup_min_size = (760, 540)
+    resize_min_size = (800, 400)
     window = MainWindow(drag_height=64, button_margin=190)
     window.setWindowTitle(text(normalize_locale(os.environ.get("STENCILFORGE_LOCALE")), "app.title"))
     if icon_path is not None:
@@ -896,6 +934,7 @@ def main() -> int:
     window.setWindowFlag(Qt.Window, True)
     window.setWindowFlag(Qt.WindowSystemMenuHint, True)
     window.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
+    window.setMinimumSize(*resize_min_size)
     view = WebView(window, drag_height=1, button_margin=190)
     view.setZoomFactor(0.8)
     settings = view.settings()
@@ -912,7 +951,7 @@ def main() -> int:
     window.setCentralWidget(view)
     backend.attach_window(window)
 
-    fit_to_screen(window, max_ratio=(0.88, 0.82), max_size=(1280, 820), min_size=(980, 680), edge_margin=20)
+    fit_to_screen(window, max_ratio=(0.80, 0.80), max_size=(1120, 760), min_size=startup_min_size, edge_margin=20)
     window.show()
     return app.exec()
 
