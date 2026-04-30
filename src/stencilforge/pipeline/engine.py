@@ -73,7 +73,6 @@ class TrimeshEngine:
             t0 = time.perf_counter()
             step_mesh = extrude_geometry(data.locator_step_geom, cfg.locator_step_height_mm)
             logger.info("Locator step extrusion in %.3fs", time.perf_counter() - t0)
-            step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
             mesh = trimesh.util.concatenate([mesh, step_mesh])
 
         logger.info("Cleaning mesh...")
@@ -155,7 +154,6 @@ class SfMeshEngine:
             step_geom = _prepare_sfmesh_geometry(data.locator_step_geom, cfg, preserve_holes=False)
             step_mesh = _extrude_with_cdt(step_geom, cfg.locator_step_height_mm)
             logger.info("sfmesh locator step extrusion in %.3fs", time.perf_counter() - t0)
-            step_mesh.apply_translation((0, 0, -cfg.locator_step_height_mm))
             mesh = trimesh.util.concatenate([mesh, step_mesh])
 
         critical_hole_width = _critical_hole_width_mm(base_geom, cfg.sfmesh_hole_protect_max_width_mm)

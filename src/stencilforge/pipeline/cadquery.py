@@ -76,7 +76,7 @@ def export_cadquery_stl(
             locator_step_geom, config.locator_step_height_mm, cq, config
         )
         for solid in step_solids:
-            solids.append(solid.translate((0, 0, -config.locator_step_height_mm)))
+            solids.append(solid)
 
     if not solids:
         raise ValueError("Failed to create CadQuery solids from geometry.")

@@ -3,11 +3,20 @@
 from pathlib import Path
 
 import pytest
-from shapely.geometry import Polygon
+
+pytest.importorskip("shapely")
+from shapely.geometry import Polygon, box
 import trimesh
 
 from stencilforge.config import StencilConfig
-from stencilforge.pipeline.engine import EngineExportInput, _adaptive_voxel_pitch, get_model_engine
+from stencilforge.pipeline.engine import (
+    EngineExportInput,
+    SfMeshEngine,
+    TrimeshEngine,
+    _adaptive_voxel_pitch,
+    get_model_engine,
+)
+from stencilforge.pipeline.locator import build_locator_step
 
 
 def test_sfmesh_engine_exports_stl_binary(tmp_path: Path) -> None:
@@ -174,3 +183,43 @@ def test_sfmesh_chunked_watertight_exports_mesh(tmp_path: Path) -> None:
     assert out.exists()
     mesh = trimesh.load_mesh(out, force="mesh")
     assert int(mesh.faces.shape[0]) > 0
+
+
+@pytest.mark.parametrize("engine_cls", [TrimeshEngine, SfMeshEngine])
+def test_locator_step_keeps_same_base_plane(tmp_path: Path, engine_cls) -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "thickness_mm": 0.12,
+            "locator_step_height_mm": 1.0,
+            "locator_step_width_mm": 1.5,
+            "locator_clearance_mm": 0.2,
+        }
+    )
+    cfg.validate()
+
+    outline = box(0, 0, 20, 20)
+    step_geom = build_locator_step(
+        outline,
+        cfg.locator_clearance_mm,
+        cfg.locator_step_width_mm,
+        cfg.locator_open_side,
+        cfg.locator_open_width_mm,
+    )
+    out = tmp_path / f"{engine_cls.__name__.lower()}_step.stl"
+
+    engine = engine_cls()
+    engine.export(
+        EngineExportInput(
+            stencil_2d=outline,
+            locator_geom=None,
+            locator_step_geom=step_geom,
+            output_path=out,
+            config=cfg,
+        )
+    )
+
+    mesh = trimesh.load_mesh(out, force="mesh")
+    bounds = mesh.bounds
+    assert bounds is not None
+    assert float(bounds[0][2]) == pytest.approx(0.0, abs=1e-6)
+    assert float(bounds[1][2]) == pytest.approx(max(cfg.thickness_mm, cfg.locator_step_height_mm), rel=0.05, abs=0.02)
