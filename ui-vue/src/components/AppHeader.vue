@@ -5,11 +5,16 @@
     @dblclick="$emit('titlebar-double-click', $event)"
   >
     <div class="w-full h-full flex items-center justify-between px-4 sm:px-6">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
-          <AppIcon name="view_in_ar" class="text-white" :size="20" />
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center overflow-hidden">
+          <img
+            alt=""
+            aria-hidden="true"
+            class="w-full h-full object-contain"
+            src="/stencilforge-logo.png"
+          />
         </div>
-        <span class="text-xl font-bold tracking-tight text-slate-900">{{ appTitle }}</span>
+        <span class="text-lg sm:text-xl font-bold tracking-tight text-slate-900">{{ appTitle }}</span>
       </div>
       <div class="flex items-center gap-4">
         <div class="text-xs text-slate-400 hidden sm:block">{{ tagline }}</div>

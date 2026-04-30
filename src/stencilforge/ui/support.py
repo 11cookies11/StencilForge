@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QCursor, QGuiApplication, QScreen
 from PySide6.QtWidgets import QDialog, QMainWindow
 
 from ..config import StencilConfig
@@ -13,7 +13,7 @@ from ..config import StencilConfig
 def resolve_project_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[3]
 
 
 def ui_dist_candidates(project_root: Path) -> list[Path]:
@@ -101,27 +101,37 @@ def resolve_icon_path(project_root: Path) -> Path | None:
     return None
 
 
+def resolve_active_screen() -> QScreen | None:
+    screen = QGuiApplication.screenAt(QCursor.pos())
+    if screen is not None:
+        return screen
+    return QGuiApplication.primaryScreen()
+
+
 def fit_to_screen(
     widget: QDialog | QMainWindow,
     max_ratio: tuple[float, float],
     max_size: tuple[int, int],
     min_size: tuple[int, int],
+    edge_margin: int = 16,
 ) -> None:
-    screen = QGuiApplication.primaryScreen()
+    screen = resolve_active_screen()
     if screen is None:
         widget.resize(*max_size)
         return
     available = screen.availableGeometry()
     avail_w = max(available.width(), 1)
     avail_h = max(available.height(), 1)
+    safe_w = max(avail_w - edge_margin * 2, 1)
+    safe_h = max(avail_h - edge_margin * 2, 1)
 
-    min_w = max(1, min(min_size[0], avail_w))
-    min_h = max(1, min(min_size[1], avail_h))
+    min_w = max(1, min(min_size[0], safe_w))
+    min_h = max(1, min(min_size[1], safe_h))
 
-    width = min(int(avail_w * max_ratio[0]), max_size[0], avail_w)
-    height = min(int(avail_h * max_ratio[1]), max_size[1], avail_h)
-    width = min(max(width, min_w), avail_w)
-    height = min(max(height, min_h), avail_h)
+    width = min(int(avail_w * max_ratio[0]), max_size[0], safe_w)
+    height = min(int(avail_h * max_ratio[1]), max_size[1], safe_h)
+    width = min(max(width, min_w), safe_w)
+    height = min(max(height, min_h), safe_h)
     widget.resize(width, height)
     x = available.x() + max((available.width() - width) // 2, 0)
     y = available.y() + max((available.height() - height) // 2, 0)
@@ -129,7 +139,7 @@ def fit_to_screen(
 
 
 def center_window(window: QMainWindow, target_size: tuple[int, int]) -> None:
-    screen = QGuiApplication.primaryScreen()
+    screen = resolve_active_screen()
     if screen is None:
         window.resize(*target_size)
         return
