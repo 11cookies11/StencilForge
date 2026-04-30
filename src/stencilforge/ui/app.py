@@ -770,28 +770,9 @@ class WebView(QWebEngineView):
         self._button_margin = button_margin
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
-        if event.button() == Qt.LeftButton:
-            pos = event.position().toPoint()
-            if pos.y() <= self._drag_height:
-                if pos.x() < max(self.width() - self._button_margin, 0):
-                    handle = self._window.windowHandle()
-                    if handle is not None:
-                        handle.startSystemMove()
-                        event.accept()
-                        return
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802
-        if event.button() == Qt.LeftButton:
-            pos = event.position().toPoint()
-            if pos.y() <= self._drag_height:
-                if pos.x() < max(self.width() - self._button_margin, 0):
-                    if self._window.isMaximized():
-                        self._window.showNormal()
-                    else:
-                        self._window.showMaximized()
-                    event.accept()
-                    return
         super().mouseDoubleClickEvent(event)
 
     def nativeEvent(self, eventType, message):  # noqa: N802
@@ -916,6 +897,7 @@ def main() -> int:
     window.setWindowFlag(Qt.WindowSystemMenuHint, True)
     window.setWindowFlag(Qt.WindowMinMaxButtonsHint, True)
     view = WebView(window, drag_height=1, button_margin=190)
+    view.setZoomFactor(0.8)
     settings = view.settings()
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessFileUrls, True)
     settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
@@ -930,7 +912,7 @@ def main() -> int:
     window.setCentralWidget(view)
     backend.attach_window(window)
 
-    fit_to_screen(window, max_ratio=(0.9, 0.85), max_size=(1280, 820), min_size=(980, 680))
+    fit_to_screen(window, max_ratio=(0.88, 0.82), max_size=(1280, 820), min_size=(980, 680), edge_margin=20)
     window.show()
     return app.exec()
 
@@ -950,7 +932,7 @@ def _build_preview_dialog() -> tuple[QDialog, "VtkStlViewer", dict]:
     dialog = QDialog()
     dialog.setWindowTitle(labels["title"])
     dialog.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-    fit_to_screen(dialog, max_ratio=(0.8, 0.8), max_size=(980, 760), min_size=(720, 540))
+    fit_to_screen(dialog, max_ratio=(0.78, 0.78), max_size=(980, 760), min_size=(720, 540), edge_margin=20)
     dialog.setStyleSheet(
         "QDialog { background-color: #f8fafc; }"
         "QToolBar { background-color: #ffffff; border-bottom: 1px solid #e5e7eb; }"
