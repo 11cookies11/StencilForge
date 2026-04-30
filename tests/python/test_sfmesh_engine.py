@@ -205,6 +205,12 @@ def test_locator_step_keeps_same_base_plane(tmp_path: Path, engine_cls) -> None:
         cfg.locator_open_side,
         cfg.locator_open_width_mm,
     )
+    step_bounds = step_geom.bounds
+    assert step_bounds is not None
+    assert float(step_bounds[0]) == pytest.approx(-1.7, abs=1e-6)
+    assert float(step_bounds[1]) == pytest.approx(-1.7, abs=1e-6)
+    assert float(step_bounds[2]) == pytest.approx(21.7, abs=1e-6)
+    assert float(step_bounds[3]) == pytest.approx(21.7, abs=1e-6)
     out = tmp_path / f"{engine_cls.__name__.lower()}_step.stl"
 
     engine = engine_cls()
