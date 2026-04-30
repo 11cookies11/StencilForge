@@ -10,6 +10,9 @@ Thumbs.db
 .idea/
 .vscode/
 .venv/
+.where/
+.where-history.json
+AGENTS.md
 
 # Python
 __pycache__/
