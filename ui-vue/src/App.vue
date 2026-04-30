@@ -18,7 +18,7 @@
       @window-close="windowClose"
     />
 
-    <main class="flex-1 w-full max-w-7xl mx-auto px-6 md:px-8 py-10 pt-12 pb-32">
+    <main class="flex-1 w-full max-w-6xl mx-auto px-6 md:px-8 py-10 pt-12 pb-32">
       <section v-show="currentTab === 'upload'" class="space-y-8">
         <div class="text-center space-y-2">
           <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("upload.title") }}</h1>
@@ -118,31 +118,51 @@
         </div>
       </section>
 
-      <section v-show="currentTab === 'config'" class="space-y-6">
-        <div class="text-center space-y-2">
-          <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("config.title") }}</h1>
-          <p class="text-slate-500">{{ t("config.subtitle") }}</p>
+      <section v-show="currentTab === 'config'" class="space-y-5">
+        <div class="max-w-3xl mx-auto space-y-1 text-center">
+          <h1 class="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{{ t("config.title") }}</h1>
+          <p class="text-sm md:text-base text-slate-500">{{ t("config.subtitle") }}</p>
         </div>
-        <div :class="['grid gap-6', showAdvancedConfig ? 'md:grid-cols-2' : 'grid-cols-1']">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-xs text-slate-400">{{ t("config.recommendedHint") }}</p>
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                  @click="restoreBasicDefaults"
-                >
-                  {{ t("config.restoreBasicDefaults") }}
-                </button>
-                <button
-                  class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-blue-600 hover:bg-blue-50"
-                  @click="showAdvancedConfig = !showAdvancedConfig"
-                >
-                  {{ showAdvancedConfig ? t("config.hideAdvanced") : t("config.showAdvanced") }}
-                </button>
-              </div>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 md:p-6 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-2 rounded-2xl bg-slate-100 p-1">
+              <button
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all"
+                :class="configPanelTab === 'basic' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'"
+                type="button"
+                @click="configPanelTab = 'basic'"
+              >
+                <AppIcon name="tune" :size="18" />
+                <span>{{ t("config.panelTabProcess") }}</span>
+              </button>
+              <button
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all"
+                :class="configPanelTab === 'rules' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'"
+                type="button"
+                @click="configPanelTab = 'rules'"
+              >
+                <AppIcon name="rule" :size="18" />
+                <span>{{ t("config.panelTabAperture") }}</span>
+              </button>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                @click="restoreBasicDefaults"
+              >
+                {{ t("config.restoreBasicDefaults") }}
+              </button>
+              <button
+                class="px-3 h-8 rounded-lg border border-slate-200 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                @click="showAdvancedConfig = !showAdvancedConfig"
+              >
+                {{ showAdvancedConfig ? t("config.hideAdvanced") : t("config.showAdvanced") }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="configPanelTab === 'basic'" class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-2">
               <label class="text-xs font-semibold text-slate-600">{{ t("config.thickness") }}
                 <input
                   v-model.number="config.thickness_mm"
@@ -193,6 +213,7 @@
                 />
               </label>
             </div>
+
             <div class="pt-2 border-t border-slate-100 space-y-3">
               <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">
                 <input
@@ -203,7 +224,7 @@
                 />
                 {{ t("config.locatorEnabled") }}
               </label>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid gap-4 md:grid-cols-2">
                 <label class="text-xs font-semibold text-slate-600">{{ t("config.locatorMode") }}
                   <AppSelect
                     v-model="config.locator_mode"
@@ -247,17 +268,16 @@
                 </label>
               </div>
             </div>
-          </div>
-          <div v-if="showAdvancedConfig" class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5 space-y-5">
-            <div class="space-y-5">
+
+            <div v-if="showAdvancedConfig" class="space-y-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
               <div>
                 <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.advancedSection") }}</div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid gap-4 md:grid-cols-2">
                   <label class="text-xs font-semibold text-slate-600">{{ t("config.outlineMergeTol") }}
                     <input
                       v-model.number="config.outline_merge_tol_mm"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="0.01"
                       min="0"
@@ -267,7 +287,7 @@
                     <input
                       v-model.number="config.arc_steps"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="1"
                     />
@@ -276,7 +296,7 @@
                     <input
                       v-model.number="config.curve_resolution"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="1"
                     />
@@ -285,7 +305,7 @@
                     <input
                       v-model.number="config.locator_step_height_mm"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="0.1"
                       min="0"
@@ -295,7 +315,7 @@
                     <input
                       v-model.number="config.locator_step_width_mm"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="0.1"
                       min="0"
@@ -319,7 +339,7 @@
                     <input
                       v-model.number="config.locator_open_width_mm"
                       @change="updateConfig"
-                      class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+                      class="mt-1 w-full h-9 px-2 text-sm bg-white border border-slate-200 rounded-lg"
                       type="number"
                       step="0.1"
                       min="0"
@@ -327,59 +347,69 @@
                   </label>
                 </div>
               </div>
-              <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.pasteRules") }}</div>
-              <div class="space-y-2">
-                <div class="flex gap-2" v-for="(pattern, index) in config.paste_patterns" :key="'paste-' + index">
-                  <input
-                    v-model="config.paste_patterns[index]"
-                    @change="updateConfig"
-                    class="flex-1 h-8 px-2 text-sm bg-white border border-slate-200 rounded font-mono"
-                    type="text"
-                  />
-                  <button
-                    class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
-                    @click="removePattern('paste', index)"
-                  >
-                    <AppIcon name="close" :size="18" />
-                  </button>
+              <div>
+                <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.pasteRules") }}</div>
+                <div class="space-y-2">
+                  <div class="flex gap-2" v-for="(pattern, index) in config.paste_patterns" :key="'paste-' + index">
+                    <input
+                      v-model="config.paste_patterns[index]"
+                      @change="updateConfig"
+                      class="flex-1 h-8 px-2 text-sm bg-white border border-slate-200 rounded font-mono"
+                      type="text"
+                    />
+                    <button
+                      class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
+                      @click="removePattern('paste', index)"
+                    >
+                      <AppIcon name="close" :size="18" />
+                    </button>
+                  </div>
                 </div>
+                <button
+                  class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  @click="addPattern('paste')"
+                >
+                  <AppIcon name="add_circle" :size="16" />
+                  {{ t("config.addRule") }}
+                </button>
               </div>
-              <button
-                class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                @click="addPattern('paste')"
-              >
-                <AppIcon name="add_circle" :size="16" />
-                {{ t("config.addRule") }}
-              </button>
-            <div>
-              <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.outlineRules") }}</div>
-              <div class="space-y-2">
-                <div class="flex gap-2" v-for="(pattern, index) in config.outline_patterns" :key="'outline-' + index">
-                  <input
-                    v-model="config.outline_patterns[index]"
-                    @change="updateConfig"
-                    class="flex-1 h-8 px-2 text-sm bg-white border border-slate-200 rounded font-mono"
-                    type="text"
-                  />
-                  <button
-                    class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
-                    @click="removePattern('outline', index)"
-                  >
-                    <AppIcon name="close" :size="18" />
-                  </button>
+              <div>
+                <div class="text-xs font-semibold text-slate-500 uppercase mb-2">{{ t("config.outlineRules") }}</div>
+                <div class="space-y-2">
+                  <div class="flex gap-2" v-for="(pattern, index) in config.outline_patterns" :key="'outline-' + index">
+                    <input
+                      v-model="config.outline_patterns[index]"
+                      @change="updateConfig"
+                      class="flex-1 h-8 px-2 text-sm bg-white border border-slate-200 rounded font-mono"
+                      type="text"
+                    />
+                    <button
+                      class="size-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
+                      @click="removePattern('outline', index)"
+                    >
+                      <AppIcon name="close" :size="18" />
+                    </button>
+                  </div>
                 </div>
+                <button
+                  class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  @click="addPattern('outline')"
+                >
+                  <AppIcon name="add_circle" :size="16" />
+                  {{ t("config.addRule") }}
+                </button>
               </div>
-              <button
-                class="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                @click="addPattern('outline')"
-              >
-                <AppIcon name="add_circle" :size="16" />
-                {{ t("config.addRule") }}
-              </button>
             </div>
           </div>
+
+          <div v-else class="pt-0">
+            <ApertureRuleWorkspace
+              embedded
+              :locale="locale"
+              :stencil-thickness-mm="config.thickness_mm"
+            />
+          </div>
         </div>
-      </div>
       </section>
 
       <section v-show="currentTab === 'preview'" class="space-y-6">
@@ -387,33 +417,35 @@
           <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("preview.title") }}</h1>
           <p class="text-slate-500">{{ t("preview.subtitle") }}</p>
         </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-4">
-          <div class="text-sm text-slate-500">{{ t("preview.popupNote") }}</div>
-          <div class="text-xs text-slate-500">
-            {{ t("preview.currentStl", { value: outputPath || t("preview.notSet") }) }}
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 space-y-5">
+          <div class="space-y-4">
+            <div class="text-sm text-slate-500">{{ t("preview.popupNote") }}</div>
+            <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-4 space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">{{ t("preview.stlLabel") }}</div>
+              <div class="text-sm text-slate-700 break-all">
+                {{ outputPath || t("preview.notSet") }}
+              </div>
+            </div>
           </div>
-          <div class="flex flex-wrap gap-3">
-            <button class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold" @click="pickStlForPreview">
-              {{ t("preview.pickStl") }}
-            </button>
-            <button
-              class="px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-600"
-              @click="openPreview"
-            >
-              {{ t("preview.open") }}
-            </button>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-xs text-slate-500">{{ t("preview.subtitle") }}</p>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-semibold shadow-sm hover:bg-slate-50"
+                type="button"
+                @click="openPreviewFolder"
+              >
+                {{ t("preview.openFolder") }}
+              </button>
+              <button
+                class="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-primary text-white text-sm font-bold shadow-sm hover:bg-blue-700"
+                type="button"
+                @click="previewPrimaryAction"
+              >
+                {{ t("preview.pickStlAndOpen") }}
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section v-show="currentTab === 'export'" class="space-y-6">
-        <div class="text-center space-y-2">
-          <h1 class="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">{{ t("export.title") }}</h1>
-          <p class="text-slate-500">{{ t("export.subtitle") }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-6 flex items-center justify-between">
-          <div class="text-sm text-slate-500">{{ t("export.output", { value: outputPath || t("export.notSet") }) }}</div>
-          <button class="px-5 py-2 rounded-lg bg-primary text-white font-bold">{{ t("export.download") }}</button>
         </div>
       </section>
     </main>
@@ -474,10 +506,6 @@
           <AppIcon name="visibility" class="text-2xl mb-0.5" :size="24" />
           <span class="nav-label">{{ t("tabs.preview") }}</span>
         </button>
-        <button :class="navClass('export')" @click="setTab('export')">
-          <AppIcon name="download" class="text-2xl mb-0.5" :size="24" />
-          <span class="nav-label">{{ t("tabs.export") }}</span>
-        </button>
       </div>
     </nav>
   </div>
@@ -486,6 +514,7 @@
 <script>
 import AppIcon from "./components/AppIcon.vue";
 import AppHeader from "./components/AppHeader.vue";
+import ApertureRuleWorkspace from "./components/ApertureRuleWorkspace.vue";
 import AppSelect from "./components/AppSelect.vue";
 import { getInitialLocale, getLocaleDisplayName, t as translate } from "./i18n";
 
@@ -535,15 +564,17 @@ export default {
   components: {
     AppIcon,
     AppHeader,
+    ApertureRuleWorkspace,
     AppSelect,
   },
   data() {
     const locale = getInitialLocale();
-    return {
-      locale,
-      currentTab: "upload",
-      showAdvancedConfig: false,
-      backend: null,
+      return {
+        locale,
+        currentTab: "upload",
+        configPanelTab: "basic",
+        showAdvancedConfig: false,
+        backend: null,
       config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)),
       inputDir: "",
       outputPath: "",
@@ -828,6 +859,14 @@ export default {
     openPreview() {
       if (!this.backend) return;
       this.backend.openPreview();
+    },
+    openPreviewFolder() {
+      if (!this.backend) return;
+      this.backend.openTargetFolder();
+    },
+    previewPrimaryAction() {
+      if (!this.backend) return;
+      this.pickStlForPreview();
     },
     previewOutput() {
       if (!this.backend) return;
