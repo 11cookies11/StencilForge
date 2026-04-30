@@ -28,16 +28,16 @@
         </div>
       </div>
 
-      <div v-if="embedded" class="mt-2 inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl bg-slate-100 p-1">
+      <div v-if="embedded" class="mt-2 flex flex-wrap items-center gap-4 border-b border-slate-200 pb-2">
         <button
           v-for="tab in tabs"
           :key="tab.value"
-          class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all"
-          :class="studioTab === tab.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'"
+          class="inline-flex items-center gap-2 border-b-2 border-transparent px-1 py-2 text-sm font-medium transition-all"
+          :class="studioTab === tab.value ? 'border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-900'"
           type="button"
           @click="studioTab = tab.value"
         >
-          <AppIcon :name="tab.icon" :size="18" />
+          <AppIcon :name="tab.icon" :size="16" />
           <span>{{ tab.label }}</span>
         </button>
       </div>
@@ -138,7 +138,7 @@
                   {{ t("config.apertureSummaryThickness") }}
                 </div>
                 <div class="mt-2 flex items-center justify-between gap-3">
-                  <div class="whitespace-nowrap text-lg font-bold text-slate-900">{{ thicknessValue.toFixed(2) }} <span class="text-sm font-semibold text-slate-500">mm</span></div>
+                  <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ thicknessValue.toFixed(2) }} <span class="text-xs font-medium text-slate-500">mm</span></div>
                 </div>
                 <div class="absolute right-2 top-2 z-30">
                   <div class="relative">
@@ -173,7 +173,7 @@
                   {{ t("config.apertureSummaryRatio") }}
                 </div>
                 <div class="mt-2 flex items-center justify-between gap-3">
-                  <div class="whitespace-nowrap text-lg font-bold text-slate-900">{{ percentLabel(transferRatio) }}</div>
+                  <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ percentLabel(transferRatio) }}</div>
                 </div>
                 <div class="absolute right-2 top-2 z-30">
                   <div class="relative">
@@ -220,7 +220,7 @@
                 <div class="relative rounded-2xl bg-slate-50 p-4 pr-10">
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-sm font-semibold text-slate-600">{{ t("config.apertureRecommendedVolume") }}</span>
-                    <span class="text-lg font-bold text-slate-900 whitespace-nowrap">{{ formatVolume(recommendedVolumeMm3) }}</span>
+                    <span class="text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatVolume(recommendedVolumeMm3) }}</span>
                   </div>
                   <div class="absolute right-3 top-3">
                     <div class="relative">
@@ -251,11 +251,11 @@
                 <div class="grid grid-cols-2 gap-3">
                   <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePadArea") }}</div>
-                    <div class="mt-2 text-lg font-bold text-slate-900 whitespace-nowrap">{{ formatArea(padAreaMm2) }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatArea(padAreaMm2) }}</div>
                   </div>
                   <div class="rounded-2xl border border-slate-200 bg-white p-3.5">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureTargetArea") }}</div>
-                    <div class="mt-2 text-lg font-bold text-slate-900 whitespace-nowrap">{{ formatArea(targetOpenAreaMm2) }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatArea(targetOpenAreaMm2) }}</div>
                   </div>
                 </div>
               </div>
@@ -557,20 +557,20 @@
                 <div class="grid gap-3 md:grid-cols-2">
                   <div class="rounded-2xl bg-slate-50 p-4">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureTargetArea") }}</div>
-                    <div class="mt-2 text-2xl font-bold text-slate-900 whitespace-nowrap">{{ formatArea(targetOpenAreaMm2) }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatArea(targetOpenAreaMm2) }}</div>
                   </div>
                   <div class="rounded-2xl bg-slate-50 p-4">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureScaleRatio") }}</div>
-                    <div class="mt-2 text-2xl font-bold text-slate-900 whitespace-nowrap">{{ formatScale(recommendedScale) }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatScale(recommendedScale) }}</div>
                   </div>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureDelta") }}</div>
-                  <div class="mt-2 text-2xl font-bold text-slate-900 whitespace-nowrap">{{ formatDelta(recommendedDeltaMm) }}</div>
+                  <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatDelta(recommendedDeltaMm) }}</div>
                 </div>
                 <div class="rounded-2xl bg-slate-900 p-4 text-white">
                   <div class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">{{ t("config.apertureRulePreviewLine") }}</div>
-                  <div class="mt-2 font-mono text-sm leading-6 text-slate-200">
+                  <div class="mt-2 font-mono text-xs leading-5 text-slate-200">
                     {{ generatedRulePreview }}
                   </div>
                 </div>
@@ -628,16 +628,16 @@
                 </div>
                 <div class="rounded-2xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureEstimatedVolume") }}</div>
-                  <div class="mt-2 text-2xl font-bold text-slate-900 whitespace-nowrap">{{ formatVolume(effectiveTargetVolumeMm3) }}</div>
+                  <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatVolume(effectiveTargetVolumeMm3) }}</div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div class="rounded-2xl border border-slate-200 bg-white p-4">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureDifference") }}</div>
-                    <div class="mt-2 text-xl font-bold text-slate-900 whitespace-nowrap">{{ formatVolume(effectiveTargetVolumeMm3 - recommendedVolumeMm3) }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatVolume(effectiveTargetVolumeMm3 - recommendedVolumeMm3) }}</div>
                   </div>
                   <div class="rounded-2xl border border-slate-200 bg-white p-4">
                     <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureStatus") }}</div>
-                    <div class="mt-2 text-xl font-bold text-slate-900">{{ previewStatusLabel }}</div>
+                    <div class="mt-2 text-base font-semibold text-slate-900">{{ previewStatusLabel }}</div>
                   </div>
                 </div>
               </div>
