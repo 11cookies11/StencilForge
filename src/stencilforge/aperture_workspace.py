@@ -4,6 +4,9 @@ from copy import deepcopy
 from math import isfinite, sqrt
 from typing import Any
 
+APERTURE_WORKSPACE_FORMAT = "stencilforge.aperture_workspace"
+APERTURE_WORKSPACE_SCHEMA_VERSION = 1
+
 PACKAGE_FACTOR_MAP = {
     "QFN": 0.94,
     "BGA": 0.92,
@@ -151,6 +154,47 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
     }
 
 
+def export_aperture_workspace_payload(
+    data: dict[str, Any] | None,
+    stencil_thickness_mm: float | None = None,
+) -> dict[str, Any]:
+    workspace = normalize_aperture_workspace(data)
+    snapshot = compute_aperture_workspace(workspace, stencil_thickness_mm)
+    return {
+        "schemaVersion": APERTURE_WORKSPACE_SCHEMA_VERSION,
+        "kind": APERTURE_WORKSPACE_FORMAT,
+        "workspace": workspace,
+        "snapshot": {
+            "thicknessValue": snapshot["thicknessValue"],
+            "thicknessLabel": snapshot["thicknessLabel"],
+            "currentThicknessFactor": snapshot["currentThicknessFactor"],
+            "theoreticalVolumeMm3": snapshot["theoreticalVolumeMm3"],
+            "recommendedVolumeMm3": snapshot["recommendedVolumeMm3"],
+            "effectiveTargetVolumeMm3": snapshot["effectiveTargetVolumeMm3"],
+            "targetOpenAreaMm2": snapshot["targetOpenAreaMm2"],
+            "recommendedScale": snapshot["recommendedScale"],
+            "recommendedDeltaMm": snapshot["recommendedDeltaMm"],
+            "calculatorStatus": snapshot["calculatorStatus"],
+            "previewStatus": snapshot["previewStatus"],
+            "packageFactor": snapshot["packageFactor"],
+            "padTypeFactor": snapshot["padTypeFactor"],
+            "strategyFactor": snapshot["strategyFactor"],
+            "generatedRulePreview": snapshot["generatedRulePreview"],
+            "activeRuleMatchSummary": snapshot["activeRuleMatchSummary"],
+            "activeRuleActionSummary": snapshot["activeRuleActionSummary"],
+        },
+    }
+
+
+def import_aperture_workspace_payload(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return normalize_aperture_workspace(None)
+    workspace = data.get("workspace")
+    if isinstance(workspace, dict):
+        return normalize_aperture_workspace(workspace)
+    return normalize_aperture_workspace(data)
+
+
 def build_generated_rule_preview(workspace: dict[str, Any], recommended_delta_mm: float, recommended_scale: float) -> str:
     package = workspace.get("packageType", "Any")
     pad_type = workspace.get("padType", "Any")
@@ -179,7 +223,7 @@ def describe_match(rule: dict[str, Any] | None) -> str:
         parts.append(str(layer))
     if pad_size:
         parts.append(str(pad_size))
-    return " • ".join(parts) if parts else "Any"
+    return " · ".join(parts) if parts else "Any"
 
 
 def describe_action(rule: dict[str, Any] | None) -> str:

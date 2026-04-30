@@ -2,6 +2,7 @@
 
 import base64
 import ctypes
+import json
 import logging
 import os
 import multiprocessing as mp
@@ -36,6 +37,8 @@ try:
     from ..aperture_workspace import (
         compute_aperture_workspace,
         default_aperture_workspace,
+        export_aperture_workspace_payload,
+        import_aperture_workspace_payload,
         normalize_aperture_workspace,
     )
     from ..config import StencilConfig
@@ -60,6 +63,8 @@ except ImportError:
     from stencilforge.aperture_workspace import (
         compute_aperture_workspace,
         default_aperture_workspace,
+        export_aperture_workspace_payload,
+        import_aperture_workspace_payload,
         normalize_aperture_workspace,
     )
     from stencilforge.config import StencilConfig
@@ -395,6 +400,70 @@ class BackendBridge(QObject):
         self._aperture_workspace = self._normalize_aperture_workspace(default_aperture_workspace())
         self._save_aperture_workspace()
         self.apertureWorkspaceChanged.emit(self._aperture_snapshot())
+
+    @Slot(result=str)
+    def importApertureWorkspace(self) -> str:
+        start_dir = self._remembered_dir("aperture_rules_dir") or self._remembered_dir("config_dir")
+        if start_dir is None:
+            config_dir = StencilConfig.default_path(self._project_root).parent
+            fallback_dir = self._project_root / "config"
+            start_dir = config_dir if config_dir.exists() else fallback_dir
+        filename, _ = QFileDialog.getOpenFileName(
+            None,
+            self._tr("ui.pick_aperture_rules_import_title"),
+            str(start_dir),
+            "JSON Files (*.json)",
+        )
+        if not filename:
+            return ""
+        path = Path(filename)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            self._emit_log(self._tr("ui.config_not_found", path=filename))
+            return ""
+        except OSError as exc:
+            self._emit_log(self._tr("ui.read_file_failed", error=exc))
+            return ""
+        except json.JSONDecodeError as exc:
+            self._emit_log(self._tr("ui.aperture_workspace_import_invalid", error=exc))
+            return ""
+
+        imported = import_aperture_workspace_payload(payload)
+        self._aperture_workspace = self._normalize_aperture_workspace(imported)
+        self._save_aperture_workspace()
+        self._remember_path("aperture_rules_dir", filename)
+        snapshot = self._aperture_snapshot()
+        self.apertureWorkspaceChanged.emit(snapshot)
+        self._emit_log(self._tr("ui.aperture_workspace_imported", path=filename))
+        return filename
+
+    @Slot(result=str)
+    def exportApertureWorkspace(self) -> str:
+        start_dir = self._remembered_dir("aperture_rules_dir") or self._remembered_dir("config_dir")
+        if start_dir is None:
+            config_dir = StencilConfig.default_path(self._project_root).parent
+            fallback_dir = self._project_root / "config"
+            start_dir = config_dir if config_dir.exists() else fallback_dir
+        start_dir.mkdir(parents=True, exist_ok=True)
+        initial = start_dir / "aperture_rules.json"
+        filename, _ = QFileDialog.getSaveFileName(
+            None,
+            self._tr("ui.pick_aperture_rules_export_title"),
+            str(initial),
+            "JSON Files (*.json)",
+        )
+        if not filename:
+            return ""
+        payload = export_aperture_workspace_payload(self._aperture_workspace, self._config.thickness_mm)
+        try:
+            Path(filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError as exc:
+            self._emit_log(self._tr("ui.aperture_workspace_export_failed", error=exc))
+            return ""
+        self._remember_path("aperture_rules_dir", filename)
+        self._emit_log(self._tr("ui.aperture_workspace_exported", path=filename))
+        return filename
 
     @Slot(str)
     def setLocale(self, locale: str) -> None:

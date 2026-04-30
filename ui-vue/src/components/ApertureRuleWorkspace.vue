@@ -305,11 +305,19 @@
                 <p class="text-sm text-slate-500">{{ t("config.apertureRulesHint") }}</p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <button class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" type="button">
+                <button
+                  class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                  type="button"
+                  @click="importRulesFromBackend"
+                >
                   <AppIcon name="upload" :size="16" />
                   {{ t("config.apertureImportRules") }}
                 </button>
-                <button class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" type="button">
+                <button
+                  class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                  type="button"
+                  @click="exportRulesToBackend"
+                >
                   <AppIcon name="download" :size="16" />
                   {{ t("config.apertureExportRules") }}
                 </button>
@@ -1111,6 +1119,32 @@ priority: 100`;
       const index = this.rules.indexOf(this.activeRule);
       this.rules.splice(index, 1);
       this.selectedRuleId = this.rules[Math.max(0, index - 1)].id;
+    },
+    importRulesFromBackend() {
+      if (!this.backend || typeof this.backend.importApertureWorkspace !== "function") return;
+      this.backend.importApertureWorkspace((resultPath) => {
+        if (!resultPath) {
+          return;
+        }
+        if (typeof this.backend.getApertureWorkspace === "function") {
+          this.backend.getApertureWorkspace((snapshot) => {
+            this.applyWorkspaceSnapshot(snapshot || {});
+          });
+        }
+      });
+    },
+    exportRulesToBackend() {
+      if (!this.backend || typeof this.backend.exportApertureWorkspace !== "function") return;
+      this.backend.exportApertureWorkspace((resultPath) => {
+        if (!resultPath) {
+          return;
+        }
+        if (typeof this.backend.getApertureWorkspace === "function") {
+          this.backend.getApertureWorkspace((snapshot) => {
+            this.applyWorkspaceSnapshot(snapshot || {});
+          });
+        }
+      });
     },
     syncTargetToRecommended() {
       this.targetVolumeMm3 = Number(this.recommendedVolumeMm3.toFixed(3));
