@@ -60,7 +60,10 @@ def test_sfmesh_backend_maps_to_trimesh() -> None:
     cfg.validate()
 
 
-def test_ui_vtk_entry_point_module_exists() -> None:
+def test_ui_entry_point_modules_exist() -> None:
+    assert importlib.util.find_spec("stencilforge.ui.app") is not None
+    assert importlib.util.find_spec("stencilforge.ui.preview") is not None
+    assert importlib.util.find_spec("stencilforge.ui.vtk_app") is not None
     assert importlib.util.find_spec("stencilforge.ui_vtk_app") is not None
 
 

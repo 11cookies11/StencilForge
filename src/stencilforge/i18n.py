@@ -43,7 +43,7 @@ _MESSAGES = {
         "ui.terminate_pid_missing": "终止进程失败: 无法获取进程 ID。",
         "ui.stop_requested_waiting": "已请求停止，正在等待任务响应。",
         "ui.ui_dist_missing": "未找到 UI 构建产物，请确认安装包包含前端资源。\n已尝试路径:\n{paths}",
-        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.preview_usage": "Usage: python -m stencilforge.ui.preview <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
     "en": {
@@ -85,7 +85,7 @@ _MESSAGES = {
         "ui.terminate_pid_missing": "Failed to terminate process: missing process ID.",
         "ui.stop_requested_waiting": "Stop requested. Waiting for job to exit.",
         "ui.ui_dist_missing": "UI build artifacts not found. Ensure frontend assets are packaged.\nChecked paths:\n{paths}",
-        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.preview_usage": "Usage: python -m stencilforge.ui.preview <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
     "ja": {
@@ -127,7 +127,7 @@ _MESSAGES = {
         "ui.terminate_pid_missing": "プロセス終了に失敗しました: プロセス ID がありません。",
         "ui.stop_requested_waiting": "停止要求を受信しました。ジョブ終了を待機しています。",
         "ui.ui_dist_missing": "UI ビルド成果物が見つかりません。フロントエンド資産が同梱されているか確認してください。\n確認済みパス:\n{paths}",
-        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.preview_usage": "Usage: python -m stencilforge.ui.preview <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
     "de": {
@@ -169,7 +169,7 @@ _MESSAGES = {
         "ui.terminate_pid_missing": "Prozess konnte nicht beendet werden: Prozess-ID fehlt.",
         "ui.stop_requested_waiting": "Stopp angefordert. Warte auf Beendigung des Jobs.",
         "ui.ui_dist_missing": "UI-Build-Artefakte wurden nicht gefunden. Prüfen Sie, ob Frontend-Ressourcen enthalten sind.\nGeprüfte Pfade:\n{paths}",
-        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.preview_usage": "Usage: python -m stencilforge.ui.preview <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
     "es": {
@@ -211,7 +211,7 @@ _MESSAGES = {
         "ui.terminate_pid_missing": "No se pudo terminar el proceso: falta el ID del proceso.",
         "ui.stop_requested_waiting": "Se solicitó detener. Esperando a que el trabajo termine.",
         "ui.ui_dist_missing": "No se encontraron los artefactos de compilación de UI. Asegúrese de incluir los recursos frontend.\nRutas comprobadas:\n{paths}",
-        "cli.preview_usage": "Usage: python -m stencilforge.preview_app <stl_path>",
+        "cli.preview_usage": "Usage: python -m stencilforge.ui.preview <stl_path>",
         "cli.stl_not_found": "STL not found: {path}",
     },
 }

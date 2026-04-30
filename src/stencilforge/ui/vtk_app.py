@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .ui.app import main
+from .preview_app import main
 
 
 if __name__ == "__main__":

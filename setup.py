@@ -21,8 +21,8 @@ setup(
     entry_points={
         "console_scripts": [
             "stencilforge=stencilforge.cli:main",
-            "stencilforge-ui=stencilforge.ui_app:main",
-            "stencilforge-ui-vtk=stencilforge.ui_vtk_app:main",
+            "stencilforge-ui=stencilforge.ui.app:main",
+            "stencilforge-ui-vtk=stencilforge.ui.vtk_app:main",
         ]
     },
 )

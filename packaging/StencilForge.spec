@@ -7,7 +7,7 @@ import importlib.util
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 project_root = Path(SPECPATH).resolve().parent
-entry_script = project_root / "src" / "stencilforge" / "ui_app.py"
+entry_script = project_root / "src" / "stencilforge" / "ui" / "app.py"
 
 datas = []
 ui_dist = project_root / "ui-vue" / "dist"
