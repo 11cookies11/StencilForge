@@ -658,6 +658,10 @@ function cloneRule(rule) {
   return JSON.parse(JSON.stringify(rule));
 }
 
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 const PACKAGE_FACTOR_MAP = {
   QFN: 0.94,
   BGA: 0.92,
@@ -681,6 +685,10 @@ export default {
   name: "ApertureRuleWorkspace",
   components: { AppIcon, AppSelect },
   props: {
+    backend: {
+      type: Object,
+      default: null,
+    },
     locale: {
       type: String,
       default: "en",
@@ -714,6 +722,11 @@ export default {
       showRatioHelp: false,
       showVolumeHelp: false,
       showFormulaHelp: false,
+      workspaceHydrating: false,
+      workspaceSnapshot: null,
+      workspaceSyncTimer: null,
+      workspaceSignalConnected: false,
+      workspaceLastSignature: "",
       rules: [
         {
           id: "rule_default",
@@ -745,6 +758,39 @@ export default {
       ],
     };
   },
+  mounted() {
+    this.connectWorkspaceBackend(this.backend);
+  },
+  beforeUnmount() {
+    if (this.workspaceSyncTimer) {
+      clearTimeout(this.workspaceSyncTimer);
+      this.workspaceSyncTimer = null;
+    }
+  },
+  watch: {
+    backend: {
+      immediate: true,
+      handler(nextBackend, previousBackend) {
+        this.connectWorkspaceBackend(nextBackend, previousBackend);
+      },
+    },
+    workspaceDraftSignature: {
+      immediate: true,
+      handler(nextSignature) {
+        if (this.workspaceHydrating) return;
+        if (!this.backend || typeof this.backend.setApertureWorkspace !== "function") return;
+        if (nextSignature === this.workspaceLastSignature) return;
+        this.workspaceLastSignature = nextSignature;
+        if (this.workspaceSyncTimer) {
+          clearTimeout(this.workspaceSyncTimer);
+        }
+        this.workspaceSyncTimer = setTimeout(() => {
+          if (!this.backend || typeof this.backend.setApertureWorkspace !== "function") return;
+          this.backend.setApertureWorkspace(this.exportWorkspaceState());
+        }, 0);
+      },
+    },
+  },
   computed: {
     tabs() {
       return [
@@ -754,6 +800,9 @@ export default {
         { value: "preview", label: this.t("config.apertureTabPreview"), icon: "visibility" },
       ];
     },
+    workspaceDraftSignature() {
+      return JSON.stringify(this.exportWorkspaceState());
+    },
     thicknessValue() {
       const value = Number(this.stencilThicknessMm);
       return Number.isFinite(value) && value > 0 ? value : 0.12;
@@ -762,30 +811,46 @@ export default {
       return `${this.thicknessValue.toFixed(2)} mm`;
     },
     currentThicknessFactor() {
+      const backendValue = this.workspaceSnapshot?.currentThicknessFactor;
+      if (Number.isFinite(backendValue)) return backendValue;
       return this.thicknessValue * this.transferRatio;
     },
     theoreticalVolumeMm3() {
+      const backendValue = this.workspaceSnapshot?.theoreticalVolumeMm3;
+      if (Number.isFinite(backendValue)) return backendValue;
       return this.padAreaMm2 * this.currentThicknessFactor;
     },
     recommendedVolumeMm3() {
+      const backendValue = this.workspaceSnapshot?.recommendedVolumeMm3;
+      if (Number.isFinite(backendValue)) return backendValue;
       return this.theoreticalVolumeMm3 * this.packageFactor * this.padTypeFactor * this.strategyFactor;
     },
     effectiveTargetVolumeMm3() {
+      const backendValue = this.workspaceSnapshot?.effectiveTargetVolumeMm3;
+      if (Number.isFinite(backendValue)) return backendValue;
       const value = Number(this.targetVolumeMm3);
       return Number.isFinite(value) && value > 0 ? value : this.recommendedVolumeMm3;
     },
     targetOpenAreaMm2() {
+      const backendValue = this.workspaceSnapshot?.targetOpenAreaMm2;
+      if (Number.isFinite(backendValue)) return backendValue;
       if (this.currentThicknessFactor <= 0) return 0;
       return this.effectiveTargetVolumeMm3 / this.currentThicknessFactor;
     },
     recommendedScale() {
+      const backendValue = this.workspaceSnapshot?.recommendedScale;
+      if (Number.isFinite(backendValue)) return backendValue;
       if (this.padAreaMm2 <= 0 || this.targetOpenAreaMm2 <= 0) return 1;
       return Math.sqrt(Math.max(0.0001, this.targetOpenAreaMm2 / this.padAreaMm2));
     },
     recommendedDeltaMm() {
+      const backendValue = this.workspaceSnapshot?.recommendedDeltaMm;
+      if (Number.isFinite(backendValue)) return backendValue;
       return this.solveDeltaForRectangle(this.padWidthMm, this.padHeightMm, this.targetOpenAreaMm2);
     },
     calculatorStatus() {
+      const backendValue = this.workspaceSnapshot?.calculatorStatus;
+      if (backendValue) return backendValue;
       if (!Number.isFinite(this.recommendedDeltaMm)) return "warning";
       if (this.minApertureMm > 0 && this.recommendedDeltaMm < -Math.abs(this.minApertureMm)) return "warning";
       if (this.maxApertureMm > 0 && this.recommendedDeltaMm > this.maxApertureMm) return "warning";
@@ -795,6 +860,13 @@ export default {
       return this.calculatorStatus === "warning" ? this.t("config.apertureStatusWarning") : this.t("config.apertureStatusOk");
     },
     previewStatusLabel() {
+      const backendValue = this.workspaceSnapshot?.previewStatus;
+      if (backendValue === "above") {
+        return this.t("config.aperturePreviewAbove");
+      }
+      if (backendValue === "recommended") {
+        return this.t("config.aperturePreviewRecommended");
+      }
       return this.effectiveTargetVolumeMm3 > this.recommendedVolumeMm3
         ? this.t("config.aperturePreviewAbove")
         : this.t("config.aperturePreviewRecommended");
@@ -848,27 +920,111 @@ export default {
       ];
     },
     generatedRulePreview() {
+      const backendValue = this.workspaceSnapshot?.generatedRulePreview;
+      if (backendValue) return backendValue;
       const delta = Number.isFinite(this.recommendedDeltaMm) ? this.recommendedDeltaMm.toFixed(3) : "0.000";
       return `match: { package: "${this.packageType}", padType: "${this.padType}" }
 action: { deltaMm: ${delta}, scale: ${this.recommendedScale.toFixed(3)} }
 priority: 100`;
     },
     strategyKey() {
+      const backendValue = this.workspaceSnapshot?.strategy;
+      if (backendValue) return this.capitalize(backendValue);
       return this.capitalize(this.strategy);
     },
     packageFactor() {
+      const backendValue = this.workspaceSnapshot?.packageFactor;
+      if (Number.isFinite(backendValue)) return backendValue;
       return PACKAGE_FACTOR_MAP[this.packageType] || 1;
     },
     padTypeFactor() {
+      const backendValue = this.workspaceSnapshot?.padTypeFactor;
+      if (Number.isFinite(backendValue)) return backendValue;
       return PAD_TYPE_FACTOR_MAP[this.padType] || 1;
     },
     strategyFactor() {
+      const backendValue = this.workspaceSnapshot?.strategyFactor;
+      if (Number.isFinite(backendValue)) return backendValue;
       return STRATEGY_FACTOR_MAP[this.strategy] || 1;
     },
   },
   methods: {
     t(key, vars = {}) {
       return translate(this.locale, key, vars);
+    },
+    connectWorkspaceBackend(nextBackend, previousBackend = null) {
+      if (previousBackend === nextBackend) {
+        return;
+      }
+      if (!nextBackend || typeof nextBackend !== "object") {
+        this.workspaceSnapshot = null;
+        return;
+      }
+      this.workspaceHydrating = true;
+      if (!this.workspaceSignalConnected && nextBackend.apertureWorkspaceChanged && nextBackend.apertureWorkspaceChanged.connect) {
+        nextBackend.apertureWorkspaceChanged.connect((snapshot) => {
+          this.applyWorkspaceSnapshot(snapshot || {});
+        });
+        this.workspaceSignalConnected = true;
+      }
+      if (typeof nextBackend.getApertureWorkspace === "function") {
+        nextBackend.getApertureWorkspace((snapshot) => {
+          this.applyWorkspaceSnapshot(snapshot || {});
+        });
+      } else {
+        this.workspaceHydrating = false;
+      }
+    },
+    applyWorkspaceSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== "object") {
+        return;
+      }
+      this.workspaceHydrating = true;
+      this.workspaceSnapshot = snapshot;
+      const fields = [
+        "profileName",
+        "transferRatio",
+        "strategy",
+        "minApertureMm",
+        "maxApertureMm",
+        "allowAsymmetric",
+        "padAreaMm2",
+        "padWidthMm",
+        "padHeightMm",
+        "packageType",
+        "padType",
+        "targetVolumeMm3",
+        "selectedRuleId",
+        "rules",
+      ];
+      for (const field of fields) {
+        if (field in snapshot) {
+          this[field] = deepClone(snapshot[field]);
+        }
+      }
+      this.$nextTick(() => {
+        this.workspaceHydrating = false;
+        this.workspaceLastSignature = JSON.stringify(this.exportWorkspaceState());
+      });
+    },
+    exportWorkspaceState() {
+      return {
+        profileName: this.profileName,
+        transferRatio: Number(this.transferRatio),
+        strategy: this.strategy,
+        minApertureMm: Number(this.minApertureMm),
+        maxApertureMm: Number(this.maxApertureMm),
+        allowAsymmetric: !!this.allowAsymmetric,
+        padAreaMm2: Number(this.padAreaMm2),
+        padWidthMm: Number(this.padWidthMm),
+        padHeightMm: Number(this.padHeightMm),
+        packageType: this.packageType,
+        padType: this.padType,
+        targetVolumeMm3: Number(this.targetVolumeMm3),
+        selectedRuleId: this.selectedRuleId,
+        rules: deepClone(this.rules),
+        stencilThicknessMm: Number(this.thicknessValue),
+      };
     },
     formatVolume(value) {
       const next = Number(value);

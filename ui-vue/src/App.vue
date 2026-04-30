@@ -405,6 +405,7 @@
           <div v-else class="pt-0">
             <ApertureRuleWorkspace
               embedded
+              :backend="backend"
               :locale="locale"
               :stencil-thickness-mm="config.thickness_mm"
             />

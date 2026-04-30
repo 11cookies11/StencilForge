@@ -33,6 +33,11 @@ from PySide6.QtWidgets import (
 )
 
 try:
+    from ..aperture_workspace import (
+        compute_aperture_workspace,
+        default_aperture_workspace,
+        normalize_aperture_workspace,
+    )
     from ..config import StencilConfig
     from ..i18n import dialog_labels, normalize_locale, preview_labels, text
     from ..pipeline import generate_stencil
@@ -52,6 +57,11 @@ try:
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from stencilforge.aperture_workspace import (
+        compute_aperture_workspace,
+        default_aperture_workspace,
+        normalize_aperture_workspace,
+    )
     from stencilforge.config import StencilConfig
     from stencilforge.i18n import dialog_labels, normalize_locale, preview_labels, text
     from stencilforge.pipeline import generate_stencil
@@ -172,6 +182,7 @@ def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:
 
 class BackendBridge(QObject):
     configChanged = Signal(dict)
+    apertureWorkspaceChanged = Signal(dict)
     filesScanned = Signal(dict)
     jobStatus = Signal(str)
     jobProgress = Signal(int)
@@ -187,6 +198,7 @@ class BackendBridge(QObject):
         self._config = StencilConfig.load_default(project_root)
         self._ui_state_path = resolve_ui_state_path(project_root)
         self._ui_state = load_ui_state(self._ui_state_path)
+        self._aperture_workspace = self._load_aperture_workspace()
         self._job_lock = threading.Lock()
         self._job_running = False
         self._temp_dirs: list[Path] = []
@@ -344,6 +356,10 @@ class BackendBridge(QObject):
     def getConfig(self) -> dict:
         return self._config.to_dict()
 
+    @Slot(result=dict)
+    def getApertureWorkspace(self) -> dict:
+        return self._aperture_snapshot()
+
     @Slot(str)
     def loadConfig(self, path: str) -> None:
         path_obj = Path(path)
@@ -363,6 +379,22 @@ class BackendBridge(QObject):
         data.update(partial or {})
         self._config = StencilConfig.from_dict(data)
         self.configChanged.emit(self._config.to_dict())
+
+    @Slot(dict)
+    def setApertureWorkspace(self, partial: dict) -> None:
+        if not isinstance(partial, dict):
+            return
+        next_state = dict(self._aperture_workspace)
+        next_state.update(partial)
+        self._aperture_workspace = self._normalize_aperture_workspace(next_state)
+        self._save_aperture_workspace()
+        self.apertureWorkspaceChanged.emit(self._aperture_snapshot())
+
+    @Slot()
+    def resetApertureWorkspace(self) -> None:
+        self._aperture_workspace = self._normalize_aperture_workspace(default_aperture_workspace())
+        self._save_aperture_workspace()
+        self.apertureWorkspaceChanged.emit(self._aperture_snapshot())
 
     @Slot(str)
     def setLocale(self, locale: str) -> None:
@@ -727,6 +759,22 @@ class BackendBridge(QObject):
             return
         self._ui_state[key] = str(directory)
         save_ui_state(self._ui_state_path, self._ui_state)
+
+    def _load_aperture_workspace(self) -> dict:
+        raw = self._ui_state.get("aperture_workspace")
+        if isinstance(raw, dict):
+            return self._normalize_aperture_workspace(raw)
+        return self._normalize_aperture_workspace(default_aperture_workspace())
+
+    def _save_aperture_workspace(self) -> None:
+        self._ui_state["aperture_workspace"] = self._aperture_workspace
+        save_ui_state(self._ui_state_path, self._ui_state)
+
+    def _normalize_aperture_workspace(self, data: dict) -> dict:
+        return normalize_aperture_workspace(data)
+
+    def _aperture_snapshot(self) -> dict:
+        return compute_aperture_workspace(self._aperture_workspace, self._config.thickness_mm)
 
     def _resolve_input_dir(self, input_dir: str) -> str:
         if not input_dir:
