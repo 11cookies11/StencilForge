@@ -5,9 +5,11 @@ from pathlib import Path
 import logging
 import time
 
+from shapely.affinity import scale as scale_geometry
 from shapely.geometry import box
 from shapely.ops import unary_union
 
+from ..aperture_workspace import resolve_aperture_workspace_effect
 from ..config import StencilConfig
 from ..geometry import GerberGeometryService
 from .engine import EngineExportInput, get_model_engine
@@ -47,7 +49,12 @@ _OUTLINE_FALLBACK_PATTERNS = [
 ]
 
 
-def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) -> dict | None:
+def generate_stencil(
+    input_dir: Path,
+    output_path: Path,
+    config: StencilConfig,
+    aperture_workspace: dict | None = None,
+) -> dict | None:
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -84,6 +91,40 @@ def generate_stencil(input_dir: Path, output_path: Path, config: StencilConfig) 
             paste_geom = regenerate_qfn_paste(paste_geom, config)
         except Exception as exc:
             logger.warning("QFN regeneration skipped: %s", exc)
+
+    if aperture_workspace is not None:
+        aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.thickness_mm)
+        effect = aperture_effect["effect"]
+        if effect["enabled"]:
+            logger.info(
+                "Aperture rule active: %s -> %s",
+                aperture_effect["matchSummary"] or "(any)",
+                aperture_effect["actionSummary"] or "(none)",
+            )
+            if effect["mode"] == "scale":
+                scale_factor = float(effect.get("scale", 1.0) or 1.0)
+                if scale_factor != 1.0:
+                    t0 = time.perf_counter()
+                    paste_geom = scale_geometry(
+                        paste_geom,
+                        xfact=scale_factor,
+                        yfact=scale_factor,
+                        origin="centroid",
+                    )
+                    logger.info("Aperture rule scale in %.3fs", time.perf_counter() - t0)
+                    logger.info("Aperture rule scale factor: %s", scale_factor)
+            else:
+                delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
+                if delta_mm != 0.0:
+                    t0 = time.perf_counter()
+                    paste_geom = paste_geom.buffer(delta_mm, resolution=config.curve_resolution)
+                    logger.info("Aperture rule delta in %.3fs", time.perf_counter() - t0)
+                    logger.info("Aperture rule delta: %s mm", delta_mm)
+        else:
+            logger.info(
+                "Aperture rule inactive: %s",
+                aperture_effect["ruleName"] or aperture_effect["matchSummary"] or "(none)",
+            )
 
     t0 = time.perf_counter()
     paste_geom = paste_geom.buffer(config.paste_offset_mm, resolution=config.curve_resolution)

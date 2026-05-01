@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from shapely.geometry import box
+import pytest
 
 from stencilforge.config import StencilConfig
 from stencilforge.pipeline.core import generate_stencil
@@ -87,3 +88,44 @@ def test_outline_falls_back_to_margin_when_no_outline_match(monkeypatch, tmp_pat
     assert min_y <= -4.9
     assert max_x >= 14.9
     assert max_y >= 12.9
+
+
+def test_aperture_workspace_rule_changes_paste_geometry(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
+
+    service = _DummyGeometryService(StencilConfig.from_dict({}))
+    engine = _DummyEngine()
+
+    monkeypatch.setattr("stencilforge.pipeline.core.GerberGeometryService", lambda cfg: service)
+    monkeypatch.setattr("stencilforge.pipeline.core.get_model_engine", lambda _name: engine)
+
+    cfg = StencilConfig.from_dict(
+        {
+            "paste_patterns": ["*no_match*"],
+            "outline_patterns": ["*not_found*"],
+            "output_mode": "holes_only",
+            "paste_offset_mm": 0.0,
+            "locator_enabled": False,
+            "qfn_regen_enabled": False,
+        }
+    )
+    workspace = {
+        "selectedRuleId": "rule_scale",
+        "rules": [
+            {
+                "id": "rule_scale",
+                "name": "Scale rule",
+                "enabled": True,
+                "priority": 100,
+                "match": {"package": "Any", "padType": "Any", "layer": "Top", "padSize": ""},
+                "action": {"mode": "scale", "deltaMm": 0.0, "scale": 0.5},
+                "note": "",
+            }
+        ],
+    }
+
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg, workspace)
+
+    assert engine.called is True
+    assert engine.last_input is not None
+    assert engine.last_input.stencil_2d.bounds == pytest.approx((2.5, 2.0, 7.5, 6.0))

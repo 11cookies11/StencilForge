@@ -195,6 +195,33 @@ def import_aperture_workspace_payload(data: Any) -> dict[str, Any]:
     return normalize_aperture_workspace(data)
 
 
+def resolve_aperture_workspace_effect(
+    data: dict[str, Any] | None,
+    stencil_thickness_mm: float | None = None,
+) -> dict[str, Any]:
+    snapshot = compute_aperture_workspace(data, stencil_thickness_mm)
+    active_rule = snapshot["activeRule"] or {}
+    action = active_rule.get("action") or {}
+    enabled = bool(active_rule.get("enabled", True))
+    mode = str(action.get("mode") or "delta")
+    delta_mm = float(action.get("deltaMm", 0.0) or 0.0)
+    scale = _positive_float(action.get("scale"), 1.0, 0.01)
+    if not enabled:
+        effect = {"enabled": False, "mode": "delta", "deltaMm": 0.0, "scale": 1.0}
+    elif mode == "scale":
+        effect = {"enabled": True, "mode": "scale", "deltaMm": 0.0, "scale": scale}
+    else:
+        effect = {"enabled": True, "mode": "delta", "deltaMm": delta_mm, "scale": 1.0}
+    return {
+        "snapshot": snapshot,
+        "effect": effect,
+        "ruleId": str(active_rule.get("id") or ""),
+        "ruleName": str(active_rule.get("name") or ""),
+        "matchSummary": snapshot["activeRuleMatchSummary"],
+        "actionSummary": snapshot["activeRuleActionSummary"],
+    }
+
+
 def build_generated_rule_preview(workspace: dict[str, Any], recommended_delta_mm: float, recommended_scale: float) -> str:
     package = workspace.get("packageType", "Any")
     pad_type = workspace.get("padType", "Any")

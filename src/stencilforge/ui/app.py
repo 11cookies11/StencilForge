@@ -89,11 +89,17 @@ def _run_generate_stencil_subprocess(
     input_dir: str,
     output_stl: str,
     config_data: dict,
+    aperture_workspace: dict | None,
     result_queue: "mp.Queue[dict]",
 ) -> None:
     try:
         config = StencilConfig.from_dict(config_data)
-        outline_debug = generate_stencil(Path(input_dir), Path(output_stl), config)
+        outline_debug = generate_stencil(
+            Path(input_dir),
+            Path(output_stl),
+            config,
+            aperture_workspace,
+        )
         result_queue.put({"ok": True, "outline_debug": outline_debug})
     except Exception as exc:
         import traceback
@@ -726,7 +732,13 @@ class BackendBridge(QObject):
                     result_queue: mp.Queue[dict] = ctx.Queue()
                     process = ctx.Process(
                         target=_run_generate_stencil_subprocess,
-                        args=(resolved_input, output_stl, config.to_dict(), result_queue),
+                        args=(
+                            resolved_input,
+                            output_stl,
+                            config.to_dict(),
+                            self._aperture_workspace,
+                            result_queue,
+                        ),
                     )
                     self._job_process = process
                     process.start()
@@ -771,7 +783,12 @@ class BackendBridge(QObject):
                         raise ValueError(f"CadQuery worker failed: {detail}")
                     outline_debug = result.get("outline_debug") if result else None
                 else:
-                    outline_debug = generate_stencil(Path(resolved_input), Path(output_stl), config)
+                    outline_debug = generate_stencil(
+                        Path(resolved_input),
+                        Path(output_stl),
+                        config,
+                        self._aperture_workspace,
+                    )
                 if (
                     outline_debug
                     and config.ui_debug_plot_outline
