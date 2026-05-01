@@ -428,10 +428,6 @@
                   <AppSelect v-model="activeRule.match.padType" :options="padTypeOptions" />
                 </label>
                 <label class="space-y-2">
-                  <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRuleLayer") }}</span>
-                  <AppSelect v-model="activeRule.match.layer" :options="layerOptions" />
-                </label>
-                <label class="space-y-2">
                   <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRulePadSize") }}</span>
                   <input
                     v-model="activeRule.match.padSize"
@@ -625,14 +621,14 @@
                   <p class="text-sm text-slate-500">{{ t("config.aperturePreviewSummaryHint") }}</p>
                 </div>
                 <span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                  {{ describeAction(activeRule) }}
+                  {{ describeAction(matchedRule) }}
                 </span>
               </div>
 
               <div class="mt-4 grid gap-3">
                 <div class="rounded-2xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRuleMatchSummary") }}</div>
-                  <div class="mt-2 text-base font-semibold text-slate-900">{{ describeMatch(activeRule) }}</div>
+                  <div class="mt-2 text-base font-semibold text-slate-900">{{ describeMatch(matchedRule) }}</div>
                 </div>
                 <div class="rounded-2xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureEstimatedVolume") }}</div>
@@ -741,7 +737,7 @@ export default {
           name: "Global fallback",
           enabled: true,
           priority: 0,
-          match: { package: "Any", padType: "Any", layer: "Top", padSize: "0.20-1.00 mm" },
+          match: { package: "Any", padType: "Any", padSize: "0.20-1.00 mm" },
           action: { mode: "delta", deltaMm: -0.02, scale: 0.98 },
           note: "Fallback rule for the whole library.",
         },
@@ -750,7 +746,7 @@ export default {
           name: "QFN fine pitch",
           enabled: true,
           priority: 80,
-          match: { package: "QFN", padType: "SMD", layer: "Top", padSize: "0.20-0.60 mm" },
+          match: { package: "QFN", padType: "SMD", padSize: "0.20-0.60 mm" },
           action: { mode: "delta", deltaMm: -0.03, scale: 0.96 },
           note: "Default recommendation for dense QFN pads.",
         },
@@ -759,7 +755,7 @@ export default {
           name: "Power pads",
           enabled: false,
           priority: 45,
-          match: { package: "Power", padType: "Thermal", layer: "Top", padSize: "1.00-3.00 mm" },
+          match: { package: "Power", padType: "Thermal", padSize: "1.00-3.00 mm" },
           action: { mode: "scale", deltaMm: 0, scale: 1.04 },
           note: "Enable when extra solder volume is preferred.",
         },
@@ -882,6 +878,12 @@ export default {
     activeRule() {
       return this.rules.find((rule) => rule.id === this.selectedRuleId) || this.rules[0];
     },
+    matchedRule() {
+      if (this.workspaceSnapshot?.matchedRule) {
+        return this.workspaceSnapshot.matchedRule;
+      }
+      return this.activeRule;
+    },
     packageOptions() {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
@@ -905,13 +907,6 @@ export default {
         { value: "SMD", label: this.t("config.aperturePadTypeSmd") },
         { value: "Thermal", label: this.t("config.aperturePadTypeThermal") },
         { value: "THT", label: this.t("config.aperturePadTypeTht") },
-      ];
-    },
-    layerOptions() {
-      return [
-        { value: "Any", label: this.t("config.apertureAny") },
-        { value: "Top", label: this.t("config.apertureLayerTop") },
-        { value: "Bottom", label: this.t("config.apertureLayerBottom") },
       ];
     },
     strategyOptions() {
@@ -1079,7 +1074,6 @@ priority: 100`;
       const parts = [];
       if (rule.match.package && rule.match.package !== "Any") parts.push(rule.match.package);
       if (rule.match.padType && rule.match.padType !== "Any") parts.push(rule.match.padType);
-      if (rule.match.layer && rule.match.layer !== "Any") parts.push(rule.match.layer);
       if (rule.match.padSize) parts.push(rule.match.padSize);
       return parts.length ? parts.join(" · ") : this.t("config.apertureAny");
     },
@@ -1096,7 +1090,7 @@ priority: 100`;
         name: this.t("config.apertureNewRule"),
         enabled: true,
         priority: 50,
-        match: { package: "Any", padType: "Any", layer: "Top", padSize: "0.20-0.80 mm" },
+        match: { package: "Any", padType: "Any", padSize: "0.20-0.80 mm" },
         action: { mode: "delta", deltaMm: -0.02, scale: 0.98 },
         note: "",
       };

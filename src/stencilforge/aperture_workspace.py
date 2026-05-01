@@ -49,7 +49,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "name": "Global fallback",
                 "enabled": True,
                 "priority": 0,
-                "match": {"package": "Any", "padType": "Any", "layer": "Top", "padSize": "0.20-1.00 mm"},
+                "match": {"package": "Any", "padType": "Any", "padSize": "0.20-1.00 mm"},
                 "action": {"mode": "delta", "deltaMm": -0.02, "scale": 0.98},
                 "note": "Fallback rule for the whole library.",
             },
@@ -58,7 +58,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "name": "QFN fine pitch",
                 "enabled": True,
                 "priority": 80,
-                "match": {"package": "QFN", "padType": "SMD", "layer": "Top", "padSize": "0.20-0.60 mm"},
+                "match": {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"},
                 "action": {"mode": "delta", "deltaMm": -0.03, "scale": 0.96},
                 "note": "Default recommendation for dense QFN pads.",
             },
@@ -67,7 +67,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "name": "Power pads",
                 "enabled": False,
                 "priority": 45,
-                "match": {"package": "Power", "padType": "Thermal", "layer": "Top", "padSize": "1.00-3.00 mm"},
+                "match": {"package": "Power", "padType": "Thermal", "padSize": "1.00-3.00 mm"},
                 "action": {"mode": "scale", "deltaMm": 0.0, "scale": 1.04},
                 "note": "Enable when extra solder volume is preferred.",
             },
@@ -132,6 +132,7 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         (rule for rule in workspace["rules"] if rule["id"] == workspace["selectedRuleId"]),
         workspace["rules"][0],
     )
+    matched_rule = resolve_matching_rule(workspace)
     return {
         **workspace,
         "thicknessValue": thickness_value,
@@ -149,9 +150,12 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         "padTypeFactor": pad_type_factor,
         "strategyFactor": strategy_factor,
         "activeRule": active_rule,
+        "matchedRule": matched_rule,
         "generatedRulePreview": build_generated_rule_preview(workspace, recommended_delta_mm, recommended_scale),
         "activeRuleMatchSummary": describe_match(active_rule),
         "activeRuleActionSummary": describe_action(active_rule),
+        "matchedRuleMatchSummary": describe_match(matched_rule),
+        "matchedRuleActionSummary": describe_action(matched_rule),
     }
 
 
@@ -183,6 +187,8 @@ def export_aperture_workspace_payload(
             "generatedRulePreview": snapshot["generatedRulePreview"],
             "activeRuleMatchSummary": snapshot["activeRuleMatchSummary"],
             "activeRuleActionSummary": snapshot["activeRuleActionSummary"],
+            "matchedRuleMatchSummary": snapshot["matchedRuleMatchSummary"],
+            "matchedRuleActionSummary": snapshot["matchedRuleActionSummary"],
         },
     }
 
@@ -250,7 +256,7 @@ def resolve_aperture_workspace_effect(
     stencil_thickness_mm: float | None = None,
 ) -> dict[str, Any]:
     snapshot = compute_aperture_workspace(data, stencil_thickness_mm)
-    active_rule = snapshot["activeRule"] or {}
+    active_rule = snapshot["matchedRule"] or snapshot["activeRule"] or {}
     action = active_rule.get("action") or {}
     enabled = bool(active_rule.get("enabled", True))
     mode = str(action.get("mode") or "delta")
@@ -267,8 +273,8 @@ def resolve_aperture_workspace_effect(
         "effect": effect,
         "ruleId": str(active_rule.get("id") or ""),
         "ruleName": str(active_rule.get("name") or ""),
-        "matchSummary": snapshot["activeRuleMatchSummary"],
-        "actionSummary": snapshot["activeRuleActionSummary"],
+        "matchSummary": snapshot["matchedRuleMatchSummary"] or snapshot["activeRuleMatchSummary"],
+        "actionSummary": snapshot["matchedRuleActionSummary"] or snapshot["activeRuleActionSummary"],
     }
 
 
@@ -290,17 +296,14 @@ def describe_match(rule: dict[str, Any] | None) -> str:
     parts: list[str] = []
     package = _first_present(match, ("package", "packageType", "package_type"))
     pad_type = _first_present(match, ("padType", "pad_type"))
-    layer = _first_present(match, ("layer", "layerType", "layer_type"))
     pad_size = _first_present(match, ("padSize", "pad_size", "pad_size_mm"))
     if package and package != "Any":
         parts.append(str(package))
     if pad_type and pad_type != "Any":
         parts.append(str(pad_type))
-    if layer and layer != "Any":
-        parts.append(str(layer))
     if pad_size:
         parts.append(str(pad_size))
-    return " · ".join(parts) if parts else "Any"
+    return " 路 ".join(parts) if parts else "Any"
 
 
 def describe_action(rule: dict[str, Any] | None) -> str:
@@ -321,7 +324,7 @@ def normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
         "name": "Untitled rule",
         "enabled": True,
         "priority": 0,
-        "match": {"package": "Any", "padType": "Any", "layer": "Any", "padSize": ""},
+        "match": {"package": "Any", "padType": "Any", "padSize": ""},
         "action": {"mode": "delta", "deltaMm": 0.0, "scale": 1.0},
         "note": "",
     }
@@ -334,7 +337,6 @@ def normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
     merged["match"] = {
         "package": str(_first_present(match, ("package", "packageType", "package_type")) or "Any"),
         "padType": str(_first_present(match, ("padType", "pad_type")) or "Any"),
-        "layer": str(_first_present(match, ("layer", "layerType", "layer_type")) or "Any"),
         "padSize": str(_first_present(match, ("padSize", "pad_size", "pad_size_mm")) or ""),
     }
     merged["action"] = {
@@ -412,6 +414,67 @@ def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
         if key in data:
             return data[key]
     return None
+
+
+def resolve_matching_rule(workspace: dict[str, Any]) -> dict[str, Any] | None:
+    rules = _ensure_list(workspace.get("rules"))
+    if not rules:
+        return None
+    package_type = str(workspace.get("packageType") or "Any")
+    pad_type = str(workspace.get("padType") or "Any")
+    selected_rule = next(
+        (rule for rule in rules if isinstance(rule, dict) and rule.get("id") == workspace.get("selectedRuleId")),
+        None,
+    )
+    enabled_rules = [rule for rule in rules if isinstance(rule, dict) and bool(rule.get("enabled", True))]
+    candidates: list[tuple[int, int, int, dict[str, Any]]] = []
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            continue
+        if not bool(rule.get("enabled", True)):
+            continue
+        match = rule.get("match") or {}
+        if not _rule_matches_workspace(match, package_type, pad_type):
+            continue
+        priority = int(rule.get("priority", 0) or 0)
+        specificity = _match_specificity(match)
+        candidates.append((priority, specificity, -index, rule))
+    if candidates:
+        candidates.sort(reverse=True)
+        return candidates[0][3]
+    if isinstance(selected_rule, dict):
+        return selected_rule
+    if enabled_rules:
+        return enabled_rules[0]
+    return rules[0]
+
+
+def _rule_matches_workspace(match: dict[str, Any], package_type: str, pad_type: str) -> bool:
+    package = _normalize_match_token(_first_present(match, ("package", "packageType", "package_type")))
+    pad = _normalize_match_token(_first_present(match, ("padType", "pad_type")))
+    return _matches_token(package, package_type) and _matches_token(pad, pad_type)
+
+
+def _match_specificity(match: dict[str, Any]) -> int:
+    score = 0
+    if _normalize_match_token(_first_present(match, ("package", "packageType", "package_type"))).casefold() != "any":
+        score += 1
+    if _normalize_match_token(_first_present(match, ("padType", "pad_type"))).casefold() != "any":
+        score += 1
+    return score
+
+
+def _normalize_match_token(value: Any) -> str:
+    token = str(value or "Any").strip()
+    return token or "Any"
+
+
+def _matches_token(rule_value: str, workspace_value: str) -> bool:
+    if rule_value.casefold() == "any":
+        return True
+    if workspace_value.casefold() == "any":
+        return True
+    return rule_value.casefold() == workspace_value.casefold()
 
 
 def _coerce_choice(value: Any, choices: set[str], default: str) -> str:

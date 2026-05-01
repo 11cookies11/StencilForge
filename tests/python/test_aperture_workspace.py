@@ -10,6 +10,7 @@ from stencilforge.aperture_workspace import (
     export_aperture_workspace_payload,
     import_aperture_workspace_payload,
     normalize_aperture_workspace,
+    resolve_aperture_workspace_effect,
     validate_aperture_workspace_payload,
 )
 
@@ -39,9 +40,24 @@ def test_workspace_descriptions_are_human_readable():
     match_text = describe_match(rule)
     assert "QFN" in match_text
     assert "SMD" in match_text
-    assert "Top" in match_text
+    assert "Top" not in match_text
     assert "0.20-0.60 mm" in match_text
     assert describe_action(rule) == "Delta -0.030 mm"
+
+
+def test_workspace_effect_prefers_package_and_pad_type_match():
+    workspace = default_aperture_workspace()
+    workspace["selectedRuleId"] = "rule_default"
+    workspace["packageType"] = "QFN"
+    workspace["padType"] = "SMD"
+
+    effect = resolve_aperture_workspace_effect(workspace, 0.15)
+
+    assert effect["ruleId"] == "rule_qfn"
+    assert effect["ruleName"] == "QFN fine pitch"
+    assert effect["matchSummary"].startswith("QFN")
+    assert effect["effect"]["mode"] == "delta"
+    assert effect["effect"]["deltaMm"] == -0.03
 
 
 def test_workspace_payload_round_trip_keeps_rules():
@@ -107,6 +123,7 @@ def test_workspace_payload_accepts_legacy_field_aliases():
     assert workspace["rules"][0]["priority"] == 12
     assert workspace["rules"][0]["match"]["package"] == "QFN"
     assert workspace["rules"][0]["match"]["padType"] == "SMD"
+    assert "layer" not in workspace["rules"][0]["match"]
     assert workspace["rules"][0]["action"]["mode"] == "scale"
     assert workspace["rules"][0]["action"]["scale"] == 0.97
 
