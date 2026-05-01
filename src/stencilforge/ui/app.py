@@ -38,8 +38,8 @@ try:
         compute_aperture_workspace,
         default_aperture_workspace,
         export_aperture_workspace_payload,
-        import_aperture_workspace_payload,
         normalize_aperture_workspace,
+        validate_aperture_workspace_payload,
     )
     from ..config import StencilConfig
     from ..i18n import dialog_labels, normalize_locale, preview_labels, text
@@ -64,8 +64,8 @@ except ImportError:
         compute_aperture_workspace,
         default_aperture_workspace,
         export_aperture_workspace_payload,
-        import_aperture_workspace_payload,
         normalize_aperture_workspace,
+        validate_aperture_workspace_payload,
     )
     from stencilforge.config import StencilConfig
     from stencilforge.i18n import dialog_labels, normalize_locale, preview_labels, text
@@ -435,7 +435,14 @@ class BackendBridge(QObject):
             self._emit_log(self._tr("ui.aperture_workspace_import_invalid", error=exc))
             return ""
 
-        imported = import_aperture_workspace_payload(payload)
+        validation = validate_aperture_workspace_payload(payload)
+        if not validation["ok"]:
+            self._emit_log(
+                self._tr("ui.aperture_workspace_import_invalid", error="; ".join(validation["issues"]))
+            )
+            return ""
+
+        imported = validation["workspace"]
         self._aperture_workspace = self._normalize_aperture_workspace(imported)
         self._save_aperture_workspace()
         self._remember_path("aperture_rules_dir", filename)

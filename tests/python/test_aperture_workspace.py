@@ -10,6 +10,7 @@ from stencilforge.aperture_workspace import (
     export_aperture_workspace_payload,
     import_aperture_workspace_payload,
     normalize_aperture_workspace,
+    validate_aperture_workspace_payload,
 )
 
 
@@ -60,3 +61,64 @@ def test_workspace_payload_round_trip_keeps_rules():
     assert imported["profileName"] == "Import / Export"
     assert imported["rules"][1]["name"] == "Round trip rule"
     assert imported["selectedRuleId"] == workspace["selectedRuleId"]
+
+
+def test_workspace_payload_accepts_legacy_field_aliases():
+    payload = {
+        "kind": "stencilforge.aperture_workspace",
+        "schemaVersion": 1,
+        "workspace": {
+            "profile_name": "Legacy profile",
+            "transfer_ratio": 0.91,
+            "selected_rule_id": "rule_legacy",
+            "rules": [
+                {
+                    "rule_id": "rule_legacy",
+                    "rule_name": "Legacy rule",
+                    "is_enabled": True,
+                    "rank": 12,
+                    "match": {
+                        "package_type": "QFN",
+                        "pad_type": "SMD",
+                        "layer": "Top",
+                        "pad_size_mm": "0.30-0.60 mm",
+                    },
+                    "action": {
+                        "actionMode": "scale",
+                        "scale_factor": 0.97,
+                        "delta_mm": -0.04,
+                    },
+                    "description": "Legacy note",
+                    "unexpected": "ignored",
+                }
+            ],
+        },
+    }
+
+    validation = validate_aperture_workspace_payload(payload)
+    workspace = validation["workspace"]
+
+    assert validation["ok"] is True
+    assert workspace["profileName"] == "Legacy profile"
+    assert workspace["transferRatio"] == 0.91
+    assert workspace["selectedRuleId"] == "rule_legacy"
+    assert workspace["rules"][0]["id"] == "rule_legacy"
+    assert workspace["rules"][0]["name"] == "Legacy rule"
+    assert workspace["rules"][0]["priority"] == 12
+    assert workspace["rules"][0]["match"]["package"] == "QFN"
+    assert workspace["rules"][0]["match"]["padType"] == "SMD"
+    assert workspace["rules"][0]["action"]["mode"] == "scale"
+    assert workspace["rules"][0]["action"]["scale"] == 0.97
+
+
+def test_workspace_payload_rejects_unsupported_schema_version():
+    validation = validate_aperture_workspace_payload(
+        {
+            "kind": "stencilforge.aperture_workspace",
+            "schemaVersion": 99,
+            "workspace": default_aperture_workspace(),
+        }
+    )
+
+    assert validation["ok"] is False
+    assert any("unsupported schemaVersion" in issue for issue in validation["issues"])

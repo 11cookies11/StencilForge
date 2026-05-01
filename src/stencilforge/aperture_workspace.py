@@ -6,6 +6,7 @@ from typing import Any
 
 APERTURE_WORKSPACE_FORMAT = "stencilforge.aperture_workspace"
 APERTURE_WORKSPACE_SCHEMA_VERSION = 1
+APERTURE_WORKSPACE_SUPPORTED_SCHEMA_VERSIONS = {1}
 
 PACKAGE_FACTOR_MAP = {
     "QFN": 0.94,
@@ -77,7 +78,7 @@ def default_aperture_workspace() -> dict[str, Any]:
 def normalize_aperture_workspace(data: dict[str, Any] | None) -> dict[str, Any]:
     merged: dict[str, Any] = default_aperture_workspace()
     if isinstance(data, dict):
-        merged.update({key: value for key, value in data.items() if key != "rules"})
+        merged.update(_pick_workspace_fields(data))
         if "rules" in data:
             merged["rules"] = [normalize_rule(rule) for rule in _ensure_list(data.get("rules"))]
     merged["rules"] = [normalize_rule(rule) for rule in _ensure_list(merged.get("rules"))]
@@ -195,6 +196,55 @@ def import_aperture_workspace_payload(data: Any) -> dict[str, Any]:
     return normalize_aperture_workspace(data)
 
 
+def validate_aperture_workspace_payload(data: Any) -> dict[str, Any]:
+    issues: list[str] = []
+    schema_version = None
+    kind = None
+    legacy = False
+    workspace: dict[str, Any] | None = None
+    if not isinstance(data, dict):
+        issues.append("payload must be an object")
+        return {
+            "ok": False,
+            "issues": issues,
+            "schemaVersion": schema_version,
+            "kind": kind,
+            "legacy": legacy,
+            "workspace": normalize_aperture_workspace(None),
+        }
+
+    kind = str(data.get("kind") or "")
+    if kind and kind != APERTURE_WORKSPACE_FORMAT:
+        issues.append(f"unsupported kind: {kind}")
+
+    raw_schema_version = data.get("schemaVersion")
+    if raw_schema_version is not None:
+        try:
+            schema_version = int(raw_schema_version)
+        except (TypeError, ValueError):
+            issues.append(f"invalid schemaVersion: {raw_schema_version!r}")
+        else:
+            if schema_version not in APERTURE_WORKSPACE_SUPPORTED_SCHEMA_VERSIONS:
+                issues.append(f"unsupported schemaVersion: {schema_version}")
+
+    workspace_data = data.get("workspace")
+    if isinstance(workspace_data, dict):
+        workspace = workspace_data
+    else:
+        legacy = True
+        workspace = data
+
+    normalized = normalize_aperture_workspace(workspace)
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "schemaVersion": schema_version,
+        "kind": kind or APERTURE_WORKSPACE_FORMAT,
+        "legacy": legacy,
+        "workspace": normalized,
+    }
+
+
 def resolve_aperture_workspace_effect(
     data: dict[str, Any] | None,
     stencil_thickness_mm: float | None = None,
@@ -238,10 +288,10 @@ def describe_match(rule: dict[str, Any] | None) -> str:
         return ""
     match = rule.get("match") or {}
     parts: list[str] = []
-    package = match.get("package")
-    pad_type = match.get("padType")
-    layer = match.get("layer")
-    pad_size = match.get("padSize")
+    package = _first_present(match, ("package", "packageType", "package_type"))
+    pad_type = _first_present(match, ("padType", "pad_type"))
+    layer = _first_present(match, ("layer", "layerType", "layer_type"))
+    pad_size = _first_present(match, ("padSize", "pad_size", "pad_size_mm"))
     if package and package != "Any":
         parts.append(str(package))
     if pad_type and pad_type != "Any":
@@ -257,11 +307,11 @@ def describe_action(rule: dict[str, Any] | None) -> str:
     if not rule:
         return ""
     action = rule.get("action") or {}
-    mode = str(action.get("mode") or "delta")
+    mode = str(_first_present(action, ("mode", "actionMode")) or "delta")
     if mode == "scale":
-        scale = _positive_float(action.get("scale"), 1.0, 0.01)
+        scale = _positive_float(_first_present(action, ("scale", "scaleFactor", "scale_factor")), 1.0, 0.01)
         return f"Scale x {scale:.3f}"
-    delta_mm = float(action.get("deltaMm", 0.0) or 0.0)
+    delta_mm = float(_first_present(action, ("deltaMm", "delta_mm", "delta")) or 0.0)
     return f"Delta {delta_mm:+.3f} mm"
 
 
@@ -278,19 +328,19 @@ def normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(rule, dict):
         return base
     merged = deepcopy(base)
-    merged.update({key: value for key, value in rule.items() if key not in {"match", "action"}})
+    merged.update(_pick_rule_fields(rule))
     match = rule.get("match") or {}
     action = rule.get("action") or {}
     merged["match"] = {
-        "package": str(match.get("package", "Any") or "Any"),
-        "padType": str(match.get("padType", "Any") or "Any"),
-        "layer": str(match.get("layer", "Any") or "Any"),
-        "padSize": str(match.get("padSize", "") or ""),
+        "package": str(_first_present(match, ("package", "packageType", "package_type")) or "Any"),
+        "padType": str(_first_present(match, ("padType", "pad_type")) or "Any"),
+        "layer": str(_first_present(match, ("layer", "layerType", "layer_type")) or "Any"),
+        "padSize": str(_first_present(match, ("padSize", "pad_size", "pad_size_mm")) or ""),
     }
     merged["action"] = {
-        "mode": _coerce_choice(action.get("mode"), {"delta", "scale"}, "delta"),
-        "deltaMm": float(action.get("deltaMm", 0.0) or 0.0),
-        "scale": _positive_float(action.get("scale"), 1.0, 0.01),
+        "mode": _coerce_choice(_first_present(action, ("mode", "actionMode")), {"delta", "scale"}, "delta"),
+        "deltaMm": float(_first_present(action, ("deltaMm", "delta_mm", "delta")) or 0.0),
+        "scale": _positive_float(_first_present(action, ("scale", "scaleFactor", "scale_factor")), 1.0, 0.01),
     }
     merged["enabled"] = bool(merged.get("enabled", True))
     merged["priority"] = int(merged.get("priority", 0) or 0)
@@ -315,6 +365,53 @@ def _ensure_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return []
+
+
+def _pick_workspace_fields(data: dict[str, Any]) -> dict[str, Any]:
+    mapping = {
+        "profileName": ("profileName", "profile_name"),
+        "transferRatio": ("transferRatio", "transfer_ratio"),
+        "strategy": ("strategy",),
+        "minApertureMm": ("minApertureMm", "min_aperture_mm"),
+        "maxApertureMm": ("maxApertureMm", "max_aperture_mm"),
+        "allowAsymmetric": ("allowAsymmetric", "allow_asymmetric"),
+        "padAreaMm2": ("padAreaMm2", "pad_area_mm2"),
+        "padWidthMm": ("padWidthMm", "pad_width_mm"),
+        "padHeightMm": ("padHeightMm", "pad_height_mm"),
+        "packageType": ("packageType", "package_type"),
+        "padType": ("padType", "pad_type"),
+        "targetVolumeMm3": ("targetVolumeMm3", "target_volume_mm3"),
+        "selectedRuleId": ("selectedRuleId", "selected_rule_id"),
+    }
+    return _pick_fields(data, mapping)
+
+
+def _pick_rule_fields(data: dict[str, Any]) -> dict[str, Any]:
+    mapping = {
+        "id": ("id", "rule_id"),
+        "name": ("name", "rule_name"),
+        "enabled": ("enabled", "is_enabled"),
+        "priority": ("priority", "rank"),
+        "note": ("note", "description"),
+    }
+    return _pick_fields(data, mapping)
+
+
+def _pick_fields(data: dict[str, Any], mapping: dict[str, tuple[str, ...]]) -> dict[str, Any]:
+    picked: dict[str, Any] = {}
+    for canonical, aliases in mapping.items():
+        for key in aliases:
+            if key in data:
+                picked[canonical] = data[key]
+                break
+    return picked
+
+
+def _first_present(data: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in data:
+            return data[key]
+    return None
 
 
 def _coerce_choice(value: Any, choices: set[str], default: str) -> str:
