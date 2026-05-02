@@ -13,7 +13,7 @@ setup(
         "cadquery==2.7.0",
         "numpy>=2.0,<3.0",
         "matplotlib==3.10.8",
-        "scipy==1.17.1",
+        "scipy>=1.10,<2.0",
         "scikit-image==0.26.0",
         "PySide6==6.10.1",
         "shapely==2.1.2",
