@@ -29,14 +29,8 @@ def build_locator_ring(outline_geom, clearance_mm: float, width_mm: float, open_
 
 
 def build_locator_step(outline_geom, clearance_mm: float, step_width_mm: float, open_side: str, open_width_mm: float):
-    # 台阶与环形类似，但用于做“台阶”几何，后续会向负 Z 方向挤出
-    if step_width_mm <= 0:
-        return None
-    inner = outline_geom.buffer(clearance_mm)
-    outer = outline_geom.buffer(clearance_mm + step_width_mm)
-    step = outer.difference(inner)
-    step = apply_open_side(step, outer, open_side, open_width_mm)
-    return _exclude_keepout(step, outline_geom)
+    # 台阶与环形几何逻辑相同，后续挤出方向不同（负 Z vs 正 Z）
+    return build_locator_ring(outline_geom, clearance_mm, step_width_mm, open_side, open_width_mm)
 
 
 def build_locator_bridge(outline_geom, clearance_mm: float, open_side: str, open_width_mm: float):
