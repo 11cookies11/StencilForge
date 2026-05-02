@@ -372,7 +372,7 @@
                 class="w-full rounded-2xl border px-4 py-4 text-left transition"
                 :class="selectedRuleId === rule.id ? 'border-blue-200 bg-white shadow-sm ring-4 ring-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'"
                 type="button"
-                @click="selectedRuleId = rule.id"
+                @click="selectRule(rule)"
               >
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="flex items-center gap-3">
@@ -832,7 +832,7 @@ export default {
         this.workspaceSyncTimer = setTimeout(() => {
           if (!this.backend || typeof this.backend.setApertureWorkspace !== "function") return;
           this.backend.setApertureWorkspace(this.exportWorkspaceState());
-        }, 0);
+        }, 150);
       },
     },
   },
@@ -1067,6 +1067,7 @@ priority: 100`;
         "padType",
         "targetVolumeMm3",
         "selectedRuleId",
+        "selectedRuleGroupKey",
         "rules",
       ];
       for (const field of fields) {
@@ -1094,6 +1095,7 @@ priority: 100`;
         padType: this.padType,
         targetVolumeMm3: Number(this.targetVolumeMm3),
         selectedRuleId: this.selectedRuleId,
+        selectedRuleGroupKey: this.selectedRuleGroupKey || "",
         rules: deepClone(this.rules),
         stencilThicknessMm: Number(this.thicknessValue),
       };
@@ -1165,6 +1167,9 @@ priority: 100`;
         this.selectedRuleId = nextRule.id;
       }
     },
+    selectRule(rule) {
+      this.selectedRuleId = rule.id;
+    },
     buildRuleGroupsFromRules(rules) {
       const groups = new Map();
       (rules || []).forEach((rule, index) => {
@@ -1231,6 +1236,7 @@ priority: 100`;
       const next = this.newRule();
       this.rules.unshift(next);
       this.selectedRuleId = next.id;
+      this.selectedRuleGroupKey = "__all__";
     },
     duplicateRule() {
       if (!this.activeRule) return;

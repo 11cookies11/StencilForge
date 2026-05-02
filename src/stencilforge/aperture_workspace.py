@@ -43,6 +43,7 @@ def default_aperture_workspace() -> dict[str, Any]:
         "padType": "SMD",
         "targetVolumeMm3": 0.062,
         "selectedRuleId": "rule_qfn",
+        "selectedRuleGroupKey": "",
         "rules": [
             {
                 "id": "rule_default",
@@ -416,6 +417,7 @@ def _pick_workspace_fields(data: dict[str, Any]) -> dict[str, Any]:
         "padType": ("padType", "pad_type"),
         "targetVolumeMm3": ("targetVolumeMm3", "target_volume_mm3"),
         "selectedRuleId": ("selectedRuleId", "selected_rule_id"),
+        "selectedRuleGroupKey": ("selectedRuleGroupKey", "selected_rule_group_key"),
     }
     return _pick_fields(data, mapping)
 

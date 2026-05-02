@@ -77,12 +77,14 @@ def test_workspace_payload_round_trip_keeps_rules():
     workspace = default_aperture_workspace()
     workspace["profileName"] = "Import / Export"
     workspace["rules"][1]["name"] = "Round trip rule"
+    workspace["selectedRuleGroupKey"] = "qfn::smd"
 
     payload = export_aperture_workspace_payload(workspace, 0.15)
 
     assert payload["schemaVersion"] == 1
     assert payload["kind"] == "stencilforge.aperture_workspace"
     assert payload["workspace"]["profileName"] == "Import / Export"
+    assert payload["workspace"]["selectedRuleGroupKey"] == "qfn::smd"
     assert payload["snapshot"]["thicknessValue"] == 0.15
     assert payload["snapshot"]["matchedRuleGroupSummary"] == "QFN / SMD"
 
@@ -91,6 +93,7 @@ def test_workspace_payload_round_trip_keeps_rules():
     assert imported["profileName"] == "Import / Export"
     assert imported["rules"][1]["name"] == "Round trip rule"
     assert imported["selectedRuleId"] == workspace["selectedRuleId"]
+    assert imported["selectedRuleGroupKey"] == "qfn::smd"
 
 
 def test_workspace_payload_accepts_legacy_field_aliases():
