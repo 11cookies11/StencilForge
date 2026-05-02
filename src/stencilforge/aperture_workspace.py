@@ -149,7 +149,7 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         "recommendedScale": recommended_scale,
         "recommendedDeltaMm": recommended_delta_mm if isfinite(recommended_delta_mm) else 0.0,
         "calculatorStatus": calculator_status,
-        "previewStatus": "above" if effective_target_volume_mm3 > recommended_volume_mm3 else "recommended",
+        "previewStatus": _preview_status(effective_target_volume_mm3, recommended_volume_mm3),
         "packageFactor": package_factor,
         "padTypeFactor": pad_type_factor,
         "strategyFactor": strategy_factor,
@@ -618,6 +618,14 @@ def _match_specificity(match: dict[str, Any]) -> int:
 def _normalize_match_token(value: Any) -> str:
     token = str(value or "Any").strip()
     return token or "Any"
+
+
+def _preview_status(effective_target_volume_mm3: float, recommended_volume_mm3: float) -> str:
+    if effective_target_volume_mm3 > recommended_volume_mm3 * 1.005:
+        return "above"
+    if effective_target_volume_mm3 < recommended_volume_mm3 * 0.995:
+        return "below"
+    return "recommended"
 
 
 def _matches_token(rule_value: str, workspace_value: str) -> bool:

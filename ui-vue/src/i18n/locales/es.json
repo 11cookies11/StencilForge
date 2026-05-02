@@ -211,5 +211,13 @@
   "log.needInput": "Input folder and output STL are required.",
   "log.done": "Done: {value}",
   "log.error": "Error: {value}",
-  "log.noOutput": "Output STL is not set."
+  "log.noOutput": "Output STL is not set.",
+  "config.aperturePreviewRawPad": "Pad base",
+  "config.aperturePreviewRawPadHint": "La geometría base antes de cualquier ajuste.",
+  "config.aperturePreviewRecommendedLabel": "Apertura recomendada",
+  "config.aperturePreviewRecommendedHint": "El tamaño de apertura recomendado por el calculador.",
+  "config.aperturePreviewRuleEffect": "Efecto de la regla",
+  "config.aperturePreviewRuleEffectHint": "El efecto real de la regla coincidente.",
+  "config.aperturePreviewBelow": "Por debajo de lo recomendado",
+  "config.apertureRuleEffectSummary": "Efecto de la regla"
 }

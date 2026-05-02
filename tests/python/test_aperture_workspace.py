@@ -32,7 +32,7 @@ def test_workspace_metrics_are_computed():
 
     assert snapshot["thicknessLabel"] == "0.12 mm"
     assert snapshot["calculatorStatus"] == "ok"
-    assert snapshot["previewStatus"] == "recommended"
+    assert snapshot["previewStatus"] == "below"
     assert isfinite(snapshot["recommendedVolumeMm3"])
     assert snapshot["generatedRulePreview"].startswith("match: { package:")
     assert snapshot["matchedRuleGroupSummary"] == "QFN / SMD"
@@ -218,3 +218,25 @@ def test_pad_size_breaks_tie_in_matching():
     ]
     effect = resolve_aperture_workspace_effect(workspace, 0.15)
     assert effect["ruleId"] == "rule_fine"
+
+
+def test_preview_status_includes_below():
+    workspace = default_aperture_workspace()
+    workspace["targetVolumeMm3"] = 0.001
+    snapshot = compute_aperture_workspace(workspace, 0.12)
+    assert snapshot["previewStatus"] == "below"
+
+
+def test_preview_status_shows_above_when_target_exceeds_recommended():
+    workspace = default_aperture_workspace()
+    workspace["targetVolumeMm3"] = 10.0
+    snapshot = compute_aperture_workspace(workspace, 0.12)
+    assert snapshot["previewStatus"] == "above"
+
+
+def test_preview_status_shows_recommended_when_target_matches_recommended():
+    snapshot = compute_aperture_workspace({}, 0.12)
+    workspace = default_aperture_workspace()
+    workspace["targetVolumeMm3"] = snapshot["recommendedVolumeMm3"]
+    snapshot2 = compute_aperture_workspace(workspace, 0.12)
+    assert snapshot2["previewStatus"] == "recommended"

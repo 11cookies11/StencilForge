@@ -211,5 +211,13 @@
   "log.needInput": "Input folder and output STL are required.",
   "log.done": "Done: {value}",
   "log.error": "Error: {value}",
-  "log.noOutput": "Output STL is not set."
+  "log.noOutput": "Output STL is not set.",
+  "config.aperturePreviewRawPad": "Rohes Pad",
+  "config.aperturePreviewRawPadHint": "Das Pad vor der Anpassung.",
+  "config.aperturePreviewRecommendedLabel": "Empfohlene Öffnung",
+  "config.aperturePreviewRecommendedHint": "Die vom Rechner empfohlene Öffnungsgröße.",
+  "config.aperturePreviewRuleEffect": "Regelwirkung",
+  "config.aperturePreviewRuleEffectHint": "Die tatsächliche Wirkung der angewendeten Regel.",
+  "config.aperturePreviewBelow": "Unter Empfehlung",
+  "config.apertureRuleEffectSummary": "Regelwirkung"
 }

@@ -211,5 +211,13 @@
   "log.needInput": "需要输入目录和输出 STL。",
   "log.done": "完成: {value}",
   "log.error": "错误: {value}",
-  "log.noOutput": "未设置输出 STL。"
+  "log.noOutput": "未设置输出 STL。",
+  "config.aperturePreviewRawPad": "原始焊盘",
+  "config.aperturePreviewRawPadHint": "调整前的焊盘几何。",
+  "config.aperturePreviewRecommendedLabel": "推荐开口",
+  "config.aperturePreviewRecommendedHint": "计算器推荐的开口尺寸。",
+  "config.aperturePreviewRuleEffect": "规则效果",
+  "config.aperturePreviewRuleEffectHint": "匹配规则的实际效果。",
+  "config.aperturePreviewBelow": "低于推荐值",
+  "config.apertureRuleEffectSummary": "规则效果"
 }

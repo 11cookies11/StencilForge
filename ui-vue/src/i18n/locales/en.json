@@ -211,5 +211,13 @@
   "log.needInput": "Input folder and output STL are required.",
   "log.done": "Done: {value}",
   "log.error": "Error: {value}",
-  "log.noOutput": "Output STL is not set."
+  "log.noOutput": "Output STL is not set.",
+  "config.aperturePreviewRawPad": "Raw pad",
+  "config.aperturePreviewRawPadHint": "The base pad geometry before any adjustment.",
+  "config.aperturePreviewRecommendedLabel": "Recommended aperture",
+  "config.aperturePreviewRecommendedHint": "The calculator recommended aperture size.",
+  "config.aperturePreviewRuleEffect": "Matched rule effect",
+  "config.aperturePreviewRuleEffectHint": "The actual effect of the matched rule on this pad.",
+  "config.aperturePreviewBelow": "Below recommendation",
+  "config.apertureRuleEffectSummary": "Rule effect"
 }

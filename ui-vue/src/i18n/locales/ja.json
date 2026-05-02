@@ -211,5 +211,13 @@
   "log.needInput": "Input folder and output STL are required.",
   "log.done": "Done: {value}",
   "log.error": "Error: {value}",
-  "log.noOutput": "Output STL is not set."
+  "log.noOutput": "Output STL is not set.",
+  "config.aperturePreviewRawPad": "ベースパッド",
+  "config.aperturePreviewRawPadHint": "調整前のパッド形状。",
+  "config.aperturePreviewRecommendedLabel": "推奨開口",
+  "config.aperturePreviewRecommendedHint": "計算機による推奨開口サイズ。",
+  "config.aperturePreviewRuleEffect": "ルール効果",
+  "config.aperturePreviewRuleEffectHint": "マッチしたルールの実際の効果。",
+  "config.aperturePreviewBelow": "推奨未満",
+  "config.apertureRuleEffectSummary": "ルール効果"
 }

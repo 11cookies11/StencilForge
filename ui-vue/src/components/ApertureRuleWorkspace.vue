@@ -631,20 +631,27 @@
               </span>
             </div>
 
-            <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <div class="mt-5 grid gap-4 sm:grid-cols-3">
               <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePreviewDefault") }}</div>
-                <div class="mt-4 flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
-                  <div class="rounded-xl bg-blue-500/15 ring-1 ring-blue-200 transition-all duration-300" :style="previewVisualStyle(1, 'default')"></div>
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePreviewRawPad") }}</div>
+                <div class="mt-4 flex h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                  <div class="rounded-xl bg-slate-400/20 ring-1 ring-slate-300 transition-all duration-300" :style="previewVisualStyle(1, 'raw')"></div>
                 </div>
-                <div class="mt-3 text-xs text-slate-500">{{ t("config.aperturePreviewDefaultHint") }}</div>
+                <div class="mt-3 text-xs text-slate-500">{{ t("config.aperturePreviewRawPadHint") }}</div>
               </div>
               <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePreviewCustom") }}</div>
-                <div class="mt-4 flex h-40 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
-                  <div class="rounded-xl bg-blue-600/15 ring-1 ring-blue-300 transition-all duration-300" :style="previewVisualStyle(recommendedScale, 'custom')"></div>
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePreviewRecommendedLabel") }}</div>
+                <div class="mt-4 flex h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                  <div class="rounded-xl bg-blue-500/15 ring-1 ring-blue-200 transition-all duration-300" :style="previewVisualStyle(recommendedScale, 'recommended')"></div>
                 </div>
-                <div class="mt-3 text-xs text-slate-500">{{ t("config.aperturePreviewCustomHint") }}</div>
+                <div class="mt-3 text-xs text-slate-500">{{ t("config.aperturePreviewRecommendedHint") }}</div>
+              </div>
+              <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.aperturePreviewRuleEffect") }}</div>
+                <div class="mt-4 flex h-36 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                  <div class="rounded-xl bg-purple-600/15 ring-1 ring-purple-300 transition-all duration-300" :style="previewVisualStyle(matchedRuleEffectScale, 'rule')"></div>
+                </div>
+                <div class="mt-3 text-xs text-slate-500">{{ t("config.aperturePreviewRuleEffectHint") }}</div>
               </div>
             </div>
           </div>
@@ -673,6 +680,10 @@
                 <div class="rounded-2xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureEstimatedVolume") }}</div>
                   <div class="mt-2 text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatVolume(effectiveTargetVolumeMm3) }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-4">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRuleEffectSummary") }}</div>
+                  <div class="mt-2 text-base font-semibold text-slate-900">{{ matchedRuleActionSummary }}</div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div class="rounded-2xl border border-slate-200 bg-white p-4">
@@ -912,9 +923,54 @@ export default {
       if (backendValue === "recommended") {
         return this.t("config.aperturePreviewRecommended");
       }
-      return this.effectiveTargetVolumeMm3 > this.recommendedVolumeMm3
-        ? this.t("config.aperturePreviewAbove")
-        : this.t("config.aperturePreviewRecommended");
+      if (backendValue === "below") {
+        return this.t("config.aperturePreviewBelow");
+      }
+      const effective = this.effectiveTargetVolumeMm3;
+      const recommended = this.recommendedVolumeMm3;
+      if (effective > recommended * 1.005) return this.t("config.aperturePreviewAbove");
+      if (effective < recommended * 0.995) return this.t("config.aperturePreviewBelow");
+      return this.t("config.aperturePreviewRecommended");
+    },
+    previewStatusClass() {
+      const backendValue = this.workspaceSnapshot?.previewStatus;
+      let status = backendValue;
+      if (!status) {
+        const effective = this.effectiveTargetVolumeMm3;
+        const recommended = this.recommendedVolumeMm3;
+        if (effective > recommended * 1.005) status = "above";
+        else if (effective < recommended * 0.995) status = "below";
+        else status = "recommended";
+      }
+      if (status === "above") return "bg-amber-50 text-amber-700 border-amber-200";
+      if (status === "below") return "bg-blue-50 text-blue-700 border-blue-200";
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    },
+    matchedRuleActionSummary() {
+      const backendValue = this.workspaceSnapshot?.matchedRuleActionSummary;
+      if (backendValue) return backendValue;
+      return this.describeAction(this.matchedRule);
+    },
+    matchedRuleEffectScale() {
+      const rule = this.matchedRule;
+      if (!rule || !rule.action) return 1;
+      if (rule.action.mode === "scale") {
+        return Number(rule.action.scale) || 1;
+      }
+      const delta = Number(rule.action.deltaMm) || 0;
+      const w = Number(this.padWidthMm);
+      const h = Number(this.padHeightMm);
+      if (w <= 0 || h <= 0) return 1;
+      const newW = w + 2 * delta;
+      const newH = h + 2 * delta;
+      if (newW <= 0 || newH <= 0) return 0.01;
+      const areaRatio = (newW * newH) / (w * h);
+      return Math.sqrt(Math.max(0.01, areaRatio));
+    },
+    matchedRuleEffectDelta() {
+      const rule = this.matchedRule;
+      if (!rule || !rule.action) return 0;
+      return Number(rule.action.deltaMm) || 0;
     },
     activeRule() {
       return this.rules.find((rule) => rule.id === this.selectedRuleId) || this.rules[0];
@@ -1133,7 +1189,7 @@ priority: 100`;
     },
     previewVisualStyle(scale, variant) {
       const nextScale = Math.max(0.38, Math.min(1.08, Number(scale) || 1));
-      const baseSize = variant === "default" ? 82 : 94;
+      const baseSize = variant === "raw" ? 72 : variant === "recommended" ? 80 : 88;
       const size = Math.round(baseSize * nextScale);
       return {
         width: `${size}px`,
