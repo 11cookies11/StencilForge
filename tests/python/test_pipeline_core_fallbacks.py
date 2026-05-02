@@ -37,15 +37,12 @@ class _DummyGeometryService:
         return {"ok": True}
 
 
-def test_outline_builtin_fallback_matches_gko(monkeypatch, tmp_path: Path) -> None:
+def test_outline_builtin_fallback_matches_gko(tmp_path: Path) -> None:
     (tmp_path / "Gerber_BottomPasteMaskLayer.GBP").write_text("G04 paste*\n", encoding="utf-8")
     (tmp_path / "Gerber_BoardOutlineLayer.GKO").write_text("G04 outline*\n", encoding="utf-8")
 
     service = _DummyGeometryService(StencilConfig.from_dict({}))
     engine = _DummyEngine()
-
-    monkeypatch.setattr("stencilforge.pipeline.core.GerberGeometryService", lambda cfg: service)
-    monkeypatch.setattr("stencilforge.pipeline.core.get_model_engine", lambda _name: engine)
 
     cfg = StencilConfig.from_dict(
         {
@@ -54,21 +51,19 @@ def test_outline_builtin_fallback_matches_gko(monkeypatch, tmp_path: Path) -> No
             "output_mode": "holes_only",
         }
     )
-    generate_stencil(tmp_path, tmp_path / "out.stl", cfg)
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
 
     assert engine.called is True
     assert service.outline_loaded is not None
     assert service.outline_loaded.name.lower().endswith(".gko")
 
 
-def test_outline_falls_back_to_margin_when_no_outline_match(monkeypatch, tmp_path: Path) -> None:
+def test_outline_falls_back_to_margin_when_no_outline_match(tmp_path: Path) -> None:
     (tmp_path / "Gerber_BottomPasteMaskLayer.GBP").write_text("G04 paste*\n", encoding="utf-8")
 
     service = _DummyGeometryService(StencilConfig.from_dict({}))
     engine = _DummyEngine()
-
-    monkeypatch.setattr("stencilforge.pipeline.core.GerberGeometryService", lambda cfg: service)
-    monkeypatch.setattr("stencilforge.pipeline.core.get_model_engine", lambda _name: engine)
 
     cfg = StencilConfig.from_dict(
         {
@@ -78,7 +73,8 @@ def test_outline_falls_back_to_margin_when_no_outline_match(monkeypatch, tmp_pat
             "outline_margin_mm": 5.0,
         }
     )
-    generate_stencil(tmp_path, tmp_path / "out.stl", cfg)
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
 
     assert engine.called is True
     assert service.outline_loaded is None
@@ -90,14 +86,11 @@ def test_outline_falls_back_to_margin_when_no_outline_match(monkeypatch, tmp_pat
     assert max_y >= 12.9
 
 
-def test_aperture_workspace_rule_changes_paste_geometry(monkeypatch, tmp_path: Path) -> None:
+def test_aperture_workspace_rule_changes_paste_geometry(tmp_path: Path) -> None:
     (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
 
     service = _DummyGeometryService(StencilConfig.from_dict({}))
     engine = _DummyEngine()
-
-    monkeypatch.setattr("stencilforge.pipeline.core.GerberGeometryService", lambda cfg: service)
-    monkeypatch.setattr("stencilforge.pipeline.core.get_model_engine", lambda _name: engine)
 
     cfg = StencilConfig.from_dict(
         {
@@ -124,7 +117,8 @@ def test_aperture_workspace_rule_changes_paste_geometry(monkeypatch, tmp_path: P
         ],
     }
 
-    generate_stencil(tmp_path, tmp_path / "out.stl", cfg, workspace)
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg, workspace,
+                     geometry_service=service, model_engine=engine)
 
     assert engine.called is True
     assert engine.last_input is not None

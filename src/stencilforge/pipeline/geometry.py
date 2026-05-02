@@ -6,11 +6,27 @@ import logging
 
 import trimesh
 from shapely import constrained_delaunay_triangles
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
 from shapely.ops import triangulate, unary_union
 
 logger = logging.getLogger(__name__)
+
+
+def as_polygon_list(geometry) -> list[Polygon]:
+    """Convert any Shapely geometry into a flat list of valid Polygon objects."""
+    if geometry is None or geometry.is_empty:
+        return []
+    if geometry.geom_type == "Polygon":
+        return [geometry] if geometry.area > 0 else []
+    if geometry.geom_type == "MultiPolygon":
+        return [poly for poly in geometry.geoms if poly.area > 0]
+    merged = unary_union([geometry])
+    if merged.geom_type == "Polygon":
+        return [merged] if merged.area > 0 else []
+    if merged.geom_type == "MultiPolygon":
+        return [poly for poly in merged.geoms if poly.area > 0]
+    return []
 
 
 def extrude_geometry(geometry, thickness_mm: float):
@@ -19,27 +35,10 @@ def extrude_geometry(geometry, thickness_mm: float):
     geometry = solidify_geometry(geometry)
 
     meshes = []
-    if geometry.geom_type == "Polygon":
-        if geometry.area > 0:
-            meshes.append(extrude_polygon_solid(geometry, thickness_mm))
-    elif geometry.geom_type == "MultiPolygon":
-        for poly in geometry.geoms:
-            poly = ensure_valid(poly)
-            if poly.area <= 0:
-                continue
+    for poly in as_polygon_list(geometry):
+        poly = ensure_valid(poly)
+        if poly.area > 0:
             meshes.append(extrude_polygon_solid(poly, thickness_mm))
-    else:
-        merged = unary_union([geometry])
-        if merged.geom_type == "Polygon":
-            merged = ensure_valid(merged)
-            if merged.area > 0:
-                meshes.append(extrude_polygon_solid(merged, thickness_mm))
-        elif merged.geom_type == "MultiPolygon":
-            for poly in merged.geoms:
-                poly = ensure_valid(poly)
-                if poly.area <= 0:
-                    continue
-                meshes.append(extrude_polygon_solid(poly, thickness_mm))
 
     if not meshes:
         raise ValueError("Failed to create STL mesh from geometry.")

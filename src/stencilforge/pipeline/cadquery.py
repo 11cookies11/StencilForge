@@ -10,7 +10,7 @@ from shapely.ops import unary_union
 from shapely.geometry import Polygon
 
 from ..config import StencilConfig
-from .geometry import ensure_valid, orient_geometry, solidify_geometry
+from .geometry import as_polygon_list, ensure_valid, orient_geometry, solidify_geometry
 
 logger = logging.getLogger(__name__)
 
@@ -183,21 +183,7 @@ def cadquery_extrude_geometry(geometry, thickness_mm: float, cq, config: Stencil
     )
     logger.info("CadQuery 2D preprocess in %.3fs", time.perf_counter() - t0)
 
-    polygons = []
-    if geometry.geom_type == "Polygon":
-        if geometry.area > 0:
-            polygons.append(geometry)
-    elif geometry.geom_type == "MultiPolygon":
-        polygons.extend([poly for poly in geometry.geoms if poly.area > 0])
-    else:
-        t0 = time.perf_counter()
-        merged = unary_union([geometry])
-        logger.info("CadQuery 2D union in %.3fs", time.perf_counter() - t0)
-        if merged.geom_type == "Polygon":
-            if merged.area > 0:
-                polygons.append(merged)
-        elif merged.geom_type == "MultiPolygon":
-            polygons.extend([poly for poly in merged.geoms if poly.area > 0])
+    polygons = as_polygon_list(geometry)
 
     solids = []
     for idx, poly in enumerate(polygons, start=1):

@@ -406,9 +406,7 @@ class OutlineBuilder:
                 segments = self._merge_near_colinear_segments(segments, merge_tol)
             merged = unary_union(segments)
             segments = self._merge_outline_segments(segments, merged)
-            loops = self._build_loops_in_order(segments, close_tol)
-            if not loops:
-                loops = self._build_closed_loops(segments, close_tol)
+            loops = self._build_closed_loops(segments, close_tol)
             if loops:
                 polygons = self._loops_to_polygons(loops)
             else:
@@ -609,45 +607,6 @@ class OutlineBuilder:
             logger.info("Outline segments merged: %s -> %s", len(segments), len(merged_segments))
             return merged_segments
         return segments
-
-    def _build_loops_in_order(self, segments, tol: float):
-        # 按原始顺序拼接，若端点接近则延续
-        loops = []
-        current = []
-        start_point = None
-        for seg in segments:
-            coords = list(seg.coords)
-            if len(coords) < 2:
-                continue
-            if not current:
-                current = coords[:]
-                start_point = current[0]
-                continue
-            last = current[-1]
-            if self._points_close(last, coords[0], tol):
-                current.extend(coords[1:])
-            elif self._points_close(last, coords[-1], tol):
-                current.extend(list(reversed(coords))[:-1])
-            else:
-                loops.extend(self._finalize_path_loop(current, start_point, tol))
-                current = coords[:]
-                start_point = current[0]
-        if current:
-            loops.extend(self._finalize_path_loop(current, start_point, tol))
-        logger.info("Outline loops ordered: %s", len(loops))
-        return loops
-
-    def _finalize_path_loop(self, path, start_point, tol: float):
-        if not path:
-            return []
-        if start_point is None:
-            start_point = path[0]
-        if self._points_close(path[-1], start_point, tol):
-            if path[-1] != path[0]:
-                path.append(path[0])
-            if len(path) >= 4:
-                return [LineString(path)]
-        return []
 
     def _build_closed_loops(self, segments, tol: float):
         # 构建端点邻接图，尝试遍历成闭合环

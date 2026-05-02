@@ -13,7 +13,7 @@ from shapely.ops import unary_union
 
 from ..config import StencilConfig
 from .cadquery import export_cadquery_stl
-from .geometry import ensure_valid, extrude_geometry, orient_geometry
+from .geometry import as_polygon_list, ensure_valid, extrude_geometry, orient_geometry
 from .mesh import cleanup_mesh, translate_to_origin
 
 logger = logging.getLogger(__name__)
@@ -217,17 +217,7 @@ def _extrude_with_cdt(geometry, thickness_mm: float) -> trimesh.Trimesh:
     if geometry.is_empty:
         raise ValueError("Geometry is empty after preprocessing.")
 
-    polygons = []
-    if geometry.geom_type == "Polygon":
-        polygons = [geometry]
-    elif geometry.geom_type == "MultiPolygon":
-        polygons = [poly for poly in geometry.geoms if poly.area > 0]
-    else:
-        merged = unary_union([geometry])
-        if merged.geom_type == "Polygon":
-            polygons = [merged]
-        elif merged.geom_type == "MultiPolygon":
-            polygons = [poly for poly in merged.geoms if poly.area > 0]
+    polygons = as_polygon_list(geometry)
 
     meshes: list[trimesh.Trimesh] = []
     for poly in polygons:
@@ -359,17 +349,7 @@ def _prepare_sfmesh_geometry(geometry, cfg: StencilConfig, preserve_holes: bool)
 def _filter_polygon_noise(geometry, min_polygon_area: float, min_hole_area: float):
     if geometry.is_empty:
         return geometry
-    polygons: list[Polygon] = []
-    if isinstance(geometry, Polygon):
-        polygons = [_clean_single_polygon(geometry, min_hole_area)]
-    elif isinstance(geometry, MultiPolygon):
-        polygons = [_clean_single_polygon(poly, min_hole_area) for poly in geometry.geoms]
-    else:
-        unioned = unary_union([geometry])
-        if isinstance(unioned, Polygon):
-            polygons = [_clean_single_polygon(unioned, min_hole_area)]
-        elif isinstance(unioned, MultiPolygon):
-            polygons = [_clean_single_polygon(poly, min_hole_area) for poly in unioned.geoms]
+    polygons = [_clean_single_polygon(poly, min_hole_area) for poly in as_polygon_list(geometry)]
     kept = [poly for poly in polygons if poly is not None and not poly.is_empty and poly.area >= min_polygon_area]
     if not kept:
         return geometry

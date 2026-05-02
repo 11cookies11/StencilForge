@@ -12,8 +12,8 @@ from shapely.ops import unary_union
 from ..aperture_workspace import resolve_aperture_workspace_effect
 from ..config import StencilConfig
 from ..geometry import GerberGeometryService
-from ..geometry.service import _flatten_to_polygons
-from .engine import EngineExportInput, get_model_engine
+from ..geometry.service import flatten_to_polygons
+from .engine import EngineExportInput, ModelEngine, get_model_engine
 from .geometry import count_holes
 from .locator import build_locator_bridge, build_locator_ring, build_locator_step
 from .pad_classifier import classify_pads
@@ -56,12 +56,16 @@ def generate_stencil(
     output_path: Path,
     config: StencilConfig,
     aperture_workspace: dict | None = None,
+    *,
+    geometry_service: GerberGeometryService | None = None,
+    model_engine: ModelEngine | None = None,
 ) -> dict | None:
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
     config.validate()
-    geometry_service = GerberGeometryService(config)
+    if geometry_service is None:
+        geometry_service = GerberGeometryService(config)
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
     overall_start = time.perf_counter()
@@ -100,7 +104,7 @@ def generate_stencil(
         logger.info("Drill files: %s", ", ".join([p.name for p in drill_files]))
     drill_holes = geometry_service.load_drill_holes(drill_files) if drill_files else []
 
-    paste_polygons = _flatten_to_polygons(paste_geom)
+    paste_polygons = flatten_to_polygons(paste_geom)
     pad_infos = classify_pads(paste_polygons, drill_holes)
     if pad_infos:
         from .pad_classifier import classification_summary
@@ -274,9 +278,10 @@ def generate_stencil(
                     config.locator_open_width_mm,
                 )
 
-    backend = get_model_engine(config.model_backend)
+    if model_engine is None:
+        model_engine = get_model_engine(config.model_backend)
     t0 = time.perf_counter()
-    backend.export(
+    model_engine.export(
         EngineExportInput(
             stencil_2d=stencil_2d,
             locator_geom=locator_geom,
@@ -285,7 +290,7 @@ def generate_stencil(
             config=config,
         )
     )
-    logger.info("Backend '%s' export in %.3fs", backend.name, time.perf_counter() - t0)
+    logger.info("Backend '%s' export in %.3fs", model_engine.name, time.perf_counter() - t0)
     logger.info("Total pipeline time: %.3fs", time.perf_counter() - overall_start)
     return outline_debug
 

@@ -13,6 +13,7 @@ from gerber import load_layer
 from gerber.common import read as gerber_read
 from gerber.excellon import ExcellonFile
 from gerber.excellon_statements import CoordinateStmt, ToolSelectionStmt
+from gerber.primitives import Drill, Slot
 from shapely import affinity
 from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
@@ -50,7 +51,7 @@ class GerberGeometryService:
             geom = self._scale_to_mm(geom, layer.cam_source.units)
             if geom is None or geom.is_empty:
                 continue
-            polygons.extend(_flatten_to_polygons(geom))
+            polygons.extend(flatten_to_polygons(geom))
         return polygons
 
     def load_drill_holes(self, paths: Iterable[Path]) -> list[tuple[float, float, float]]:
@@ -78,7 +79,17 @@ class GerberGeometryService:
         holes: list[tuple[float, float, float]] = []
 
         for stmt in cnc.primitives:
-            if isinstance(stmt, ToolSelectionStmt):
+            if isinstance(stmt, Drill):
+                x = float(stmt.position[0]) * scale
+                y = float(stmt.position[1]) * scale
+                diameter = float(stmt.diameter) * scale
+                holes.append((x, y, diameter))
+            elif isinstance(stmt, Slot):
+                sx = (float(stmt.start[0]) + float(stmt.end[0])) / 2.0 * scale
+                sy = (float(stmt.start[1]) + float(stmt.end[1])) / 2.0 * scale
+                diameter = float(stmt.diameter) * scale
+                holes.append((sx, sy, diameter))
+            elif isinstance(stmt, ToolSelectionStmt):
                 tool = getattr(stmt, "tool", None)
                 if tool is not None:
                     diameter = float(getattr(tool, "diameter", 0) or 0)
@@ -130,7 +141,7 @@ class GerberGeometryService:
         return unary_union([g for g in geometries if g is not None and not g.is_empty])
 
 
-def _flatten_to_polygons(geom) -> list[Polygon]:
+def flatten_to_polygons(geom) -> list[Polygon]:
     """Decompose a Shapely geometry into a flat list of Polygon objects."""
     if geom is None or geom.is_empty:
         return []
