@@ -172,3 +172,27 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+.app-titlebar {
+  user-select: none;
+}
+.window-btn {
+  width: 34px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.window-btn:hover {
+  background: #f1f5f9;
+  color: #1f2937;
+}
+.window-btn-close:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+</style>
