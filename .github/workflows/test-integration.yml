@@ -1,0 +1,47 @@
+name: Integration Tests
+
+# ──────────────────────────────────────────────────────────────────────
+# Full pipeline tests using real Gerber fixture ZIPs.
+# These are slow (~3-5 min) so they do NOT run on every push.
+# Trigger: manual (workflow_dispatch) or nightly schedule.
+# ──────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    - cron: "23 2 * * *"   # 2:23 AM UTC daily
+  workflow_dispatch:        # manual trigger from GitHub UI
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: Gerber → STL pipeline (5 fixture cases)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+
+      - name: Run integration tests
+        run: |
+          pytest tests/python/ -m integration -v --timeout=600
+
+      - name: Upload Gerber fixture artifacts (for debugging)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            .pytest_cache/
+            tests/fixtures/gerber/
+          if-no-files-found: ignore
