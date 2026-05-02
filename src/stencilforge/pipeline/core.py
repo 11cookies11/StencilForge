@@ -101,6 +101,12 @@ def generate_stencil(
                 aperture_effect["matchSummary"] or "(any)",
                 aperture_effect["actionSummary"] or "(none)",
             )
+            if aperture_effect.get("groupSummary"):
+                logger.info(
+                    "Aperture rule group: %s (%s rule(s))",
+                    aperture_effect["groupSummary"],
+                    aperture_effect.get("groupRuleCount", 0),
+                )
             if effect["mode"] == "scale":
                 scale_factor = float(effect.get("scale", 1.0) or 1.0)
                 if scale_factor != 1.0:

@@ -627,6 +627,10 @@
 
               <div class="mt-4 grid gap-3">
                 <div class="rounded-2xl bg-slate-50 p-4">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRuleGroupSummary") }}</div>
+                  <div class="mt-2 text-base font-semibold text-slate-900">{{ matchedRuleGroupSummary }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-4">
                   <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t("config.apertureRuleMatchSummary") }}</div>
                   <div class="mt-2 text-base font-semibold text-slate-900">{{ describeMatch(matchedRule) }}</div>
                 </div>
@@ -884,6 +888,11 @@ export default {
       }
       return this.activeRule;
     },
+    matchedRuleGroupSummary() {
+      const backendValue = this.workspaceSnapshot?.matchedRuleGroupSummary;
+      if (backendValue) return backendValue;
+      return this.describeRuleGroup(this.matchedRule);
+    },
     packageOptions() {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
@@ -1075,7 +1084,16 @@ priority: 100`;
       if (rule.match.package && rule.match.package !== "Any") parts.push(rule.match.package);
       if (rule.match.padType && rule.match.padType !== "Any") parts.push(rule.match.padType);
       if (rule.match.padSize) parts.push(rule.match.padSize);
-      return parts.length ? parts.join(" · ") : this.t("config.apertureAny");
+      return parts.length ? parts.join(" / ") : this.t("config.apertureAny");
+    },
+    describeRuleGroup(group) {
+      if (!group) return this.t("config.apertureAny");
+      const label = String(group.label || "").trim();
+      if (label) return label;
+      const parts = [];
+      if (group.package && group.package !== "Any") parts.push(group.package);
+      if (group.padType && group.padType !== "Any") parts.push(group.padType);
+      return parts.length ? parts.join(" / ") : this.t("config.apertureAny");
     },
     describeAction(rule) {
       if (!rule) return "";

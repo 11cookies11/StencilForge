@@ -129,6 +129,7 @@
   "config.apertureRuleNote": "备注",
   "config.apertureRuleMatchSummary": "匹配摘要",
   "config.apertureRuleActionSummary": "动作摘要",
+  "config.apertureRuleGroupSummary": "规则分组",
   "config.apertureCalculatorTitle": "体积计算器",
   "config.apertureCalculatorHint": "结合焊盘几何和工艺参数，反推出目标体积和生成规则。",
   "config.aperturePackageType": "封装类型",

@@ -31,6 +31,8 @@ def test_workspace_metrics_are_computed():
     assert snapshot["previewStatus"] == "recommended"
     assert isfinite(snapshot["recommendedVolumeMm3"])
     assert snapshot["generatedRulePreview"].startswith("match: { package:")
+    assert snapshot["matchedRuleGroupSummary"] == "QFN / SMD"
+    assert len(snapshot["ruleGroups"]) == 3
 
 
 def test_workspace_descriptions_are_human_readable():
@@ -55,6 +57,7 @@ def test_workspace_effect_prefers_package_and_pad_type_match():
 
     assert effect["ruleId"] == "rule_qfn"
     assert effect["ruleName"] == "QFN fine pitch"
+    assert effect["groupSummary"] == "QFN / SMD"
     assert effect["matchSummary"].startswith("QFN")
     assert effect["effect"]["mode"] == "delta"
     assert effect["effect"]["deltaMm"] == -0.03
@@ -71,6 +74,7 @@ def test_workspace_payload_round_trip_keeps_rules():
     assert payload["kind"] == "stencilforge.aperture_workspace"
     assert payload["workspace"]["profileName"] == "Import / Export"
     assert payload["snapshot"]["thicknessValue"] == 0.15
+    assert payload["snapshot"]["matchedRuleGroupSummary"] == "QFN / SMD"
 
     imported = import_aperture_workspace_payload(payload)
 

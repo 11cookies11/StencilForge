@@ -133,6 +133,9 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         workspace["rules"][0],
     )
     matched_rule = resolve_matching_rule(workspace)
+    rule_groups = build_rule_groups(workspace, matched_rule=matched_rule, active_rule=active_rule)
+    matched_rule_group = next((group for group in rule_groups if group.get("matched")), None)
+    active_rule_group = next((group for group in rule_groups if group.get("active")), None)
     return {
         **workspace,
         "thicknessValue": thickness_value,
@@ -151,6 +154,11 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         "strategyFactor": strategy_factor,
         "activeRule": active_rule,
         "matchedRule": matched_rule,
+        "ruleGroups": rule_groups,
+        "activeRuleGroup": active_rule_group,
+        "matchedRuleGroup": matched_rule_group,
+        "activeRuleGroupSummary": describe_rule_group(active_rule_group),
+        "matchedRuleGroupSummary": describe_rule_group(matched_rule_group),
         "generatedRulePreview": build_generated_rule_preview(workspace, recommended_delta_mm, recommended_scale),
         "activeRuleMatchSummary": describe_match(active_rule),
         "activeRuleActionSummary": describe_action(active_rule),
@@ -184,6 +192,11 @@ def export_aperture_workspace_payload(
             "packageFactor": snapshot["packageFactor"],
             "padTypeFactor": snapshot["padTypeFactor"],
             "strategyFactor": snapshot["strategyFactor"],
+            "ruleGroups": snapshot["ruleGroups"],
+            "activeRuleGroup": snapshot["activeRuleGroup"],
+            "matchedRuleGroup": snapshot["matchedRuleGroup"],
+            "activeRuleGroupSummary": snapshot["activeRuleGroupSummary"],
+            "matchedRuleGroupSummary": snapshot["matchedRuleGroupSummary"],
             "generatedRulePreview": snapshot["generatedRulePreview"],
             "activeRuleMatchSummary": snapshot["activeRuleMatchSummary"],
             "activeRuleActionSummary": snapshot["activeRuleActionSummary"],
@@ -273,6 +286,8 @@ def resolve_aperture_workspace_effect(
         "effect": effect,
         "ruleId": str(active_rule.get("id") or ""),
         "ruleName": str(active_rule.get("name") or ""),
+        "groupSummary": snapshot["matchedRuleGroupSummary"] or snapshot["activeRuleGroupSummary"],
+        "groupRuleCount": int((snapshot["matchedRuleGroup"] or snapshot["activeRuleGroup"] or {}).get("ruleCount", 0) or 0),
         "matchSummary": snapshot["matchedRuleMatchSummary"] or snapshot["activeRuleMatchSummary"],
         "actionSummary": snapshot["matchedRuleActionSummary"] or snapshot["activeRuleActionSummary"],
     }
@@ -304,6 +319,23 @@ def describe_match(rule: dict[str, Any] | None) -> str:
     if pad_size:
         parts.append(str(pad_size))
     return " 路 ".join(parts) if parts else "Any"
+
+
+def describe_rule_group(group: dict[str, Any] | None) -> str:
+    if not isinstance(group, dict):
+        return "Any"
+    label = str(group.get("label") or "").strip()
+    if label:
+        return label
+    package = _normalize_match_token(group.get("package"))
+    pad_type = _normalize_match_token(group.get("padType"))
+    parts: list[str] = []
+    if package and package != "Any":
+        parts.append(package)
+    if pad_type and pad_type != "Any":
+        parts.append(pad_type)
+    return " / ".join(parts) if parts else "Any"
+
 
 
 def describe_action(rule: dict[str, Any] | None) -> str:
@@ -447,6 +479,78 @@ def resolve_matching_rule(workspace: dict[str, Any]) -> dict[str, Any] | None:
     if enabled_rules:
         return enabled_rules[0]
     return rules[0]
+
+
+def build_rule_groups(
+    workspace: dict[str, Any],
+    matched_rule: dict[str, Any] | None = None,
+    active_rule: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    groups: dict[str, dict[str, Any]] = {}
+    for index, rule in enumerate(_ensure_list(workspace.get("rules"))):
+        if not isinstance(rule, dict):
+            continue
+        match = rule.get("match") or {}
+        group_key = _rule_group_key(match)
+        group = groups.get(group_key)
+        if group is None:
+            group = {
+                "key": group_key,
+                "label": _group_label(match),
+                "package": _normalize_match_token(_first_present(match, ("package", "packageType", "package_type"))),
+                "padType": _normalize_match_token(_first_present(match, ("padType", "pad_type"))),
+                "ruleIds": [],
+                "ruleNames": [],
+                "ruleCount": 0,
+                "enabledRuleCount": 0,
+                "maxPriority": -10_000,
+                "matched": False,
+                "active": False,
+                "_order": index,
+            }
+            groups[group_key] = group
+        group["ruleIds"].append(str(rule.get("id") or ""))
+        group["ruleNames"].append(str(rule.get("name") or "Untitled rule"))
+        group["ruleCount"] += 1
+        if bool(rule.get("enabled", True)):
+            group["enabledRuleCount"] += 1
+        group["maxPriority"] = max(group["maxPriority"], int(rule.get("priority", 0) or 0))
+        if isinstance(matched_rule, dict) and rule.get("id") == matched_rule.get("id"):
+            group["matched"] = True
+        if isinstance(active_rule, dict) and rule.get("id") == active_rule.get("id"):
+            group["active"] = True
+    ordered_groups = sorted(
+        groups.values(),
+        key=lambda group: (
+            0 if group.get("matched") else 1,
+            0 if group.get("active") else 1,
+            -int(group.get("maxPriority", 0) or 0),
+            -int(group.get("enabledRuleCount", 0) or 0),
+            int(group.get("_order", 0) or 0),
+            str(group.get("label") or ""),
+        ),
+    )
+    for group in ordered_groups:
+        group.pop("_order", None)
+    return ordered_groups
+
+
+def _rule_group_key(match: dict[str, Any]) -> str:
+    package = _normalize_match_token(_first_present(match, ("package", "packageType", "package_type")))
+    pad_type = _normalize_match_token(_first_present(match, ("padType", "pad_type")))
+    return f"{package.casefold()}::{pad_type.casefold()}"
+
+
+def _group_label(match: dict[str, Any]) -> str:
+    package = _normalize_match_token(_first_present(match, ("package", "packageType", "package_type")))
+    pad_type = _normalize_match_token(_first_present(match, ("padType", "pad_type")))
+    parts: list[str] = []
+    if package and package != "Any":
+        parts.append(package)
+    if pad_type and pad_type != "Any":
+        parts.append(pad_type)
+    return " / ".join(parts) if parts else "Any"
+
 
 
 def _rule_matches_workspace(match: dict[str, Any], package_type: str, pad_type: str) -> bool:

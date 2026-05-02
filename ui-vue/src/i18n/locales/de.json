@@ -129,6 +129,7 @@
   "config.apertureRuleNote": "Note",
   "config.apertureRuleMatchSummary": "Match summary",
   "config.apertureRuleActionSummary": "Action summary",
+  "config.apertureRuleGroupSummary": "Rule group",
   "config.apertureCalculatorTitle": "Volume calculator",
   "config.apertureCalculatorHint": "Use pad geometry and process parameters to derive a target volume and the generated rule.",
   "config.aperturePackageType": "Package type",
