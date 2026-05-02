@@ -332,9 +332,42 @@
               </div>
             </div>
 
+            <div class="mt-5">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {{ t("config.apertureRuleGroupsTitle") }}
+                </div>
+                <button
+                  class="text-xs font-semibold text-blue-600 transition hover:text-blue-700"
+                  type="button"
+                  @click="selectAllRuleGroups"
+                >
+                  {{ t("config.apertureAllGroups") }}
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="group in ruleGroups"
+                  :key="group.key"
+                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-semibold transition"
+                  :class="activeRuleGroupKey === group.key ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'"
+                  type="button"
+                  @click="selectRuleGroup(group.key)"
+                >
+                  <span>{{ group.label }}</span>
+                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                    {{ group.ruleCount }}
+                  </span>
+                </button>
+              </div>
+              <div v-if="showingAllRuleGroups" class="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                {{ t("config.apertureAllGroups") }}
+              </div>
+            </div>
+
             <div class="mt-5 space-y-3">
               <button
-                v-for="rule in rules"
+                v-for="rule in filteredRules"
                 :key="rule.id"
                 class="w-full rounded-2xl border px-4 py-4 text-left transition"
                 :class="selectedRuleId === rule.id ? 'border-blue-200 bg-white shadow-sm ring-4 ring-blue-50' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'"
@@ -365,6 +398,9 @@
                   <AppIcon name="chevron_right" :size="18" class="text-slate-400" />
                 </div>
               </button>
+              <div v-if="!filteredRules.length" class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                {{ t("config.apertureNoRulesInGroup") }}
+              </div>
             </div>
           </div>
 
@@ -726,6 +762,7 @@ export default {
       padType: "SMD",
       targetVolumeMm3: 0.062,
       selectedRuleId: "rule_qfn",
+      selectedRuleGroupKey: null,
       showThicknessHelp: false,
       showRatioHelp: false,
       showVolumeHelp: false,
@@ -887,6 +924,29 @@ export default {
         return this.workspaceSnapshot.matchedRule;
       }
       return this.activeRule;
+    },
+    matchedRuleGroupKey() {
+      return this.ruleGroupKeyFromRule(this.matchedRule);
+    },
+    activeRuleGroupKey() {
+      if (this.selectedRuleGroupKey === "__all__") return "";
+      if (this.selectedRuleGroupKey) return this.selectedRuleGroupKey;
+      return this.matchedRuleGroupKey || "";
+    },
+    showingAllRuleGroups() {
+      return this.selectedRuleGroupKey === "__all__";
+    },
+    ruleGroups() {
+      const backendGroups = this.workspaceSnapshot?.ruleGroups;
+      if (Array.isArray(backendGroups) && backendGroups.length) {
+        return backendGroups;
+      }
+      return this.buildRuleGroupsFromRules(this.rules);
+    },
+    filteredRules() {
+      const groupKey = this.activeRuleGroupKey;
+      if (!groupKey) return this.rules;
+      return this.rules.filter((rule) => this.ruleGroupKeyFromRule(rule) === groupKey);
     },
     matchedRuleGroupSummary() {
       const backendValue = this.workspaceSnapshot?.matchedRuleGroupSummary;
@@ -1094,6 +1154,60 @@ priority: 100`;
       if (group.package && group.package !== "Any") parts.push(group.package);
       if (group.padType && group.padType !== "Any") parts.push(group.padType);
       return parts.length ? parts.join(" / ") : this.t("config.apertureAny");
+    },
+    selectAllRuleGroups() {
+      this.selectedRuleGroupKey = "__all__";
+    },
+    selectRuleGroup(groupKey) {
+      this.selectedRuleGroupKey = groupKey || null;
+      const nextRule = this.filteredRules[0];
+      if (nextRule) {
+        this.selectedRuleId = nextRule.id;
+      }
+    },
+    buildRuleGroupsFromRules(rules) {
+      const groups = new Map();
+      (rules || []).forEach((rule, index) => {
+        const key = this.ruleGroupKeyFromRule(rule);
+        if (!groups.has(key)) {
+          groups.set(key, {
+            key,
+            label: this.describeRuleGroup(rule?.match ? this.ruleGroupDescriptorFromRule(rule) : null),
+            package: String(rule?.match?.package || "Any"),
+            padType: String(rule?.match?.padType || "Any"),
+            ruleCount: 0,
+            enabledRuleCount: 0,
+            _order: index,
+          });
+        }
+        const group = groups.get(key);
+        group.ruleCount += 1;
+        if (rule && rule.enabled !== false) {
+          group.enabledRuleCount += 1;
+        }
+      });
+      return Array.from(groups.values())
+        .sort((left, right) => {
+          if (left._order !== right._order) return left._order - right._order;
+          return String(left.label).localeCompare(String(right.label));
+        })
+        .map((group) => {
+          const next = { ...group };
+          delete next._order;
+          return next;
+        });
+    },
+    ruleGroupDescriptorFromRule(rule) {
+      return {
+        package: String(rule?.match?.package || "Any"),
+        padType: String(rule?.match?.padType || "Any"),
+      };
+    },
+    ruleGroupKeyFromRule(rule) {
+      const match = rule && rule.match ? rule.match : {};
+      const packageType = String(match.package || "Any").trim() || "Any";
+      const padType = String(match.padType || "Any").trim() || "Any";
+      return `${packageType.toLowerCase()}::${padType.toLowerCase()}`;
     },
     describeAction(rule) {
       if (!rule) return "";

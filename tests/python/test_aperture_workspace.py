@@ -35,6 +35,16 @@ def test_workspace_metrics_are_computed():
     assert len(snapshot["ruleGroups"]) == 3
 
 
+def test_workspace_rule_groups_are_usable_for_filtering():
+    snapshot = compute_aperture_workspace(default_aperture_workspace(), 0.12)
+    group_map = {group["key"]: group for group in snapshot["ruleGroups"]}
+
+    assert group_map["qfn::smd"]["label"] == "QFN / SMD"
+    assert group_map["qfn::smd"]["ruleCount"] == 1
+    assert group_map["qfn::smd"]["enabledRuleCount"] == 1
+    assert group_map["any::any"]["ruleCount"] == 1
+
+
 def test_workspace_descriptions_are_human_readable():
     workspace = default_aperture_workspace()
     rule = workspace["rules"][1]
