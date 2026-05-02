@@ -58,72 +58,10 @@ class TrimeshEngine:
         mesh = extrude_geometry(data.stencil_2d, cfg.thickness_mm)
         logger.info("Base mesh extrusion in %.3fs", time.perf_counter() - t0)
 
-        if data.locator_geom is not None and not data.locator_geom.is_empty and cfg.locator_height_mm > 0:
-            t0 = time.perf_counter()
-            locator_mesh = extrude_geometry(data.locator_geom, cfg.locator_height_mm)
-            logger.info("Locator mesh extrusion in %.3fs", time.perf_counter() - t0)
-            locator_mesh.apply_translation((0, 0, cfg.thickness_mm))
-            mesh = trimesh.util.concatenate([mesh, locator_mesh])
-
-        if (
-            data.locator_step_geom is not None
-            and not data.locator_step_geom.is_empty
-            and cfg.locator_step_height_mm > 0
-        ):
-            t0 = time.perf_counter()
-            step_mesh = extrude_geometry(data.locator_step_geom, cfg.locator_step_height_mm)
-            logger.info("Locator step extrusion in %.3fs", time.perf_counter() - t0)
-            mesh = trimesh.util.concatenate([mesh, step_mesh])
-
-        logger.info("Cleaning mesh...")
-        try:
-            t0 = time.perf_counter()
-            cleanup_mesh(mesh)
-            logger.info("Mesh cleanup in %.3fs", time.perf_counter() - t0)
-        except Exception as exc:
-            logger.warning("Mesh cleanup failed: %s", exc)
-
-        logger.info("Translating mesh to origin...")
-        try:
-            t0 = time.perf_counter()
-            translate_to_origin(mesh)
-            logger.info("Mesh translation in %.3fs", time.perf_counter() - t0)
-        except Exception as exc:
-            logger.warning("Mesh translation failed: %s", exc)
-
-        data.output_path.parent.mkdir(parents=True, exist_ok=True)
-        if mesh.is_empty or mesh.faces.size == 0:
-            raise ValueError("Generated mesh is empty; check outline/paste geometry.")
-
-        watertight = getattr(mesh, "is_watertight", None)
-        euler = getattr(mesh, "euler_number", None)
-        logger.info("Mesh stats: faces=%s watertight=%s euler=%s", mesh.faces.shape[0], watertight, euler)
-
-        t0 = time.perf_counter()
-        mesh.export(data.output_path, file_type="stl_ascii")
-        logger.info("STL export write in %.3fs", time.perf_counter() - t0)
-
-        try:
-            size = data.output_path.stat().st_size
-        except OSError:
-            size = 0
-        logger.info("STL size: %s bytes", size)
-        if size <= 0:
-            raise ValueError("Exported STL file is empty.")
-
-        try:
-            t0 = time.perf_counter()
-            check_mesh = trimesh.load_mesh(data.output_path, force="mesh")
-            faces = getattr(check_mesh, "faces", None)
-            face_count = int(faces.shape[0]) if faces is not None else 0
-            logger.info("STL reload check in %.3fs", time.perf_counter() - t0)
-            logger.info("STL check: faces=%s", face_count)
-            if face_count == 0:
-                raise ValueError("Exported STL has no faces; check geometry.")
-        except Exception as exc:
-            raise ValueError(f"Failed to validate exported STL: {exc}") from exc
-
-        logger.info("STL export complete")
+        mesh = _attach_locator_mesh(mesh, data.locator_geom, data.locator_step_geom,
+                                    extrude_geometry, cfg)
+        _finalize_mesh(mesh)
+        _export_and_validate_stl(mesh, data.output_path, file_type="stl_ascii")
 
 
 class SfMeshEngine:
@@ -137,24 +75,11 @@ class SfMeshEngine:
         mesh = _extrude_with_cdt(base_geom, cfg.thickness_mm)
         logger.info("sfmesh base extrusion in %.3fs", time.perf_counter() - t0)
 
-        if data.locator_geom is not None and not data.locator_geom.is_empty and cfg.locator_height_mm > 0:
-            t0 = time.perf_counter()
-            locator_geom = _prepare_sfmesh_geometry(data.locator_geom, cfg, preserve_holes=False)
-            locator_mesh = _extrude_with_cdt(locator_geom, cfg.locator_height_mm)
-            logger.info("sfmesh locator extrusion in %.3fs", time.perf_counter() - t0)
-            locator_mesh.apply_translation((0, 0, cfg.thickness_mm))
-            mesh = trimesh.util.concatenate([mesh, locator_mesh])
+        def _cdt_extrude(g, h):
+            return _extrude_with_cdt(_prepare_sfmesh_geometry(g, cfg, preserve_holes=False), h)
 
-        if (
-            data.locator_step_geom is not None
-            and not data.locator_step_geom.is_empty
-            and cfg.locator_step_height_mm > 0
-        ):
-            t0 = time.perf_counter()
-            step_geom = _prepare_sfmesh_geometry(data.locator_step_geom, cfg, preserve_holes=False)
-            step_mesh = _extrude_with_cdt(step_geom, cfg.locator_step_height_mm)
-            logger.info("sfmesh locator step extrusion in %.3fs", time.perf_counter() - t0)
-            mesh = trimesh.util.concatenate([mesh, step_mesh])
+        mesh = _attach_locator_mesh(mesh, data.locator_geom, data.locator_step_geom,
+                                    _cdt_extrude, cfg, tag="sfmesh")
 
         critical_hole_width = _critical_hole_width_mm(base_geom, cfg.sfmesh_hole_protect_max_width_mm)
         if _should_attempt_watertight(mesh, cfg):
@@ -177,56 +102,86 @@ class SfMeshEngine:
 
         mesh = _maybe_decimate_mesh(mesh, cfg)
 
-        logger.info("Cleaning mesh...")
-        try:
-            t0 = time.perf_counter()
-            cleanup_mesh(mesh)
-            _repair_mesh_topology(mesh)
-            logger.info("Mesh cleanup in %.3fs", time.perf_counter() - t0)
-        except Exception as exc:
-            logger.warning("Mesh cleanup failed: %s", exc)
+        _finalize_mesh(mesh)
+        _repair_mesh_topology(mesh)
+        _export_and_validate_stl(mesh, data.output_path, file_type="stl")
 
-        logger.info("Translating mesh to origin...")
-        try:
-            t0 = time.perf_counter()
-            translate_to_origin(mesh)
-            logger.info("Mesh translation in %.3fs", time.perf_counter() - t0)
-        except Exception as exc:
-            logger.warning("Mesh translation failed: %s", exc)
 
-        data.output_path.parent.mkdir(parents=True, exist_ok=True)
-        if mesh.is_empty or mesh.faces.size == 0:
-            raise ValueError("Generated mesh is empty; check outline/paste geometry.")
+# --- shared engine helpers ---
 
-        watertight = getattr(mesh, "is_watertight", None)
-        euler = getattr(mesh, "euler_number", None)
-        logger.info("Mesh stats: faces=%s watertight=%s euler=%s", mesh.faces.shape[0], watertight, euler)
-
+def _attach_locator_mesh(base_mesh, locator_geom, locator_step_geom,
+                         extrude_fn, cfg: StencilConfig, tag: str = ""):
+    """Extrude and concatenate locator wall and step geometries onto base mesh."""
+    prefix = f"{tag} " if tag else ""
+    if locator_geom is not None and not locator_geom.is_empty and cfg.locator_height_mm > 0:
         t0 = time.perf_counter()
-        mesh.export(data.output_path, file_type="stl")
-        logger.info("STL export write (binary) in %.3fs", time.perf_counter() - t0)
+        lm = extrude_fn(locator_geom, cfg.locator_height_mm)
+        logger.info("%slocator extrusion in %.3fs", prefix, time.perf_counter() - t0)
+        lm.apply_translation((0, 0, cfg.thickness_mm))
+        base_mesh = trimesh.util.concatenate([base_mesh, lm])
+    if (locator_step_geom is not None and not locator_step_geom.is_empty
+            and cfg.locator_step_height_mm > 0):
+        t0 = time.perf_counter()
+        sm = extrude_fn(locator_step_geom, cfg.locator_step_height_mm)
+        logger.info("%slocator step extrusion in %.3fs", prefix, time.perf_counter() - t0)
+        base_mesh = trimesh.util.concatenate([base_mesh, sm])
+    return base_mesh
 
-        try:
-            size = data.output_path.stat().st_size
-        except OSError:
-            size = 0
-        logger.info("STL size: %s bytes", size)
-        if size <= 0:
-            raise ValueError("Exported STL file is empty.")
 
-        try:
-            t0 = time.perf_counter()
-            check_mesh = trimesh.load_mesh(data.output_path, force="mesh")
-            faces = getattr(check_mesh, "faces", None)
-            face_count = int(faces.shape[0]) if faces is not None else 0
-            logger.info("STL reload check in %.3fs", time.perf_counter() - t0)
-            logger.info("STL check: faces=%s", face_count)
-            if face_count == 0:
-                raise ValueError("Exported STL has no faces; check geometry.")
-        except Exception as exc:
-            raise ValueError(f"Failed to validate exported STL: {exc}") from exc
+def _finalize_mesh(mesh):
+    """Clean up and translate mesh to origin."""
+    logger.info("Cleaning mesh...")
+    try:
+        t0 = time.perf_counter()
+        cleanup_mesh(mesh)
+        logger.info("Mesh cleanup in %.3fs", time.perf_counter() - t0)
+    except Exception as exc:
+        logger.warning("Mesh cleanup failed: %s", exc)
 
-        logger.info("STL export complete")
+    logger.info("Translating mesh to origin...")
+    try:
+        t0 = time.perf_counter()
+        translate_to_origin(mesh)
+        logger.info("Mesh translation in %.3fs", time.perf_counter() - t0)
+    except Exception as exc:
+        logger.warning("Mesh translation failed: %s", exc)
+
+
+def _export_and_validate_stl(mesh, output_path, file_type="stl_ascii"):
+    """Write STL to disk and perform basic validation checks."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if mesh.is_empty or mesh.faces.size == 0:
+        raise ValueError("Generated mesh is empty; check outline/paste geometry.")
+
+    watertight = getattr(mesh, "is_watertight", None)
+    euler = getattr(mesh, "euler_number", None)
+    logger.info("Mesh stats: faces=%s watertight=%s euler=%s", mesh.faces.shape[0], watertight, euler)
+
+    t0 = time.perf_counter()
+    mesh.export(output_path, file_type=file_type)
+    logger.info("STL export write in %.3fs", time.perf_counter() - t0)
+
+    try:
+        size = output_path.stat().st_size
+    except OSError:
+        size = 0
+    logger.info("STL size: %s bytes", size)
+    if size <= 0:
+        raise ValueError("Exported STL file is empty.")
+
+    try:
+        t0 = time.perf_counter()
+        check_mesh = trimesh.load_mesh(output_path, force="mesh")
+        faces = getattr(check_mesh, "faces", None)
+        face_count = int(faces.shape[0]) if faces is not None else 0
+        logger.info("STL reload check in %.3fs", time.perf_counter() - t0)
+        logger.info("STL check: faces=%s", face_count)
+        if face_count == 0:
+            raise ValueError("Exported STL has no faces; check geometry.")
+    except Exception as exc:
+        raise ValueError(f"Failed to validate exported STL: {exc}") from exc
+
+    logger.info("STL export complete")
 
 
 _ENGINES: dict[str, ModelEngine] = {
