@@ -36,7 +36,7 @@ def test_workspace_metrics_are_computed():
     assert isfinite(snapshot["recommendedVolumeMm3"])
     assert snapshot["generatedRulePreview"].startswith("match: { package:")
     assert snapshot["matchedRuleGroupSummary"] == "QFN / SMD"
-    assert len(snapshot["ruleGroups"]) == 3
+    assert len(snapshot["ruleGroups"]) == 6
 
 
 def test_workspace_rule_groups_are_usable_for_filtering():
@@ -44,8 +44,8 @@ def test_workspace_rule_groups_are_usable_for_filtering():
     group_map = {group["key"]: group for group in snapshot["ruleGroups"]}
 
     assert group_map["qfn::smd"]["label"] == "QFN / SMD"
-    assert group_map["qfn::smd"]["ruleCount"] == 1
-    assert group_map["qfn::smd"]["enabledRuleCount"] == 1
+    assert group_map["qfn::smd"]["ruleCount"] == 2
+    assert group_map["qfn::smd"]["enabledRuleCount"] == 2
     assert group_map["any::any"]["ruleCount"] == 1
 
 
@@ -240,3 +240,35 @@ def test_preview_status_shows_recommended_when_target_matches_recommended():
     workspace["targetVolumeMm3"] = snapshot["recommendedVolumeMm3"]
     snapshot2 = compute_aperture_workspace(workspace, 0.12)
     assert snapshot2["previewStatus"] == "recommended"
+
+
+def test_default_workspace_has_expanded_rules():
+    workspace = default_aperture_workspace()
+    rule_ids = [r["id"] for r in workspace["rules"]]
+    assert len(workspace["rules"]) == 7
+    assert "rule_qfn_std" in rule_ids
+    assert "rule_bga" in rule_ids
+    assert "rule_ic" in rule_ids
+    assert "rule_tht" in rule_ids
+
+
+def test_tht_rule_matches_workspace():
+    workspace = default_aperture_workspace()
+    workspace["packageType"] = "IC"
+    workspace["padType"] = "THT"
+    workspace["padWidthMm"] = 1.2
+    workspace["padHeightMm"] = 1.2
+    effect = resolve_aperture_workspace_effect(workspace, 0.15)
+    assert effect["ruleId"] == "rule_tht"
+    assert effect["effect"]["mode"] == "scale"
+    assert effect["effect"]["scale"] == 1.04
+
+
+def test_bga_rule_matches_workspace():
+    workspace = default_aperture_workspace()
+    workspace["packageType"] = "BGA"
+    workspace["padType"] = "SMD"
+    workspace["padWidthMm"] = 0.4
+    workspace["padHeightMm"] = 0.4
+    effect = resolve_aperture_workspace_effect(workspace, 0.15)
+    assert effect["ruleId"] == "rule_bga"
