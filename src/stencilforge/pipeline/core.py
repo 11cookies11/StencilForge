@@ -295,30 +295,77 @@ def _apply_per_class_aperture(
     aperture_workspace: dict,
     config: StencilConfig,
 ) -> None:
-    """Apply aperture workspace rules per pad type, modifying polygons in place."""
+    """Apply aperture effects per pad type, using actual polygon dimensions
+    to drive the solder-volume calculator and rule engine."""
     from copy import deepcopy
+    from .pad_classifier import aggregate_pad_metrics
 
-    pad_types = sorted({pi.pad_type for pi in pad_infos})
-    for pad_type in pad_types:
+    metrics = aggregate_pad_metrics(pad_infos)
+
+    for pad_type, dims in sorted(metrics.items()):
         ws_for_type = deepcopy(aperture_workspace)
         ws_for_type["padType"] = pad_type
+        ws_for_type["padWidthMm"] = dims["padWidthMm"]
+        ws_for_type["padHeightMm"] = dims["padHeightMm"]
+        ws_for_type["padAreaMm2"] = dims["padAreaMm2"]
+
         effect_info = resolve_aperture_workspace_effect(ws_for_type, config.thickness_mm)
         effect = effect_info["effect"]
-        if not effect["enabled"]:
+        snapshot = effect_info["snapshot"]
+
+        # Detect fallback: the matched rule doesn't actually target this pad type
+        matched_rule = snapshot.get("matchedRule") or {}
+        matched_pad_type = str(matched_rule.get("match", {}).get("padType", ""))
+        rule_genuinely_matches = (
+            matched_pad_type.casefold() in ("any", pad_type.casefold())
+        )
+
+        if rule_genuinely_matches and effect["enabled"]:
+            mode = effect["mode"]
+            scale_factor = float(effect.get("scale", 1.0) or 1.0)
+            delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
+            source = f"rule: {effect_info['matchSummary']} -> {effect_info['actionSummary']}"
+        else:
+            # No rule targets this pad type; use volume-calculator recommendation
+            mode = "scale"
+            scale_factor = float(snapshot.get("recommendedScale", 1.0) or 1.0)
+            delta_mm = float(snapshot.get("recommendedDeltaMm", 0.0) or 0.0)
+            if effect["enabled"]:
+                source = (
+                    f"calculator ({effect_info['matchSummary']} inapplicable, "
+                    f"using recommended scale={scale_factor:.3f})"
+                )
+            else:
+                source = (
+                    f"calculator (rule disabled, using recommended "
+                    f"scale={scale_factor:.3f})"
+                )
+
+        if not effect["enabled"] and not rule_genuinely_matches:
+            pass  # fall through to apply calculator recommendation
+        elif not effect["enabled"]:
             logger.info(
-                "Aperture rule for %s inactive: %s",
-                pad_type,
-                effect_info["ruleName"] or "(none)",
+                "Aperture [%s] (%s pads, %.3f mm²): %s (inactive)",
+                pad_type, int(dims["count"]), dims["padAreaMm2"], source,
             )
             continue
+
         logger.info(
-            "Aperture [%s]: %s -> %s",
+            "Aperture [%s] (%s pads, %.3f mm², %.3f x %.3f mm): "
+            "theoretical=%.3f mm³ recommended=%.3f mm³ "
+            "target_area=%.3f mm² | %s",
             pad_type,
-            effect_info["matchSummary"] or "(any)",
-            effect_info["actionSummary"] or "(none)",
+            int(dims["count"]),
+            dims["padAreaMm2"],
+            dims["padWidthMm"],
+            dims["padHeightMm"],
+            snapshot.get("theoreticalVolumeMm3", 0),
+            snapshot.get("recommendedVolumeMm3", 0),
+            snapshot.get("targetOpenAreaMm2", 0),
+            source,
         )
-        if effect["mode"] == "scale":
-            scale_factor = float(effect.get("scale", 1.0) or 1.0)
+
+        if mode == "scale":
             if scale_factor != 1.0:
                 for pi in pad_infos:
                     if pi.pad_type == pad_type:
@@ -329,7 +376,6 @@ def _apply_per_class_aperture(
                             origin="centroid",
                         )
         else:
-            delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
             if delta_mm != 0.0:
                 for pi in pad_infos:
                     if pi.pad_type == pad_type:

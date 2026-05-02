@@ -151,3 +151,30 @@ def classification_summary(pad_infos: list[PadInfo]) -> dict[str, int]:
     for pi in pad_infos:
         counts[pi.pad_type] = counts.get(pi.pad_type, 0) + 1
     return counts
+
+
+def aggregate_pad_metrics(pad_infos: list[PadInfo]) -> dict[str, dict[str, float]]:
+    """Aggregate shape metrics per pad type (median values).
+
+    Returns dict keyed by pad_type with:
+      padWidthMm, padHeightMm, padAreaMm2, count
+    """
+    from statistics import median as median_value
+
+    groups: dict[str, list[ShapeMetrics]] = {}
+    for pi in pad_infos:
+        groups.setdefault(pi.pad_type, []).append(pi.shape)
+
+    result: dict[str, dict[str, float]] = {}
+    for pad_type, shapes in groups.items():
+        areas = [s.area_mm2 for s in shapes if s.area_mm2 > 0]
+        shorts = [s.short_side_mm for s in shapes if s.short_side_mm > 0]
+        longs = [s.long_side_mm for s in shapes if s.long_side_mm > 0]
+
+        result[pad_type] = {
+            "padWidthMm": median_value(shorts) if shorts else 0.5,
+            "padHeightMm": median_value(longs) if longs else 0.5,
+            "padAreaMm2": median_value(areas) if areas else 0.25,
+            "count": len(shapes),
+        }
+    return result
