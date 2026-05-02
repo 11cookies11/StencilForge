@@ -42,6 +42,9 @@ def test_fit_to_screen_uses_active_screen(monkeypatch) -> None:
         def __init__(self) -> None:
             self._geometry = DummyGeometry(100, 50, 1200, 800)
 
+        def geometry(self) -> DummyGeometry:
+            return self._geometry
+
         def availableGeometry(self) -> DummyGeometry:
             return self._geometry
 

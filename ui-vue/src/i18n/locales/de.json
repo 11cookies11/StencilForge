@@ -13,7 +13,7 @@
   "tabs.upload": "Upload",
   "tabs.config": "Config",
   "tabs.preview": "Preview",
-  "upload.title": "Upload PCB files",
+  "upload.title": "PCB-Dateien hochladen",
   "upload.subtitle": "Select a Gerber folder and set the output STL path.",
   "upload.inputLabel": "Input folder / ZIP",
   "upload.inputPlaceholder": "Gerber folder or ZIP...",
