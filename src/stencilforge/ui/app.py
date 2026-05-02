@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
         self._bridge = bridge
         self.setWindowTitle("StencilForge")
         self.setWindowFlags(Qt.Window)
-        if sys.platform == "win32" and dialog is None:
+        if sys.platform == "win32":
             _apply_snap_styles(int(self.winId()))
         drag_height = 64
         button_margin = 190
