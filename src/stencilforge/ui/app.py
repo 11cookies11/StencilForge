@@ -8,7 +8,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QCursor, QIcon, QSurfaceFormat
+from PySide6.QtGui import QCursor, QIcon
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -222,12 +222,6 @@ def main() -> int:
     view.setUrl(QUrl.fromLocalFile(str(html_path)))
     window.setCentralWidget(view)
     bridge.attach_window(window)
-
-    try:
-        from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
-        QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
-    except Exception:
-        pass
 
     fit_to_screen(window, max_ratio=(0.80, 0.80), max_size=(1120, 760), min_size=(760, 540), edge_margin=20)
     window.show()

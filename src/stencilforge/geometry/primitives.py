@@ -70,7 +70,7 @@ class PrimitiveGeometryBuilder:
         if isinstance(prim, gprim.Arc):
             return self._arc_to_shape(prim)
         if isinstance(prim, gprim.Region):
-            return self._region_to_shape(prim)
+            return _region_to_shape(self, prim)
         return None
 
     @staticmethod
@@ -141,26 +141,30 @@ def get_arc_points(arc: gprim.Arc, steps: int):
     cx, cy = arc.center
     return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
 
-    def _region_to_shape(self, region: gprim.Region):
-        # Region 由线段/圆弧闭合而成，拼成多边形
-        points = []
-        for prim in region.primitives:
-            if isinstance(prim, gprim.Line):
-                if not points:
-                    points.append(prim.start)
-                points.append(prim.end)
-            elif isinstance(prim, gprim.Arc):
-                arc_pts = get_arc_points(prim, self._config.arc_steps)
-                if not points:
-                    points.append(arc_pts[0])
-                    points.extend(arc_pts[1:])
-                else:
-                    points.extend(arc_pts)
-        if len(points) >= 3:
-            if points[0] != points[-1]:
-                points.append(points[0])
-            poly = Polygon(points)
-            if not poly.is_valid:
-                poly = poly.buffer(0)
-            return poly
-        return self._primitives_to_geometry(region.primitives)
+
+# This method is part of PrimitiveGeometryBuilder but moved here as a
+# standalone to avoid circular indentation issues during refactoring.
+def _region_to_shape(primitive_builder, region: gprim.Region):
+    # Region 由线段/圆弧闭合而成，拼成多边形
+    config = primitive_builder._config
+    points = []
+    for prim in region.primitives:
+        if isinstance(prim, gprim.Line):
+            if not points:
+                points.append(prim.start)
+            points.append(prim.end)
+        elif isinstance(prim, gprim.Arc):
+            arc_pts = get_arc_points(prim, config.arc_steps)
+            if not points:
+                points.append(arc_pts[0])
+                points.extend(arc_pts[1:])
+            else:
+                points.extend(arc_pts)
+    if len(points) >= 3:
+        if points[0] != points[-1]:
+            points.append(points[0])
+        poly = Polygon(points)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        return poly
+    return primitive_builder._primitives_to_geometry(region.primitives)

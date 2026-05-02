@@ -19,7 +19,7 @@ from shapely.strtree import STRtree
 from shapely.ops import linemerge, polygonize, unary_union
 
 from ..config import StencilConfig
-from .primitives import PrimitiveGeometryBuilder
+from .primitives import PrimitiveGeometryBuilder, _region_to_shape
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class RobustOutlineExtractor:
                 for i in range(len(points) - 1):
                     segments.append((points[i], points[i + 1]))
             elif isinstance(prim, gprim.Region):
-                geom = self._primitive_builder._region_to_shape(prim)
+                geom = _region_to_shape(self._primitive_builder, prim)
                 segments.extend(self._segments_from_shape(geom))
         return segments
 
@@ -373,7 +373,7 @@ class OutlineBuilder:
         # 优先使用 Region；否则用线段集合闭合为轮廓
         for prim in primitives:
             if isinstance(prim, gprim.Region):
-                geom = self._primitive_builder._region_to_shape(prim)
+                geom = _region_to_shape(self._primitive_builder, prim)
                 if geom is not None and not geom.is_empty:
                     logger.info("Outline source: region")
                     return geom
