@@ -13,6 +13,34 @@ from ..config import StencilConfig
 
 logger = logging.getLogger(__name__)
 
+# --- detection thresholds ---
+QFN_RECTANGULARITY_MIN = 0.85    # minimum area / min-rotated-rectangle ratio
+QFN_ASPECT_RATIO_MIN = 1.2       # long_side / short_side lower bound
+QFN_ASPECT_RATIO_MAX = 6.0       # long_side / short_side upper bound
+QFN_MIN_CANDIDATE_COUNT = 12     # minimum pad count to consider as potential QFN
+
+# --- orientation classification ---
+QFN_HORIZONTAL_ANGLE_MAX = 30    # degrees: |angle| <= this → horizontal
+QFN_VERTICAL_ANGLE_MIN = 60      # degrees: angle >= this (and <= 120) → vertical
+QFN_VERTICAL_ANGLE_MAX = 120
+
+# --- scoring weights ---
+QFN_SCORE_PITCH_BONUS = 1.0      # base score offset when pitch consistency is good
+QFN_SCORE_CENTER_PAD_BONUS = 0.05  # bonus for detecting a center thermal pad
+QFN_SYMMETRY_TOLERANCE = 0.3     # fraction of max side count for symmetry check
+QFN_MIN_SIDES_FOR_SYMMETRY = 2   # minimum rows/cols in each axis
+
+# --- slot generation ---
+QFN_SLOT_PAD_THRESHOLD_6 = 6     # pads per side threshold for short slots
+QFN_SLOT_PAD_THRESHOLD_12 = 12   # pads per side threshold for long slots
+QFN_SLOT_SEGMENT_OFFSET = 0.3    # fraction of slot_width for end-offset
+QFN_SLOT_SEGMENT_COUNT_LONG = 3  # segments per pad when side is large
+
+# --- windowpane ---
+QFN_WINDOWPANE_ROWS_MIN = 3      # minimum rows in center pad windowpane
+QFN_WINDOWPANE_COLS_MIN = 6      # minimum columns in center pad windowpane
+QFN_WINDOWPANE_SPACING = 3.0     # mm between pane centres
+
 
 def regenerate_qfn_paste(geometry, config: StencilConfig):
     # 主入口：识别 QFN、重建开窗；失败则回退原几何
@@ -61,9 +89,9 @@ def _detect_qfn_pads(polys, config: StencilConfig):
             continue
         rectangularity = poly.area / rect_area
         aspect = long_side / short_side if short_side > 0 else 0
-        if rectangularity < 0.85:
+        if rectangularity < QFN_RECTANGULARITY_MIN:
             continue
-        if not 1.2 <= aspect <= 6.0:
+        if not QFN_ASPECT_RATIO_MIN <= aspect <= QFN_ASPECT_RATIO_MAX:
             continue
         if short_side > config.qfn_max_pad_width_mm:
             continue
@@ -76,7 +104,7 @@ def _detect_qfn_pads(polys, config: StencilConfig):
                 "short": short_side,
             }
         )
-    if len(pads) < 12:
+    if len(pads) < QFN_MIN_CANDIDATE_COUNT:
         return None
     return pads
 
@@ -137,9 +165,9 @@ def _build_qfn_group(pads, polys, config: StencilConfig):
     vertical = []
     for pad in pads:
         angle = pad["angle_norm"]
-        if angle <= 30 or angle >= 150:
+        if angle <= QFN_HORIZONTAL_ANGLE_MAX or angle >= 180 - QFN_HORIZONTAL_ANGLE_MAX:
             horizontal.append(pad)
-        elif 60 <= angle <= 120:
+        elif QFN_VERTICAL_ANGLE_MIN <= angle <= QFN_VERTICAL_ANGLE_MAX:
             vertical.append(pad)
     if len(horizontal) < 6 or len(vertical) < 6:
         return None, 0.0
@@ -210,7 +238,7 @@ def _estimate_center(pads):
 
 def _pick_qfn_sides(horiz_rows, vert_rows, center):
     # 从上下左右行中选出四边并做对称性检查
-    if len(horiz_rows) < 2 or len(vert_rows) < 2:
+    if len(horiz_rows) < QFN_MIN_SIDES_FOR_SYMMETRY or len(vert_rows) < QFN_MIN_SIDES_FOR_SYMMETRY:
         return None
     horiz_rows = sorted(horiz_rows, key=lambda r: r["coord"])
     vert_rows = sorted(vert_rows, key=lambda r: r["coord"])
@@ -222,7 +250,7 @@ def _pick_qfn_sides(horiz_rows, vert_rows, center):
     if any(len(side["pads"]) < 3 for side in sides):
         return None
     counts = [len(side["pads"]) for side in sides]
-    if max(counts) - min(counts) > max(2, int(0.3 * max(counts))):
+    if max(counts) - min(counts) > max(QFN_MIN_SIDES_FOR_SYMMETRY, int(QFN_SYMMETRY_TOLERANCE * max(counts))):
         return None
     pads = []
     for side in sides:
@@ -279,10 +307,10 @@ def _score_qfn(qfn):
     ]
     symmetry = 1.0 - (max(counts) - min(counts)) / max(counts)
     scores.append(max(0.0, symmetry))
-    scores.append(1.0)
+    scores.append(QFN_SCORE_PITCH_BONUS)
     base = _average(scores)
     if qfn.get("center_pad") is not None:
-        base = min(1.0, base + 0.05)
+        base = min(1.0, base + QFN_SCORE_CENTER_PAD_BONUS)
     return base
 
 
@@ -377,10 +405,10 @@ def _generate_slots_for_side(side, qfn, min_feature):
     # 根据焊盘数量生成若干条 slot（减少锡膏）
     pads = side["pads"]
     count = len(pads)
-    if count <= 6:
+    if count <= QFN_SLOT_PAD_THRESHOLD_6:
         slots_count = 2
-    elif count <= 12:
-        slots_count = 3
+    elif count <= QFN_SLOT_PAD_THRESHOLD_12:
+        slots_count = QFN_SLOT_SEGMENT_COUNT_LONG
     else:
         slots_count = 4
 
@@ -417,7 +445,7 @@ def _generate_slots_for_side(side, qfn, min_feature):
         centers.append(center)
 
     outward = _outward_sign(side, qfn["center_norm"])
-    bias = min(0.3 * slot_width, 0.25)
+    bias = min(QFN_SLOT_SEGMENT_OFFSET * slot_width, 0.25)
     slots = []
     for center in centers:
         if direction == "x":
@@ -455,10 +483,10 @@ def _generate_center_windowpane(center_pad, qfn, min_feature):
     height = bounds[3] - bounds[1]
     if width <= min_feature * 2 or height <= min_feature * 2:
         return None
-    if min(width, height) < 3.0:
+    if min(width, height) < QFN_WINDOWPANE_SPACING:
         rows = cols = 2
-    elif min(width, height) < 6.0:
-        rows = cols = 3
+    elif min(width, height) < QFN_WINDOWPANE_SPACING * 2:
+        rows = cols = QFN_WINDOWPANE_ROWS_MIN
     else:
         rows = cols = 4
 
