@@ -968,20 +968,6 @@ export default {
       if (effective < recommended * 0.995) return this.t("config.aperturePreviewBelow");
       return this.t("config.aperturePreviewRecommended");
     },
-    previewStatusClass() {
-      const backendValue = this.workspaceSnapshot?.previewStatus;
-      let status = backendValue;
-      if (!status) {
-        const effective = this.effectiveTargetVolumeMm3;
-        const recommended = this.recommendedVolumeMm3;
-        if (effective > recommended * 1.005) status = "above";
-        else if (effective < recommended * 0.995) status = "below";
-        else status = "recommended";
-      }
-      if (status === "above") return "bg-amber-50 text-amber-700 border-amber-200";
-      if (status === "below") return "bg-blue-50 text-blue-700 border-blue-200";
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    },
     matchedRuleActionSummary() {
       const backendValue = this.workspaceSnapshot?.matchedRuleActionSummary;
       if (backendValue) return backendValue;

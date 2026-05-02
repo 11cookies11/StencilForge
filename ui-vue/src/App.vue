@@ -616,10 +616,6 @@ export default {
       };
       return map[this.status] || this.status;
     },
-    progressPercent() {
-      const value = Math.max(0, Math.min(100, this.progressValue || 0));
-      return Math.round(value);
-    },
   },
   mounted() {
     this.applyLocale(false);
@@ -806,18 +802,6 @@ export default {
         }
       });
     },
-    importZip() {
-      if (!this.backend) return;
-      this.backend.pickZipFile((zipPath) => {
-        if (!zipPath) return;
-        this.backend.importZip(zipPath, (extracted) => {
-          if (extracted) {
-            this.inputDir = extracted;
-            this.scanFiles();
-          }
-        });
-      });
-    },
     scanFiles() {
       if (!this.backend || !this.inputDir) return;
       this.backend.scanFiles(this.inputDir);
@@ -856,10 +840,6 @@ export default {
     stopJob() {
       if (!this.backend) return;
       this.backend.stopJob();
-    },
-    openPreview() {
-      if (!this.backend) return;
-      this.backend.openPreview();
     },
     openPreviewFolder() {
       if (!this.backend) return;
@@ -909,8 +889,6 @@ export default {
         this.progressHideTimer = null;
       }, remaining);
     },
-    _startProgressPulse() {},
-    _stopProgressPulse() {},
     onTitlebarMouseDown(event) {
       if (event.button !== 0) return;
       if (event.target.closest(".window-controls")) return;
