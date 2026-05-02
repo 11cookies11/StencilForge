@@ -396,6 +396,32 @@ def solve_delta_for_rectangle(width: float, height: float, target_area: float) -
     return (-w - h + root) / 4
 
 
+def _parse_pad_size(pad_size_str: str) -> tuple[float, float] | None:
+    raw = (pad_size_str or "").strip()
+    if not raw:
+        return None
+    cleaned = raw.replace("mm", "").strip()
+    parts = cleaned.split("-")
+    if len(parts) != 2:
+        return None
+    try:
+        lo = float(parts[0])
+        hi = float(parts[1])
+    except (TypeError, ValueError):
+        return None
+    if not (isfinite(lo) and isfinite(hi)) or lo < 0 or hi < 0 or lo > hi:
+        return None
+    return (lo, hi)
+
+
+def _get_pad_size_metric(pad_width_mm: float, pad_height_mm: float) -> float:
+    w = float(pad_width_mm or 0.0)
+    h = float(pad_height_mm or 0.0)
+    if w <= 0 or h <= 0:
+        return 0.0
+    return min(w, h)
+
+
 def _ensure_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
@@ -456,6 +482,8 @@ def resolve_matching_rule(workspace: dict[str, Any]) -> dict[str, Any] | None:
         return None
     package_type = str(workspace.get("packageType") or "Any")
     pad_type = str(workspace.get("padType") or "Any")
+    pad_width = float(workspace.get("padWidthMm", 0) or 0)
+    pad_height = float(workspace.get("padHeightMm", 0) or 0)
     selected_rule = next(
         (rule for rule in rules if isinstance(rule, dict) and rule.get("id") == workspace.get("selectedRuleId")),
         None,
@@ -468,7 +496,7 @@ def resolve_matching_rule(workspace: dict[str, Any]) -> dict[str, Any] | None:
         if not bool(rule.get("enabled", True)):
             continue
         match = rule.get("match") or {}
-        if not _rule_matches_workspace(match, package_type, pad_type):
+        if not _rule_matches_workspace(match, package_type, pad_type, pad_width, pad_height):
             continue
         priority = int(rule.get("priority", 0) or 0)
         specificity = _match_specificity(match)
@@ -555,10 +583,24 @@ def _group_label(match: dict[str, Any]) -> str:
 
 
 
-def _rule_matches_workspace(match: dict[str, Any], package_type: str, pad_type: str) -> bool:
+def _rule_matches_workspace(
+    match: dict[str, Any],
+    package_type: str,
+    pad_type: str,
+    pad_width_mm: float = 0.0,
+    pad_height_mm: float = 0.0,
+) -> bool:
     package = _normalize_match_token(_first_present(match, ("package", "packageType", "package_type")))
     pad = _normalize_match_token(_first_present(match, ("padType", "pad_type")))
-    return _matches_token(package, package_type) and _matches_token(pad, pad_type)
+    if not (_matches_token(package, package_type) and _matches_token(pad, pad_type)):
+        return False
+    pad_size_str = _first_present(match, ("padSize", "pad_size", "pad_size_mm"))
+    size_range = _parse_pad_size(str(pad_size_str) if pad_size_str is not None else "")
+    if size_range is None:
+        return True
+    lo, hi = size_range
+    pad_metric = _get_pad_size_metric(pad_width_mm, pad_height_mm)
+    return lo <= pad_metric <= hi
 
 
 def _match_specificity(match: dict[str, Any]) -> int:
@@ -566,6 +608,9 @@ def _match_specificity(match: dict[str, Any]) -> int:
     if _normalize_match_token(_first_present(match, ("package", "packageType", "package_type"))).casefold() != "any":
         score += 1
     if _normalize_match_token(_first_present(match, ("padType", "pad_type"))).casefold() != "any":
+        score += 1
+    pad_size = str(_first_present(match, ("padSize", "pad_size", "pad_size_mm")) or "")
+    if pad_size.strip():
         score += 1
     return score
 

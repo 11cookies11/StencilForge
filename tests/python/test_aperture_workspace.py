@@ -3,6 +3,10 @@ from __future__ import annotations
 from math import isfinite
 
 from stencilforge.aperture_workspace import (
+    _get_pad_size_metric,
+    _match_specificity,
+    _parse_pad_size,
+    _rule_matches_workspace,
     compute_aperture_workspace,
     default_aperture_workspace,
     describe_action,
@@ -156,3 +160,61 @@ def test_workspace_payload_rejects_unsupported_schema_version():
 
     assert validation["ok"] is False
     assert any("unsupported schemaVersion" in issue for issue in validation["issues"])
+
+
+def test_pad_size_parses_correctly():
+    assert _parse_pad_size("0.20-0.60 mm") == (0.20, 0.60)
+    assert _parse_pad_size("") is None
+    assert _parse_pad_size("0.20-1.00 mm") == (0.20, 1.00)
+    assert _parse_pad_size(None) is None
+    assert _parse_pad_size("invalid") is None
+
+
+def test_pad_size_metric_uses_min_dimension():
+    assert _get_pad_size_metric(0.45, 0.4) == 0.4
+    assert _get_pad_size_metric(0.5, 0.5) == 0.5
+    assert _get_pad_size_metric(0, 0.4) == 0.0
+
+
+def test_pad_size_matching_empty_matches_any():
+    match = {"package": "Any", "padType": "Any", "padSize": ""}
+    assert _rule_matches_workspace(match, "QFN", "SMD", 0.45, 0.4)
+
+
+def test_pad_size_matching_in_range_succeeds():
+    match = {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"}
+    assert _rule_matches_workspace(match, "QFN", "SMD", 0.45, 0.4)
+
+
+def test_pad_size_matching_out_of_range_fails():
+    match = {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.30 mm"}
+    assert not _rule_matches_workspace(match, "QFN", "SMD", 0.45, 0.4)
+
+
+def test_pad_size_contributes_to_specificity():
+    assert _match_specificity({"package": "Any", "padType": "Any", "padSize": ""}) == 0
+    assert _match_specificity({"package": "QFN", "padType": "Any", "padSize": ""}) == 1
+    assert _match_specificity({"package": "QFN", "padType": "SMD", "padSize": ""}) == 2
+    assert _match_specificity({"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"}) == 3
+
+
+def test_pad_size_breaks_tie_in_matching():
+    workspace = default_aperture_workspace()
+    workspace["packageType"] = "QFN"
+    workspace["padType"] = "SMD"
+    workspace["padWidthMm"] = 0.45
+    workspace["padHeightMm"] = 0.4
+    workspace["rules"] = [
+        {
+            "id": "rule_fine", "name": "Fine pitch", "enabled": True, "priority": 80,
+            "match": {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"},
+            "action": {"mode": "delta", "deltaMm": -0.03, "scale": 0.96},
+        },
+        {
+            "id": "rule_standard", "name": "Standard", "enabled": True, "priority": 80,
+            "match": {"package": "QFN", "padType": "SMD", "padSize": "0.60-1.00 mm"},
+            "action": {"mode": "delta", "deltaMm": -0.02, "scale": 0.97},
+        },
+    ]
+    effect = resolve_aperture_workspace_effect(workspace, 0.15)
+    assert effect["ruleId"] == "rule_fine"
