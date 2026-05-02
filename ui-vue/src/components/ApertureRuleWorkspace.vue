@@ -141,29 +141,7 @@
                   <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ thicknessValue.toFixed(2) }} <span class="text-xs font-medium text-slate-500">mm</span></div>
                 </div>
                 <div class="absolute right-2 top-2 z-30">
-                  <div class="relative">
-                    <button
-                      class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-white text-xs font-bold text-blue-600 shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
-                      :aria-label="t('config.apertureSummaryThicknessHint')"
-                      type="button"
-                      @mouseenter="showThicknessHelp = true"
-                      @mouseleave="showThicknessHelp = false"
-                      @focus="showThicknessHelp = true"
-                      @blur="showThicknessHelp = false"
-                    >
-                      ?
-                    </button>
-                    <div
-                      v-show="showThicknessHelp"
-                      class="pointer-events-none absolute bottom-full right-0 mb-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-blue-100 bg-white px-3 py-2 text-left text-xs leading-5 text-slate-600 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
-                    >
-                      <span
-                        class="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-blue-100 bg-white"
-                        aria-hidden="true"
-                      ></span>
-                      {{ t("config.apertureSummaryThicknessHint") }}
-                    </div>
-                  </div>
+                  <HelpTooltip :text="t('config.apertureSummaryThicknessHint')" variant="blue" />
                 </div>
               </div>
               <div
@@ -176,29 +154,7 @@
                   <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ percentLabel(transferRatio) }}</div>
                 </div>
                 <div class="absolute right-2 top-2 z-30">
-                  <div class="relative">
-                    <button
-                      class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                      :aria-label="t('config.apertureSummaryRatioHint')"
-                      type="button"
-                      @mouseenter="showRatioHelp = true"
-                      @mouseleave="showRatioHelp = false"
-                      @focus="showRatioHelp = true"
-                      @blur="showRatioHelp = false"
-                    >
-                      ?
-                    </button>
-                    <div
-                      v-show="showRatioHelp"
-                      class="pointer-events-none absolute bottom-full right-0 mb-2 w-64 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs leading-5 text-slate-600 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
-                    >
-                      <span
-                        class="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-slate-200 bg-white"
-                        aria-hidden="true"
-                      ></span>
-                      {{ t("config.apertureSummaryRatioHint") }}
-                    </div>
-                  </div>
+                  <HelpTooltip :text="t('config.apertureSummaryRatioHint')" variant="slate" />
                 </div>
               </div>
             </div>
@@ -223,29 +179,7 @@
                     <span class="text-base font-semibold text-slate-900 whitespace-nowrap">{{ formatVolume(recommendedVolumeMm3) }}</span>
                   </div>
                   <div class="absolute right-3 top-3">
-                    <div class="relative">
-                      <button
-                        class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                        :aria-label="t('config.apertureRecommendedVolumeHint')"
-                        type="button"
-                        @mouseenter="showVolumeHelp = true"
-                        @mouseleave="showVolumeHelp = false"
-                        @focus="showVolumeHelp = true"
-                        @blur="showVolumeHelp = false"
-                      >
-                        ?
-                      </button>
-                      <div
-                        v-show="showVolumeHelp"
-                        class="pointer-events-none absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs leading-5 text-slate-600 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
-                      >
-                        <span
-                          class="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-slate-200 bg-white"
-                          aria-hidden="true"
-                        ></span>
-                        {{ t("config.apertureRecommendedVolumeHint") }}
-                      </div>
-                    </div>
+                    <HelpTooltip :text="t('config.apertureRecommendedVolumeHint')" variant="slate" />
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
@@ -266,29 +200,7 @@
                 <div class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
                   {{ t("config.apertureFormulaLabel") }}
                 </div>
-                <div class="relative">
-                  <button
-                    class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-500 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-                    :aria-label="t('config.aperturePreviewSummaryHint')"
-                    type="button"
-                    @mouseenter="showFormulaHelp = true"
-                    @mouseleave="showFormulaHelp = false"
-                    @focus="showFormulaHelp = true"
-                    @blur="showFormulaHelp = false"
-                  >
-                    ?
-                  </button>
-                  <div
-                    v-show="showFormulaHelp"
-                    class="pointer-events-none absolute bottom-full right-0 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-xs leading-5 text-slate-600 shadow-[0_20px_45px_rgba(15,23,42,0.12)]"
-                  >
-                    <span
-                      class="absolute -bottom-1 right-3 h-2 w-2 rotate-45 border-b border-r border-slate-200 bg-white"
-                      aria-hidden="true"
-                    ></span>
-                    {{ t("config.aperturePreviewSummaryHint") }}
-                  </div>
-                </div>
+                <HelpTooltip :text="t('config.aperturePreviewSummaryHint')" variant="slate" />
               </div>
               <div class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
                 {{ t("config.apertureFormulaLine1") }}
@@ -707,6 +619,7 @@
 <script>
 import AppIcon from "./AppIcon.vue";
 import AppSelect from "./AppSelect.vue";
+import HelpTooltip from "./HelpTooltip.vue";
 import { t as translate } from "../i18n";
 
 function cloneRule(rule) {
@@ -738,7 +651,7 @@ const STRATEGY_FACTOR_MAP = {
 
 export default {
   name: "ApertureRuleWorkspace",
-  components: { AppIcon, AppSelect },
+  components: { AppIcon, AppSelect, HelpTooltip },
   props: {
     backend: {
       type: Object,
@@ -774,10 +687,6 @@ export default {
       targetVolumeMm3: 0.062,
       selectedRuleId: "rule_qfn",
       selectedRuleGroupKey: null,
-      showThicknessHelp: false,
-      showRatioHelp: false,
-      showVolumeHelp: false,
-      showFormulaHelp: false,
       workspaceHydrating: false,
       workspaceSnapshot: null,
       workspaceSyncTimer: null,
