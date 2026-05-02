@@ -12,9 +12,11 @@ from shapely.ops import unary_union
 from ..aperture_workspace import resolve_aperture_workspace_effect
 from ..config import StencilConfig
 from ..geometry import GerberGeometryService
+from ..geometry.service import _flatten_to_polygons
 from .engine import EngineExportInput, get_model_engine
 from .geometry import count_holes
 from .locator import build_locator_bridge, build_locator_ring, build_locator_step
+from .pad_classifier import classify_pads
 from .qfn import regenerate_qfn_paste
 
 logger = logging.getLogger(__name__)
@@ -92,44 +94,31 @@ def generate_stencil(
         except Exception as exc:
             logger.warning("QFN regeneration skipped: %s", exc)
 
+    # --- drill detection & per-pad classification ---
+    drill_files = _find_files(input_dir, config.drill_patterns)
+    if drill_files:
+        logger.info("Drill files: %s", ", ".join([p.name for p in drill_files]))
+    drill_holes = geometry_service.load_drill_holes(drill_files) if drill_files else []
+
+    paste_polygons = _flatten_to_polygons(paste_geom)
+    pad_infos = classify_pads(paste_polygons, drill_holes)
+    if pad_infos:
+        from .pad_classifier import classification_summary
+        summary = classification_summary(pad_infos)
+        logger.info("Pad classification: %s", summary)
+
     if aperture_workspace is not None:
-        aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.thickness_mm)
-        effect = aperture_effect["effect"]
-        if effect["enabled"]:
-            logger.info(
-                "Aperture rule active: %s -> %s",
-                aperture_effect["matchSummary"] or "(any)",
-                aperture_effect["actionSummary"] or "(none)",
+        if pad_infos:
+            # Per-class rule application
+            _apply_per_class_aperture(
+                pad_infos, aperture_workspace, config
             )
-            if aperture_effect.get("groupSummary"):
-                logger.info(
-                    "Aperture rule group: %s (%s rule(s))",
-                    aperture_effect["groupSummary"],
-                    aperture_effect.get("groupRuleCount", 0),
-                )
-            if effect["mode"] == "scale":
-                scale_factor = float(effect.get("scale", 1.0) or 1.0)
-                if scale_factor != 1.0:
-                    t0 = time.perf_counter()
-                    paste_geom = scale_geometry(
-                        paste_geom,
-                        xfact=scale_factor,
-                        yfact=scale_factor,
-                        origin="centroid",
-                    )
-                    logger.info("Aperture rule scale in %.3fs", time.perf_counter() - t0)
-                    logger.info("Aperture rule scale factor: %s", scale_factor)
-            else:
-                delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
-                if delta_mm != 0.0:
-                    t0 = time.perf_counter()
-                    paste_geom = paste_geom.buffer(delta_mm, resolution=config.curve_resolution)
-                    logger.info("Aperture rule delta in %.3fs", time.perf_counter() - t0)
-                    logger.info("Aperture rule delta: %s mm", delta_mm)
+            paste_geom = unary_union([pi.polygon for pi in pad_infos])
+            logger.info("Aperture workspace applied per pad type.")
         else:
-            logger.info(
-                "Aperture rule inactive: %s",
-                aperture_effect["ruleName"] or aperture_effect["matchSummary"] or "(none)",
+            # Global fallback: apply one rule to the entire merged geometry
+            paste_geom = _apply_global_aperture(
+                paste_geom, aperture_workspace, config
             )
 
     t0 = time.perf_counter()
@@ -299,6 +288,88 @@ def generate_stencil(
     logger.info("Backend '%s' export in %.3fs", backend.name, time.perf_counter() - t0)
     logger.info("Total pipeline time: %.3fs", time.perf_counter() - overall_start)
     return outline_debug
+
+
+def _apply_per_class_aperture(
+    pad_infos,
+    aperture_workspace: dict,
+    config: StencilConfig,
+) -> None:
+    """Apply aperture workspace rules per pad type, modifying polygons in place."""
+    from copy import deepcopy
+
+    pad_types = sorted({pi.pad_type for pi in pad_infos})
+    for pad_type in pad_types:
+        ws_for_type = deepcopy(aperture_workspace)
+        ws_for_type["padType"] = pad_type
+        effect_info = resolve_aperture_workspace_effect(ws_for_type, config.thickness_mm)
+        effect = effect_info["effect"]
+        if not effect["enabled"]:
+            logger.info(
+                "Aperture rule for %s inactive: %s",
+                pad_type,
+                effect_info["ruleName"] or "(none)",
+            )
+            continue
+        logger.info(
+            "Aperture [%s]: %s -> %s",
+            pad_type,
+            effect_info["matchSummary"] or "(any)",
+            effect_info["actionSummary"] or "(none)",
+        )
+        if effect["mode"] == "scale":
+            scale_factor = float(effect.get("scale", 1.0) or 1.0)
+            if scale_factor != 1.0:
+                for pi in pad_infos:
+                    if pi.pad_type == pad_type:
+                        pi.polygon = scale_geometry(
+                            pi.polygon,
+                            xfact=scale_factor,
+                            yfact=scale_factor,
+                            origin="centroid",
+                        )
+        else:
+            delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
+            if delta_mm != 0.0:
+                for pi in pad_infos:
+                    if pi.pad_type == pad_type:
+                        pi.polygon = pi.polygon.buffer(
+                            delta_mm, resolution=config.curve_resolution
+                        )
+
+
+def _apply_global_aperture(paste_geom, aperture_workspace: dict, config: StencilConfig):
+    """Apply a single workspace rule to the entire geometry (legacy path)."""
+    aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.thickness_mm)
+    effect = aperture_effect["effect"]
+    if not effect["enabled"]:
+        logger.info(
+            "Aperture rule inactive: %s",
+            aperture_effect["ruleName"] or aperture_effect["matchSummary"] or "(none)",
+        )
+        return paste_geom
+    logger.info(
+        "Aperture rule active: %s -> %s",
+        aperture_effect["matchSummary"] or "(any)",
+        aperture_effect["actionSummary"] or "(none)",
+    )
+    if aperture_effect.get("groupSummary"):
+        logger.info(
+            "Aperture rule group: %s (%s rule(s))",
+            aperture_effect["groupSummary"],
+            aperture_effect.get("groupRuleCount", 0),
+        )
+    if effect["mode"] == "scale":
+        scale_factor = float(effect.get("scale", 1.0) or 1.0)
+        if scale_factor != 1.0:
+            paste_geom = scale_geometry(
+                paste_geom, xfact=scale_factor, yfact=scale_factor, origin="centroid",
+            )
+    else:
+        delta_mm = float(effect.get("deltaMm", 0.0) or 0.0)
+        if delta_mm != 0.0:
+            paste_geom = paste_geom.buffer(delta_mm, resolution=config.curve_resolution)
+    return paste_geom
 
 
 def _find_files(input_dir: Path, patterns: list[str]) -> list[Path]:

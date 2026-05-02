@@ -9,12 +9,18 @@ from typing import Iterable
 
 DEFAULT_PASTE_PATTERNS = ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"]
 DEFAULT_OUTLINE_PATTERNS = ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"]
+DEFAULT_DRILL_PATTERNS = [
+    "*.drl", "*.txt", "*.drd", "*.exc",
+    "*drill*", "*hole*", "*pth*", "*npth*",
+    "*thru*", "*round*",
+]
 
 
 @dataclass(frozen=True)
 class StencilConfig:
     paste_patterns: list[str]
     outline_patterns: list[str]
+    drill_patterns: list[str]
     thickness_mm: float
     paste_offset_mm: float
     outline_margin_mm: float
@@ -105,6 +111,7 @@ class StencilConfig:
     def from_dict(data: dict) -> "StencilConfig":
         paste_patterns = _ensure_list(data.get("paste_patterns", [])) or list(DEFAULT_PASTE_PATTERNS)
         outline_patterns = _ensure_list(data.get("outline_patterns", [])) or list(DEFAULT_OUTLINE_PATTERNS)
+        drill_patterns = _ensure_list(data.get("drill_patterns", [])) or list(DEFAULT_DRILL_PATTERNS)
         thickness_mm = float(data.get("thickness_mm", 0.12))
         paste_offset_mm = float(data.get("paste_offset_mm", -0.05))
         outline_margin_mm = float(data.get("outline_margin_mm", 5.0))
@@ -174,6 +181,7 @@ class StencilConfig:
         return StencilConfig(
             paste_patterns=paste_patterns,
             outline_patterns=outline_patterns,
+            drill_patterns=drill_patterns,
             thickness_mm=thickness_mm,
             paste_offset_mm=paste_offset_mm,
             outline_margin_mm=outline_margin_mm,

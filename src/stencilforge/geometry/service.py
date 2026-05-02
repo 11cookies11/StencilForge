@@ -10,7 +10,11 @@ from threading import RLock
 from typing import Iterable
 
 from gerber import load_layer
+from gerber.common import read as gerber_read
+from gerber.excellon import ExcellonFile
+from gerber.excellon_statements import CoordinateStmt, ToolSelectionStmt
 from shapely import affinity
+from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 
 from ..config import StencilConfig
@@ -36,6 +40,61 @@ class GerberGeometryService:
             geom = self._scale_to_mm(geom, layer.cam_source.units)
             geometries.append(geom)
         return self._merge_geometries(geometries)
+
+    def load_paste_polygons(self, paths: Iterable[Path]) -> list[Polygon]:
+        """Load paste layers and return list of individual polygons (no merge)."""
+        polygons: list[Polygon] = []
+        for path in paths:
+            layer = self._load_layer(path, "paste")
+            geom = self._primitive_builder.build(layer.primitives)
+            geom = self._scale_to_mm(geom, layer.cam_source.units)
+            if geom is None or geom.is_empty:
+                continue
+            polygons.extend(_flatten_to_polygons(geom))
+        return polygons
+
+    def load_drill_holes(self, paths: Iterable[Path]) -> list[tuple[float, float, float]]:
+        """Load Excellon drill files and return list of (x_mm, y_mm, diameter_mm) tuples."""
+        holes: list[tuple[float, float, float]] = []
+        for path in paths:
+            try:
+                with _legacy_open_mode_compat():
+                    cnc = gerber_read(str(path))
+            except Exception:
+                logger.warning("Failed to read drill file: %s", path.name)
+                continue
+            if not isinstance(cnc, ExcellonFile):
+                logger.warning("Not an Excellon file, skipping: %s", path.name)
+                continue
+            holes.extend(self._extract_holes(cnc))
+        logger.info("Loaded %s drill holes from %s file(s)", len(holes), len(list(paths)))
+        return holes
+
+    def _extract_holes(self, cnc: ExcellonFile) -> list[tuple[float, float, float]]:
+        """Extract (x_mm, y_mm, diameter_mm) tuples from an ExcellonFile."""
+        units = getattr(cnc.settings, "units", "inch")
+        scale = 25.4 if units == "inch" else 1.0
+        tool_map: dict[int, float] = {}
+        holes: list[tuple[float, float, float]] = []
+
+        for stmt in cnc.primitives:
+            if isinstance(stmt, ToolSelectionStmt):
+                tool = getattr(stmt, "tool", None)
+                if tool is not None:
+                    diameter = float(getattr(tool, "diameter", 0) or 0)
+                    tool_map[getattr(stmt, "tool_number", 0) or 0] = diameter
+            elif isinstance(stmt, CoordinateStmt):
+                x_val = getattr(stmt, "x", None)
+                y_val = getattr(stmt, "y", None)
+                if x_val is None and y_val is None:
+                    continue
+                x = (float(x_val) if x_val is not None else 0.0) * scale
+                y = (float(y_val) if y_val is not None else 0.0) * scale
+                tool_num = getattr(stmt, "tool_number", 0) or 0
+                diameter = tool_map.get(tool_num, 0.3) * scale
+                holes.append((x, y, diameter))
+
+        return holes
 
     def load_outline_geometry(self, path: Path):
         layer = self._load_layer(path, "outline")
@@ -69,6 +128,21 @@ class GerberGeometryService:
         if not geometries:
             return None
         return unary_union([g for g in geometries if g is not None and not g.is_empty])
+
+
+def _flatten_to_polygons(geom) -> list[Polygon]:
+    """Decompose a Shapely geometry into a flat list of Polygon objects."""
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "Polygon":
+        return [geom]
+    if geom.geom_type == "MultiPolygon":
+        return [p for p in geom.geoms if isinstance(p, Polygon) and not p.is_empty]
+    # GeometryCollection or other types
+    try:
+        return [p for p in geom.geoms if isinstance(p, Polygon) and not p.is_empty]
+    except Exception:
+        return []
 
 
 @contextmanager
