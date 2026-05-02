@@ -108,7 +108,7 @@ class PrimitiveGeometryBuilder:
 
     def _arc_to_shape(self, arc: gprim.Arc):
         # 圆弧离散成线段后缓冲成面
-        points = self._arc_points(arc, self._config.arc_steps)
+        points = get_arc_points(arc, self._config.arc_steps)
         radius = None
         if isinstance(arc.aperture, gprim.Circle):
             radius = arc.aperture.radius
@@ -126,22 +126,20 @@ class PrimitiveGeometryBuilder:
             resolution=self._config.curve_resolution,
         )
 
-    @staticmethod
-    def _arc_points(arc: gprim.Arc, steps: int):
-        # 生成圆弧采样点，顺/逆时针处理不同
-        steps = max(8, steps)
-        start = arc.start_angle
-        end = arc.end_angle
-        if arc.direction == "counterclockwise":
-            if end <= start:
-                end += 2 * math.pi
-            angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
-        else:
-            if end >= start:
-                end -= 2 * math.pi
-            angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
-        cx, cy = arc.center
-        return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
+def get_arc_points(arc: gprim.Arc, steps: int):
+    steps = max(8, steps)
+    start = arc.start_angle
+    end = arc.end_angle
+    if arc.direction == "counterclockwise":
+        if end <= start:
+            end += 2 * math.pi
+        angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
+    else:
+        if end >= start:
+            end -= 2 * math.pi
+        angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
+    cx, cy = arc.center
+    return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
 
     def _region_to_shape(self, region: gprim.Region):
         # Region 由线段/圆弧闭合而成，拼成多边形
@@ -152,7 +150,7 @@ class PrimitiveGeometryBuilder:
                     points.append(prim.start)
                 points.append(prim.end)
             elif isinstance(prim, gprim.Arc):
-                arc_pts = self._arc_points(prim, self._config.arc_steps)
+                arc_pts = get_arc_points(prim, self._config.arc_steps)
                 if not points:
                     points.append(arc_pts[0])
                     points.extend(arc_pts[1:])

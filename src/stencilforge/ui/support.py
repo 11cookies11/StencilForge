@@ -1,13 +1,38 @@
 from __future__ import annotations
 
+import ctypes
 import json
+import os
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QCursor, QGuiApplication, QScreen
 from PySide6.QtWidgets import QDialog, QMainWindow
 
 from ..config import StencilConfig
+
+
+def init_qt_env(webengine_flags: str | None = None) -> None:
+    os.environ.setdefault("QT_OPENGL", "software")
+    os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
+    if sys.platform == "win32":
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("StencilForge")
+        except Exception:
+            pass
+    from PySide6.QtCore import QCoreApplication
+
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
+    try:
+        QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
+    except Exception:
+        pass
+    if webengine_flags:
+        existing = os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS", "")
+        if webengine_flags not in existing:
+            combined = f"{existing} {webengine_flags}".strip()
+            os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = combined
 
 
 def resolve_project_root() -> Path:
@@ -59,7 +84,7 @@ def load_ui_state(path: Path) -> dict[str, str]:
         raw = path.read_text(encoding="utf-8")
         data = json.loads(raw)
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return {}
 
 

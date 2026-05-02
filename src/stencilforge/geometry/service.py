@@ -135,14 +135,17 @@ def _flatten_to_polygons(geom) -> list[Polygon]:
     if geom is None or geom.is_empty:
         return []
     if geom.geom_type == "Polygon":
-        return [geom]
-    if geom.geom_type == "MultiPolygon":
-        return [p for p in geom.geoms if isinstance(p, Polygon) and not p.is_empty]
-    # GeometryCollection or other types
-    try:
-        return [p for p in geom.geoms if isinstance(p, Polygon) and not p.is_empty]
-    except Exception:
-        return []
+        return [geom] if not geom.is_empty else []
+    result: list[Polygon] = []
+    if hasattr(geom, "geoms"):
+        for sub in geom.geoms:
+            if sub.geom_type == "Polygon" and not sub.is_empty:
+                result.append(sub)
+            elif hasattr(sub, "geoms"):
+                result.extend(
+                    p for p in sub.geoms if isinstance(p, Polygon) and not p.is_empty
+                )
+    return result
 
 
 @contextmanager

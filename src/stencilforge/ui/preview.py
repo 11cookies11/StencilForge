@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QCoreApplication
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QSurfaceFormat, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
@@ -13,14 +13,14 @@ try:
     from ..i18n import preview_labels, text
     from ..title_bar import TitleBar
     from ..vtk_viewer import VtkStlViewer
-    from .support import center_window, resolve_icon_path, resolve_project_root
+    from .support import center_window, init_qt_env, resolve_icon_path, resolve_project_root
 except ImportError:
     # Allow running as a script when package context is missing.
     sys.path.append(str(Path(__file__).resolve().parents[2]))
     from stencilforge.i18n import preview_labels, text
     from stencilforge.title_bar import TitleBar
     from stencilforge.vtk_viewer import VtkStlViewer
-    from stencilforge.ui.support import center_window, resolve_icon_path, resolve_project_root
+    from stencilforge.ui.support import center_window, init_qt_env, resolve_icon_path, resolve_project_root
 
 
 def main() -> int:
@@ -33,20 +33,7 @@ def main() -> int:
         print(text(locale, "cli.stl_not_found", path=stl_path))
         return 1
 
-    os.environ.setdefault("QT_OPENGL", "software")
-    os.environ.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
-    if sys.platform == "win32":
-        try:
-            import ctypes
-
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("StencilForge")
-        except Exception:
-            pass
-    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
-    try:
-        QCoreApplication.setAttribute(Qt.AA_UseDesktopOpenGL)
-    except Exception:
-        pass
+    init_qt_env()
     try:
         QSurfaceFormat.setDefaultFormat(QVTKRenderWindowInteractor.defaultFormat())
     except Exception:

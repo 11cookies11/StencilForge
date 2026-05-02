@@ -10,6 +10,7 @@ from shapely.geometry import MultiPoint, box
 from shapely.ops import unary_union
 
 from ..config import StencilConfig
+from ..geometry.service import _flatten_to_polygons
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ QFN_WINDOWPANE_SPACING = 3.0     # mm between pane centres
 
 def regenerate_qfn_paste(geometry, config: StencilConfig):
     # 主入口：识别 QFN、重建开窗；失败则回退原几何
-    polys = _flatten_polygons(geometry)
+    polys = _flatten_to_polygons(geometry)
     if not polys:
         return geometry
     pads = _detect_qfn_pads(polys, config)
@@ -58,23 +59,6 @@ def regenerate_qfn_paste(geometry, config: StencilConfig):
     if regenerated is None:
         return geometry
     return regenerated
-
-
-def _flatten_polygons(geometry):
-    if geometry is None or geometry.is_empty:
-        return []
-    if geometry.geom_type == "Polygon":
-        return [geometry]
-    if geometry.geom_type == "MultiPolygon":
-        return list(geometry.geoms)
-    polygons = []
-    if hasattr(geometry, "geoms"):
-        for geom in geometry.geoms:
-            if geom.geom_type == "Polygon":
-                polygons.append(geom)
-            elif geom.geom_type == "MultiPolygon":
-                polygons.extend(list(geom.geoms))
-    return polygons
 
 
 def _detect_qfn_pads(polys, config: StencilConfig):

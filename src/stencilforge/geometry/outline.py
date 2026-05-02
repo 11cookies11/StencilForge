@@ -13,6 +13,8 @@ from gerber import primitives as gprim
 from gerber import load_layer
 from shapely import affinity
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
+
+from stencilforge.geometry.primitives import get_arc_points
 from shapely.strtree import STRtree
 from shapely.ops import linemerge, polygonize, unary_union
 
@@ -475,7 +477,7 @@ class OutlineBuilder:
             if isinstance(prim, gprim.Line):
                 segments.append(LineString([prim.start, prim.end]))
             elif isinstance(prim, gprim.Arc):
-                arc_pts = _arc_points(prim, self._config.arc_steps)
+                arc_pts = get_arc_points(prim, self._config.arc_steps)
                 if len(arc_pts) >= 2:
                     segments.append(LineString(arc_pts))
         return segments
@@ -834,23 +836,6 @@ class OutlineBuilder:
         if odd_polys:
             result = result.difference(unary_union(odd_polys))
         return result
-
-
-def _arc_points(arc: gprim.Arc, steps: int):
-    # 与 primitives 中类似的圆弧采样
-    steps = max(8, steps)
-    start = arc.start_angle
-    end = arc.end_angle
-    if arc.direction == "counterclockwise":
-        if end <= start:
-            end += 2 * math.pi
-        angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
-    else:
-        if end >= start:
-            end -= 2 * math.pi
-        angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
-    cx, cy = arc.center
-    return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
 
 
 def _cli() -> int:

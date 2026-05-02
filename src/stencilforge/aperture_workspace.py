@@ -8,6 +8,7 @@ APERTURE_WORKSPACE_FORMAT = "stencilforge.aperture_workspace"
 APERTURE_WORKSPACE_SCHEMA_VERSION = 1
 APERTURE_WORKSPACE_SUPPORTED_SCHEMA_VERSIONS = {1}
 
+# Keep in sync with ui-vue/src/components/ApertureRuleWorkspace.vue
 PACKAGE_FACTOR_MAP = {
     "QFN": 0.94,
     "BGA": 0.92,

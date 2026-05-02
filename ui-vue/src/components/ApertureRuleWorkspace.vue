@@ -630,6 +630,7 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+// Keep in sync with src/stencilforge/aperture_workspace.py
 const PACKAGE_FACTOR_MAP = {
   QFN: 0.94,
   BGA: 0.92,
@@ -692,71 +693,7 @@ export default {
       workspaceSyncTimer: null,
       workspaceSignalConnected: false,
       workspaceLastSignature: "",
-      rules: [
-        {
-          id: "rule_default",
-          name: "Global fallback",
-          enabled: true,
-          priority: 0,
-          match: { package: "Any", padType: "Any", padSize: "0.20-1.00 mm" },
-          action: { mode: "delta", deltaMm: -0.02, scale: 0.98 },
-          note: "Fallback rule for the whole library.",
-        },
-        {
-          id: "rule_qfn",
-          name: "QFN fine pitch",
-          enabled: true,
-          priority: 80,
-          match: { package: "QFN", padType: "SMD", padSize: "0.20-0.60 mm" },
-          action: { mode: "delta", deltaMm: -0.03, scale: 0.96 },
-          note: "Default recommendation for dense QFN pads.",
-        },
-        {
-          id: "rule_qfn_std",
-          name: "QFN standard",
-          enabled: true,
-          priority: 70,
-          match: { package: "QFN", padType: "SMD", padSize: "0.60-1.00 mm" },
-          action: { mode: "delta", deltaMm: -0.02, scale: 0.97 },
-          note: "Larger QFN pads with moderate reduction.",
-        },
-        {
-          id: "rule_bga",
-          name: "BGA",
-          enabled: true,
-          priority: 75,
-          match: { package: "BGA", padType: "SMD", padSize: "0.20-0.80 mm" },
-          action: { mode: "delta", deltaMm: -0.015, scale: 0.95 },
-          note: "BGA ball pads with conservative reduction to avoid bridging.",
-        },
-        {
-          id: "rule_ic",
-          name: "IC / SOIC",
-          enabled: true,
-          priority: 60,
-          match: { package: "IC", padType: "SMD", padSize: "0.30-0.80 mm" },
-          action: { mode: "delta", deltaMm: -0.01, scale: 0.97 },
-          note: "Standard IC pads with slight reduction for fine-pitch devices.",
-        },
-        {
-          id: "rule_power",
-          name: "Power pads",
-          enabled: false,
-          priority: 45,
-          match: { package: "Power", padType: "Thermal", padSize: "1.00-3.00 mm" },
-          action: { mode: "scale", deltaMm: 0, scale: 1.04 },
-          note: "Enable when extra solder volume is preferred.",
-        },
-        {
-          id: "rule_tht",
-          name: "THT",
-          enabled: true,
-          priority: 40,
-          match: { package: "Any", padType: "THT", padSize: "0.60-2.00 mm" },
-          action: { mode: "scale", deltaMm: 0, scale: 1.04 },
-          note: "Through-hole pads benefit from increased aperture for barrel fill.",
-        },
-      ],
+      rules: [],
     };
   },
   mounted() {
@@ -1028,7 +965,15 @@ priority: 100`;
       }
       if (typeof nextBackend.getApertureWorkspace === "function") {
         nextBackend.getApertureWorkspace((snapshot) => {
-          this.applyWorkspaceSnapshot(snapshot || {});
+          if (snapshot && Array.isArray(snapshot.rules) && snapshot.rules.length > 0) {
+            this.applyWorkspaceSnapshot(snapshot);
+          } else if (typeof nextBackend.getDefaultApertureWorkspace === "function") {
+            nextBackend.getDefaultApertureWorkspace((defaults) => {
+              this.applyWorkspaceSnapshot(defaults || {});
+            });
+          } else {
+            this.workspaceHydrating = false;
+          }
         });
       } else {
         this.workspaceHydrating = false;

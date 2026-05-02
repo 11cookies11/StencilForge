@@ -18,6 +18,14 @@ from .mesh import cleanup_mesh, translate_to_origin
 
 logger = logging.getLogger(__name__)
 
+_ADAPTIVE_PITCH_TIERS: list[tuple[float, float]] = [
+    (180, 3.0),
+    (120, 2.4),
+    (80, 2.0),
+    (50, 1.6),
+]
+_SFMESH_CDT_MIN_COVERAGE = 0.995
+
 
 @dataclass(frozen=True)
 class EngineExportInput:
@@ -251,7 +259,7 @@ def _extrude_polygon_with_cdt(poly, thickness_mm: float) -> trimesh.Trimesh:
     tri_list = [tri for tri in tri_list if tri.area > 0 and poly.covers(tri.representative_point())]
     covered_area = sum(tri.area for tri in tri_list)
     coverage = covered_area / poly.area if poly.area > 0 else 0.0
-    if coverage < 0.995:
+    if coverage < _SFMESH_CDT_MIN_COVERAGE:
         logger.warning(
             "sfmesh CDT coverage low: poly_area=%.6f kept=%.6f coverage=%.3f",
             float(poly.area),
@@ -427,14 +435,10 @@ def _adaptive_voxel_pitch(mesh: trimesh.Trimesh, cfg: StencilConfig, critical_ho
         return pitch
     extents = np.asarray(bounds[1]) - np.asarray(bounds[0])
     longest = float(np.max(extents)) if extents.size else 0.0
-    if longest > 180:
-        pitch *= 3.0
-    elif longest > 120:
-        pitch *= 2.4
-    elif longest > 80:
-        pitch *= 2.0
-    elif longest > 50:
-        pitch *= 1.6
+    for threshold, multiplier in _ADAPTIVE_PITCH_TIERS:
+        if longest > threshold:
+            pitch *= multiplier
+            break
     pitch = float(np.clip(pitch, cfg.sfmesh_adaptive_pitch_min_mm, cfg.sfmesh_adaptive_pitch_max_mm))
     if cfg.sfmesh_hole_protect_enabled and critical_hole_width is not None:
         cap = max(cfg.sfmesh_adaptive_pitch_min_mm, critical_hole_width / cfg.sfmesh_hole_pitch_divisor)
@@ -478,19 +482,19 @@ def _repair_mesh_topology(mesh: trimesh.Trimesh) -> None:
     try:
         trimesh.repair.fix_winding(mesh)
     except Exception:
-        pass
+        logger.debug("fix_winding failed", exc_info=True)
     try:
         trimesh.repair.fix_normals(mesh)
     except Exception:
-        pass
+        logger.debug("fix_normals failed", exc_info=True)
     try:
         trimesh.repair.fix_inversion(mesh)
     except Exception:
-        pass
+        logger.debug("fix_inversion failed", exc_info=True)
     try:
         trimesh.repair.fill_holes(mesh)
     except Exception:
-        pass
+        logger.debug("fill_holes failed", exc_info=True)
     if hasattr(mesh, "merge_vertices"):
         mesh.merge_vertices(digits_vertex=6)
     if hasattr(mesh, "remove_duplicate_faces"):

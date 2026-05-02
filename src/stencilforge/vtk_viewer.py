@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import shutil
 import tempfile
 
 import numpy as np
 import trimesh
+
+_logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QVBoxLayout, QWidget, QSizePolicy
@@ -103,10 +106,10 @@ class VtkStlViewer(QWidget):
         output = reader.GetOutput()
         polydata = output
         if output is None or output.GetNumberOfCells() == 0:
-            print(f"[VTK] STL has no cells: {load_path}, trying trimesh fallback")
+            _logger.warning("STL has no cells: %s, trying trimesh fallback", load_path)
             polydata = self._load_with_trimesh(load_path)
             if polydata is None or polydata.GetNumberOfCells() == 0:
-                print(f"[VTK] STL fallback failed: {load_path}")
+                _logger.error("STL fallback failed: %s", load_path)
                 return
 
         mapper = vtkPolyDataMapper()
@@ -152,8 +155,8 @@ class VtkStlViewer(QWidget):
                     self._edge_actor.SetScale(1.0, 1.0, scale_z)
                 if self._outline_actor is not None:
                     self._outline_actor.SetScale(1.0, 1.0, scale_z)
-                print(f"[VTK] Applied preview Z scale: {scale_z:.2f}")
-        print(f"[VTK] Loaded STL: {load_path} bounds={bounds} cells={polydata.GetNumberOfCells()}")
+                _logger.info("Applied preview Z scale: %.2f", scale_z)
+        _logger.info("Loaded STL: %s bounds=%s cells=%d", load_path, bounds, polydata.GetNumberOfCells())
         self.fit_view(bounds)
         self._default_camera = self._renderer.GetActiveCamera()
         self.refresh_view()
@@ -282,7 +285,7 @@ class VtkStlViewer(QWidget):
         try:
             mesh = trimesh.load_mesh(path, force="mesh")
         except Exception as exc:
-            print(f"[VTK] Trimesh load failed: {exc}")
+            _logger.error("Trimesh load failed: %s", exc)
             return None
         if mesh.is_empty:
             return None

@@ -241,101 +241,60 @@ class StencilConfig:
         return asdict(self)
 
     def validate(self) -> None:
-        if self.thickness_mm <= 0:
-            raise ValueError("thickness_mm must be > 0")
-        if self.arc_steps < 8:
-            raise ValueError("arc_steps must be >= 8")
-        if self.curve_resolution < 4:
-            raise ValueError("curve_resolution must be >= 4")
-        if self.qfn_min_feature_mm <= 0:
-            raise ValueError("qfn_min_feature_mm must be > 0")
-        if not 0.0 < self.qfn_confidence_threshold <= 1.0:
-            raise ValueError("qfn_confidence_threshold must be in (0, 1]")
-        if self.qfn_max_pad_width_mm <= 0:
-            raise ValueError("qfn_max_pad_width_mm must be > 0")
-        if self.output_mode not in {"holes_only", "solid_with_cutouts"}:
-            raise ValueError("output_mode must be holes_only or solid_with_cutouts")
-        if self.model_backend not in {"trimesh", "cadquery"}:
-            raise ValueError("model_backend must be trimesh or cadquery")
-        if self.sfmesh_quality_mode not in {"fast", "auto", "watertight"}:
-            raise ValueError("sfmesh_quality_mode must be fast, auto, or watertight")
-        if self.sfmesh_voxel_pitch_mm <= 0:
-            raise ValueError("sfmesh_voxel_pitch_mm must be > 0")
-        if self.sfmesh_adaptive_pitch_min_mm <= 0:
-            raise ValueError("sfmesh_adaptive_pitch_min_mm must be > 0")
-        if self.sfmesh_adaptive_pitch_max_mm <= 0:
-            raise ValueError("sfmesh_adaptive_pitch_max_mm must be > 0")
-        if self.sfmesh_adaptive_pitch_min_mm > self.sfmesh_adaptive_pitch_max_mm:
-            raise ValueError("sfmesh_adaptive_pitch_min_mm must be <= sfmesh_adaptive_pitch_max_mm")
-        if self.sfmesh_watertight_face_limit <= 0:
-            raise ValueError("sfmesh_watertight_face_limit must be > 0")
-        if self.sfmesh_simplify_tol_mm < 0:
-            raise ValueError("sfmesh_simplify_tol_mm must be >= 0")
-        if self.sfmesh_min_polygon_area_mm2 < 0:
-            raise ValueError("sfmesh_min_polygon_area_mm2 must be >= 0")
-        if self.sfmesh_min_hole_area_mm2 < 0:
-            raise ValueError("sfmesh_min_hole_area_mm2 must be >= 0")
-        if not 0 < self.sfmesh_decimate_target_ratio <= 1:
-            raise ValueError("sfmesh_decimate_target_ratio must be in (0, 1]")
-        if self.sfmesh_hole_protect_max_width_mm <= 0:
-            raise ValueError("sfmesh_hole_protect_max_width_mm must be > 0")
-        if self.sfmesh_hole_pitch_divisor <= 1:
-            raise ValueError("sfmesh_hole_pitch_divisor must be > 1")
-        if self.sfmesh_chunk_size_mm <= 0:
-            raise ValueError("sfmesh_chunk_size_mm must be > 0")
-        if self.sfmesh_chunk_overlap_mm < 0:
-            raise ValueError("sfmesh_chunk_overlap_mm must be >= 0")
-        if self.stl_linear_deflection <= 0:
-            raise ValueError("stl_linear_deflection must be > 0")
-        if self.stl_angular_deflection <= 0:
-            raise ValueError("stl_angular_deflection must be > 0")
-        if self.stl_tolerance < 0:
-            raise ValueError("stl_tolerance must be >= 0")
-        if self.stl_quality and self.stl_quality not in ("fast", "balanced", "high_quality"):
-            raise ValueError("stl_quality must be fast, balanced, or high_quality")
-        if self.locator_height_mm < 0:
-            raise ValueError("locator_height_mm must be >= 0")
-        if self.locator_width_mm < 0:
-            raise ValueError("locator_width_mm must be >= 0")
-        if self.locator_clearance_mm < 0:
-            raise ValueError("locator_clearance_mm must be >= 0")
-        if self.locator_step_height_mm < 0:
-            raise ValueError("locator_step_height_mm must be >= 0")
-        if self.locator_step_width_mm < 0:
-            raise ValueError("locator_step_width_mm must be >= 0")
-        if self.locator_mode not in {"step", "wall"}:
-            raise ValueError("locator_mode must be step or wall")
-        if self.locator_step_height_mm > 0 and self.locator_height_mm > 0:
-            if self.locator_step_height_mm > self.locator_height_mm:
-                raise ValueError("locator_step_height_mm must be <= locator_height_mm")
-        if self.locator_open_width_mm < 0:
-            raise ValueError("locator_open_width_mm must be >= 0")
-        if self.locator_open_side not in {"none", "top", "right", "bottom", "left"}:
-            raise ValueError("locator_open_side must be none/top/right/bottom/left")
-        if self.outline_fill_rule not in {"legacy", "evenodd"}:
-            raise ValueError("outline_fill_rule must be legacy or evenodd")
-        if self.outline_close_strategy not in {"legacy", "graph", "robust_polygonize"}:
-            raise ValueError("outline_close_strategy must be legacy, graph, or robust_polygonize")
-        if self.outline_merge_tol_mm < 0:
-            raise ValueError("outline_merge_tol_mm must be >= 0")
-        if self.outline_snap_eps_mm <= 0:
-            raise ValueError("outline_snap_eps_mm must be > 0")
-        if self.outline_arc_max_chord_error_mm <= 0:
-            raise ValueError("outline_arc_max_chord_error_mm must be > 0")
-        if self.outline_gap_bridge_mm < 0:
-            raise ValueError("outline_gap_bridge_mm must be >= 0")
-        if self.cadquery_simplify_tol_mm < 0:
-            raise ValueError("cadquery_simplify_tol_mm must be >= 0")
-        if self.cadquery_short_edge_min_mm < 0:
-            raise ValueError("cadquery_short_edge_min_mm must be >= 0")
-        if self.cadquery_quantize_mm < 0:
-            raise ValueError("cadquery_quantize_mm must be >= 0")
-        if self.ui_debug_plot_max_segments < 0:
-            raise ValueError("ui_debug_plot_max_segments must be >= 0")
-        if self.ui_debug_plot_max_offset_vectors < 0:
-            raise ValueError("ui_debug_plot_max_offset_vectors must be >= 0")
-        if self.ui_debug_plot_offset_min_mm < 0:
-            raise ValueError("ui_debug_plot_offset_min_mm must be >= 0")
+        for desc, check in self._RULES:
+            if not check(self):
+                raise ValueError(f"Invalid config: {desc}")
+
+
+StencilConfig._RULES = [
+    ("thickness_mm > 0", lambda s: s.thickness_mm > 0),
+    ("arc_steps >= 8", lambda s: s.arc_steps >= 8),
+    ("curve_resolution >= 4", lambda s: s.curve_resolution >= 4),
+    ("qfn_min_feature_mm > 0", lambda s: s.qfn_min_feature_mm > 0),
+    ("qfn_confidence_threshold in (0, 1]", lambda s: 0.0 < s.qfn_confidence_threshold <= 1.0),
+    ("qfn_max_pad_width_mm > 0", lambda s: s.qfn_max_pad_width_mm > 0),
+    ("output_mode in {holes_only, solid_with_cutouts}", lambda s: s.output_mode in {"holes_only", "solid_with_cutouts"}),
+    ("model_backend in {trimesh, cadquery}", lambda s: s.model_backend in {"trimesh", "cadquery"}),
+    ("sfmesh_quality_mode in {fast, auto, watertight}", lambda s: s.sfmesh_quality_mode in {"fast", "auto", "watertight"}),
+    ("sfmesh_voxel_pitch_mm > 0", lambda s: s.sfmesh_voxel_pitch_mm > 0),
+    ("sfmesh_adaptive_pitch_min_mm > 0", lambda s: s.sfmesh_adaptive_pitch_min_mm > 0),
+    ("sfmesh_adaptive_pitch_max_mm > 0", lambda s: s.sfmesh_adaptive_pitch_max_mm > 0),
+    ("sfmesh_adaptive_pitch_min_mm <= sfmesh_adaptive_pitch_max_mm", lambda s: s.sfmesh_adaptive_pitch_min_mm <= s.sfmesh_adaptive_pitch_max_mm),
+    ("sfmesh_watertight_face_limit > 0", lambda s: s.sfmesh_watertight_face_limit > 0),
+    ("sfmesh_simplify_tol_mm >= 0", lambda s: s.sfmesh_simplify_tol_mm >= 0),
+    ("sfmesh_min_polygon_area_mm2 >= 0", lambda s: s.sfmesh_min_polygon_area_mm2 >= 0),
+    ("sfmesh_min_hole_area_mm2 >= 0", lambda s: s.sfmesh_min_hole_area_mm2 >= 0),
+    ("sfmesh_decimate_target_ratio in (0, 1]", lambda s: 0 < s.sfmesh_decimate_target_ratio <= 1),
+    ("sfmesh_hole_protect_max_width_mm > 0", lambda s: s.sfmesh_hole_protect_max_width_mm > 0),
+    ("sfmesh_hole_pitch_divisor > 1", lambda s: s.sfmesh_hole_pitch_divisor > 1),
+    ("sfmesh_chunk_size_mm > 0", lambda s: s.sfmesh_chunk_size_mm > 0),
+    ("sfmesh_chunk_overlap_mm >= 0", lambda s: s.sfmesh_chunk_overlap_mm >= 0),
+    ("stl_linear_deflection > 0", lambda s: s.stl_linear_deflection > 0),
+    ("stl_angular_deflection > 0", lambda s: s.stl_angular_deflection > 0),
+    ("stl_tolerance >= 0", lambda s: s.stl_tolerance >= 0),
+    ("stl_quality in {fast, balanced, high_quality} or empty", lambda s: not s.stl_quality or s.stl_quality in ("fast", "balanced", "high_quality")),
+    ("locator_height_mm >= 0", lambda s: s.locator_height_mm >= 0),
+    ("locator_width_mm >= 0", lambda s: s.locator_width_mm >= 0),
+    ("locator_clearance_mm >= 0", lambda s: s.locator_clearance_mm >= 0),
+    ("locator_step_height_mm >= 0", lambda s: s.locator_step_height_mm >= 0),
+    ("locator_step_width_mm >= 0", lambda s: s.locator_step_width_mm >= 0),
+    ("locator_mode in {step, wall}", lambda s: s.locator_mode in {"step", "wall"}),
+    ("locator_step_height_mm <= locator_height_mm when both > 0", lambda s: not (s.locator_step_height_mm > 0 and s.locator_height_mm > 0) or s.locator_step_height_mm <= s.locator_height_mm),
+    ("locator_open_width_mm >= 0", lambda s: s.locator_open_width_mm >= 0),
+    ("locator_open_side in {none, top, right, bottom, left}", lambda s: s.locator_open_side in {"none", "top", "right", "bottom", "left"}),
+    ("outline_fill_rule in {legacy, evenodd}", lambda s: s.outline_fill_rule in {"legacy", "evenodd"}),
+    ("outline_close_strategy in {legacy, graph, robust_polygonize}", lambda s: s.outline_close_strategy in {"legacy", "graph", "robust_polygonize"}),
+    ("outline_merge_tol_mm >= 0", lambda s: s.outline_merge_tol_mm >= 0),
+    ("outline_snap_eps_mm > 0", lambda s: s.outline_snap_eps_mm > 0),
+    ("outline_arc_max_chord_error_mm > 0", lambda s: s.outline_arc_max_chord_error_mm > 0),
+    ("outline_gap_bridge_mm >= 0", lambda s: s.outline_gap_bridge_mm >= 0),
+    ("cadquery_simplify_tol_mm >= 0", lambda s: s.cadquery_simplify_tol_mm >= 0),
+    ("cadquery_short_edge_min_mm >= 0", lambda s: s.cadquery_short_edge_min_mm >= 0),
+    ("cadquery_quantize_mm >= 0", lambda s: s.cadquery_quantize_mm >= 0),
+    ("ui_debug_plot_max_segments >= 0", lambda s: s.ui_debug_plot_max_segments >= 0),
+    ("ui_debug_plot_max_offset_vectors >= 0", lambda s: s.ui_debug_plot_max_offset_vectors >= 0),
+    ("ui_debug_plot_offset_min_mm >= 0", lambda s: s.ui_debug_plot_offset_min_mm >= 0),
+]
 
 
 def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
