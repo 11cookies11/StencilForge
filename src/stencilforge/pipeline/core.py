@@ -308,6 +308,7 @@ def _apply_per_class_aperture(
         ws_for_type["padWidthMm"] = dims["padWidthMm"]
         ws_for_type["padHeightMm"] = dims["padHeightMm"]
         ws_for_type["padAreaMm2"] = dims["padAreaMm2"]
+        ws_for_type["targetVolumeMm3"] = 0.0  # let calculator derive from actual dimensions
 
         effect_info = resolve_aperture_workspace_effect(ws_for_type, config.thickness_mm)
         effect = effect_info["effect"]
