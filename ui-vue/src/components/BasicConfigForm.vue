@@ -17,6 +17,14 @@
           :options="outputModeOptions"
         />
       </label>
+      <label class="text-xs font-semibold text-slate-600">{{ t("config.pasteSide") }}
+        <AppSelect
+          :model-value="config.paste_side || 'top'"
+          @update:model-value="$emit('update:config', { ...config, paste_side: $event })"
+          class="mt-1"
+          :options="pasteSideOptions"
+        />
+      </label>
       <label class="text-xs font-semibold text-slate-600">{{ t("config.modelBackend") }}
         <AppSelect
           :model-value="config.model_backend"
@@ -205,6 +213,13 @@ export default {
   },
   emits: ["update:config", "add-pattern", "remove-pattern"],
   computed: {
+    pasteSideOptions() {
+      return [
+        { value: "both", label: this.t("config.pasteSideBoth") },
+        { value: "top", label: this.t("config.pasteSideTop") },
+        { value: "bottom", label: this.t("config.pasteSideBottom") },
+      ];
+    },
     outputModeOptions() {
       return [
         { value: "solid_with_cutouts", label: this.t("config.outputModeSolid") },

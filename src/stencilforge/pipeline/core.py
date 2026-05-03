@@ -38,6 +38,8 @@ _PASTE_FALLBACK_PATTERNS = [
     "*smt*bottom*",
 ]
 
+_BOTTOM_PASTE_MARKERS = ["gbp", "bottom", "bcream"]
+
 _OUTLINE_FALLBACK_PATTERNS = [
     "*gko*",
     "*.gko",
@@ -66,8 +68,40 @@ def generate_stencil(
     config.validate()
     if geometry_service is None:
         geometry_service = GerberGeometryService(config)
+    if model_engine is None:
+        model_engine = get_model_engine(config.model_backend)
+
+    sides = ["top", "bottom"] if config.paste_side == "both" else [config.paste_side]
+    last_debug = None
+    for side in sides:
+        stem = output_path.stem
+        suffix = f"_{side}" if len(sides) > 1 else ""
+        side_path = output_path.with_stem(f"{stem}{suffix}")
+        _generate_stencil_side(
+            input_dir=input_dir,
+            output_path=side_path,
+            config=config,
+            side=side,
+            geometry_service=geometry_service,
+            model_engine=model_engine,
+            aperture_workspace=aperture_workspace,
+        )
+    return last_debug
+
+
+def _generate_stencil_side(
+    *,
+    input_dir: Path,
+    output_path: Path,
+    config: StencilConfig,
+    side: str,
+    geometry_service: GerberGeometryService,
+    model_engine: ModelEngine,
+    aperture_workspace: dict | None,
+) -> dict | None:
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
+    logger.info("Paste side: %s", side)
     overall_start = time.perf_counter()
 
     paste_files = _find_files(input_dir, config.paste_patterns)
@@ -84,6 +118,24 @@ def generate_stencil(
         raise FileNotFoundError(
             f"No paste layer files found in input directory. Seen: {preview}"
         )
+    all_paste = paste_files.copy()
+    other_side_info = ""
+    if side != "both":
+        paste_files = _filter_paste_side(paste_files, side)
+        if not paste_files:
+            other = "bottom" if side == "top" else "top"
+            other_files = _filter_paste_side(all_paste, other)
+            hint = f" ({len(other_files)} file(s) found for '{other}' side)" if other_files else ""
+            raise FileNotFoundError(
+                f"No paste files found for side '{side}'.{hint}"
+            )
+        other = "bottom" if side == "top" else "top"
+        other_files = _filter_paste_side(all_paste, other)
+        if not other_files:
+            other_side_info = f" (no '{other}' paste layer in input)"
+        else:
+            other_side_info = f" ({len(other_files)} '{other}' paste file(s) found but not selected)"
+        logger.info("Paste side filter: %s%s", side, other_side_info)
     logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
 
     t0 = time.perf_counter()
@@ -106,10 +158,11 @@ def generate_stencil(
 
     paste_polygons = flatten_to_polygons(paste_geom)
     pad_infos = classify_pads(paste_polygons, drill_holes)
+    pad_summary: dict[str, int] = {}
     if pad_infos:
         from .pad_classifier import classification_summary
-        summary = classification_summary(pad_infos)
-        logger.info("Pad classification: %s", summary)
+        pad_summary = classification_summary(pad_infos)
+        logger.info("Pad classification: %s", pad_summary)
 
     if aperture_workspace is not None:
         if pad_infos:
@@ -278,8 +331,6 @@ def generate_stencil(
                     config.locator_open_width_mm,
                 )
 
-    if model_engine is None:
-        model_engine = get_model_engine(config.model_backend)
     t0 = time.perf_counter()
     model_engine.export(
         EngineExportInput(
@@ -290,8 +341,28 @@ def generate_stencil(
             config=config,
         )
     )
-    logger.info("Backend '%s' export in %.3fs", model_engine.name, time.perf_counter() - t0)
-    logger.info("Total pipeline time: %.3fs", time.perf_counter() - overall_start)
+    export_elapsed = time.perf_counter() - t0
+    total_elapsed = time.perf_counter() - overall_start
+    logger.info("Backend '%s' export in %.3fs", model_engine.name, export_elapsed)
+    logger.info("Total pipeline time: %.3fs", total_elapsed)
+
+    report = _build_stencil_report(
+        input_dir=input_dir,
+        output_path=output_path,
+        side=side,
+        config=config,
+        paste_files=paste_files,
+        paste_geom=paste_geom,
+        pad_summary=pad_summary,
+        outline_files=outline_files,
+        outline_geom=outline_geom,
+        drill_count=len(drill_holes),
+        has_outline_fallback=(outline_geom is not None and not outline_files),
+        model_backend=model_engine.name,
+        elapsed_s=total_elapsed,
+        other_side_info=other_side_info,
+    )
+    _write_stencil_report(output_path, report)
     return outline_debug
 
 
@@ -443,6 +514,109 @@ def _match(pattern: str, name: str) -> bool:
     return fnmatch(name, pattern)
 
 
+def _filter_paste_side(paste_files: list[Path], side: str) -> list[Path]:
+    """Filter paste files by board side (top/bottom)."""
+    filtered = []
+    for f in paste_files:
+        name = f.name.lower()
+        is_bottom = any(marker in name for marker in _BOTTOM_PASTE_MARKERS)
+        if side == "top" and not is_bottom:
+            filtered.append(f)
+        elif side == "bottom" and is_bottom:
+            filtered.append(f)
+    return filtered
+
+
 def _outline_from_paste(paste_geom, margin_mm: float):
     min_x, min_y, max_x, max_y = paste_geom.bounds
     return box(min_x - margin_mm, min_y - margin_mm, max_x + margin_mm, max_y + margin_mm)
+
+
+def _build_stencil_report(
+    *,
+    input_dir: Path,
+    output_path: Path,
+    side: str,
+    config: StencilConfig,
+    paste_files: list[Path],
+    paste_geom,
+    pad_summary: dict[str, int],
+    outline_files: list[Path],
+    outline_geom,
+    drill_count: int,
+    has_outline_fallback: bool,
+    model_backend: str,
+    elapsed_s: float,
+    other_side_info: str = "",
+) -> str:
+    lines = []
+    lines.append("=" * 60)
+    lines.append("  StencilForge — Generation Report")
+    lines.append("=" * 60)
+    lines.append(f"  Input       : {input_dir}")
+    lines.append(f"  Output      : {output_path}")
+    lines.append(f"  Date        : {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append("")
+
+    # Paste info
+    lines.append("── Paste Layers ──")
+    lines.append(f"  Side         : {side}")
+    for f in paste_files:
+        lines.append(f"  File         : {f.name} ({f.stat().st_size:,} bytes)")
+    if other_side_info:
+        lines.append(f"  Note         : {other_side_info.strip()}")
+    lines.append(f"  Total pads   : {sum(pad_summary.values()) if pad_summary else 'N/A'}")
+    if pad_summary:
+        lines.append(f"  Breakdown    : {', '.join(f'{v} {k}' for k, v in sorted(pad_summary.items()))}")
+    lines.append(f"  Paste area   : {paste_geom.area:.2f} mm² (before offset)")
+    lines.append(f"  Offset       : {config.paste_offset_mm:+.2f} mm")
+    lines.append("")
+
+    # Outline info
+    lines.append("── Board Outline ──")
+    if outline_files:
+        outlines = ", ".join(f.name for f in outline_files)
+        lines.append(f"  Layer        : {outlines}")
+    else:
+        lines.append(f"  Layer        : (none found)")
+    if has_outline_fallback:
+        lines.append(f"  Method       : paste bounding box + margin ({config.outline_margin_mm} mm)")
+    else:
+        lines.append(f"  Method       : {config.outline_close_strategy}")
+        if outline_geom is not None and not outline_geom.is_empty:
+            lines.append(f"  Area         : {outline_geom.area:.2f} mm²")
+            b = outline_geom.bounds
+            lines.append(f"  Dimensions   : {b[2]-b[0]:.1f} × {b[3]-b[1]:.1f} mm")
+    lines.append("")
+
+    # Drill
+    lines.append("── Drill Holes ──")
+    lines.append(f"  Loaded       : {drill_count}")
+    lines.append("")
+
+    # Output
+    lines.append("── Output ──")
+    lines.append(f"  Backend      : {model_backend}")
+    lines.append(f"  Thickness    : {config.thickness_mm} mm")
+    lines.append(f"  Locator      : {'enabled' if config.locator_enabled else 'disabled'}")
+    try:
+        size_bytes = output_path.stat().st_size
+        lines.append(f"  File size    : {size_bytes:,} bytes ({size_bytes/1024:.0f} KB)")
+    except OSError:
+        pass
+    lines.append(f"  Duration     : {elapsed_s:.1f}s")
+    lines.append("")
+    lines.append("=" * 60)
+
+    return "\n".join(lines)
+
+
+def _write_stencil_report(output_path: Path, report: str) -> None:
+    report_path = output_path.with_suffix(".txt")
+    try:
+        report_path.write_text(report, encoding="utf-8")
+    except OSError:
+        logger.warning("Failed to write stencil report: %s", report_path)
+    for line in report.splitlines():
+        if line.strip() and not line.startswith("="):
+            logger.info(line.strip())

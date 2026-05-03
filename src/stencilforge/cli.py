@@ -84,6 +84,7 @@ _FIELD_MAP: list[tuple[str, str, type, str]] = [
     ("ui_debug_plot_max_offset_vectors", "ui_debug_plot_max_offset_vectors", int, "Max offset vectors to plot"),
     ("ui_debug_plot_offset_min_mm", "ui_debug_plot_offset_min_mm", float, "Min offset to plot"),
     ("paste_patterns", "paste_patterns", "list", "Gerber paste layer patterns (accepts multiple)"),
+    ("paste_side", "paste_side", str, '"top", "bottom", or "both"'),
     ("outline_patterns", "outline_patterns", "list", "Gerber outline layer patterns (accepts multiple)"),
     ("drill_patterns", "drill_patterns", "list", "Drill file patterns (accepts multiple)"),
 ]
@@ -169,6 +170,8 @@ def _arg_group(field: str) -> str:
         return "resolution options"
     if field in ("output_mode", "model_backend"):
         return "output options"
+    if field in ("paste_side",):
+        return "paste options"
     return "geometry options"
 
 

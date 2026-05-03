@@ -19,6 +19,7 @@ DEFAULT_DRILL_PATTERNS = [
 @dataclass(frozen=True)
 class StencilConfig:
     paste_patterns: list[str]
+    paste_side: str
     outline_patterns: list[str]
     drill_patterns: list[str]
     thickness_mm: float
@@ -110,6 +111,9 @@ class StencilConfig:
     @staticmethod
     def from_dict(data: dict) -> "StencilConfig":
         paste_patterns = _ensure_list(data.get("paste_patterns", [])) or list(DEFAULT_PASTE_PATTERNS)
+        paste_side = str(data.get("paste_side", "top")).strip().lower()
+        if paste_side not in ("top", "bottom", "both"):
+            paste_side = "top"
         outline_patterns = _ensure_list(data.get("outline_patterns", [])) or list(DEFAULT_OUTLINE_PATTERNS)
         drill_patterns = _ensure_list(data.get("drill_patterns", [])) or list(DEFAULT_DRILL_PATTERNS)
         thickness_mm = float(data.get("thickness_mm", 0.12))
@@ -166,11 +170,11 @@ class StencilConfig:
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
         qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
-        outline_close_strategy = str(data.get("outline_close_strategy", "legacy"))
+        outline_close_strategy = str(data.get("outline_close_strategy", "robust_polygonize"))
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
         outline_snap_eps_mm = float(data.get("outline_snap_eps_mm", 0.001))
         outline_arc_max_chord_error_mm = float(data.get("outline_arc_max_chord_error_mm", 0.01))
-        outline_gap_bridge_mm = float(data.get("outline_gap_bridge_mm", 0.05))
+        outline_gap_bridge_mm = float(data.get("outline_gap_bridge_mm", 0.08))
         cadquery_simplify_tol_mm = float(data.get("cadquery_simplify_tol_mm", 0.0))
         cadquery_short_edge_min_mm = float(data.get("cadquery_short_edge_min_mm", 0.0001))
         cadquery_quantize_mm = float(data.get("cadquery_quantize_mm", 0.00001))
@@ -180,6 +184,7 @@ class StencilConfig:
         ui_debug_plot_offset_min_mm = float(data.get("ui_debug_plot_offset_min_mm", 0.0))
         return StencilConfig(
             paste_patterns=paste_patterns,
+            paste_side=paste_side,
             outline_patterns=outline_patterns,
             drill_patterns=drill_patterns,
             thickness_mm=thickness_mm,
@@ -247,6 +252,7 @@ class StencilConfig:
 
 
 StencilConfig._RULES = [
+    ("paste_side in {top, bottom, both}", lambda s: s.paste_side in {"top", "bottom", "both"}),
     ("thickness_mm > 0", lambda s: s.thickness_mm > 0),
     ("arc_steps >= 8", lambda s: s.arc_steps >= 8),
     ("curve_resolution >= 4", lambda s: s.curve_resolution >= 4),

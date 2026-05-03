@@ -38,7 +38,7 @@ class _DummyGeometryService:
 
 
 def test_outline_builtin_fallback_matches_gko(tmp_path: Path) -> None:
-    (tmp_path / "Gerber_BottomPasteMaskLayer.GBP").write_text("G04 paste*\n", encoding="utf-8")
+    (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
     (tmp_path / "Gerber_BoardOutlineLayer.GKO").write_text("G04 outline*\n", encoding="utf-8")
 
     service = _DummyGeometryService(StencilConfig.from_dict({}))
@@ -60,7 +60,7 @@ def test_outline_builtin_fallback_matches_gko(tmp_path: Path) -> None:
 
 
 def test_outline_falls_back_to_margin_when_no_outline_match(tmp_path: Path) -> None:
-    (tmp_path / "Gerber_BottomPasteMaskLayer.GBP").write_text("G04 paste*\n", encoding="utf-8")
+    (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
 
     service = _DummyGeometryService(StencilConfig.from_dict({}))
     engine = _DummyEngine()

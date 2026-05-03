@@ -90,7 +90,7 @@ class VtkStlViewer(QWidget):
                 self._orientation_widget.InteractiveOff()
         self._viewer.GetRenderWindow().Render()
 
-    def load_stl(self, path: str) -> None:
+    def load_stl(self, path: str, skip_edges: bool = False) -> None:
         stl_path = Path(path)
         if not stl_path.exists():
             return
@@ -137,9 +137,12 @@ class VtkStlViewer(QWidget):
             self._renderer.RemoveActor(self._outline_actor)
         self._actor = actor
         self._renderer.AddActor(self._actor)
-        self._edge_actor = self._build_edge_actor(output if polydata is output else polydata)
-        if self._edge_actor is not None:
-            self._renderer.AddActor(self._edge_actor)
+
+        cell_count = polydata.GetNumberOfCells()
+        if not skip_edges and cell_count <= 50000:
+            self._edge_actor = self._build_edge_actor(output if polydata is output else polydata)
+            if self._edge_actor is not None:
+                self._renderer.AddActor(self._edge_actor)
         bounds = polydata.GetBounds()
         thickness = bounds[5] - bounds[4]
         if thickness < 0.2:

@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QSurfaceFormat, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QToolBar, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
@@ -88,7 +88,8 @@ def main() -> int:
 
     window.setCentralWidget(container)
     window.show()
-    viewer.load_stl(str(stl_path))
+    app.processEvents()
+    QTimer.singleShot(30, lambda: viewer.load_stl(str(stl_path)))
     return app.exec()
 if __name__ == "__main__":
     raise SystemExit(main())

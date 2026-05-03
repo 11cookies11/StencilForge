@@ -300,6 +300,7 @@ const LOCALE_OPTIONS = [
 
 const DEFAULT_CONFIG = {
   paste_patterns: ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"],
+  paste_side: "top",
   outline_patterns: ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"],
   thickness_mm: 0.12,
   paste_offset_mm: -0.05,

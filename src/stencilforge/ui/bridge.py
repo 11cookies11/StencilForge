@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import zipfile
 from datetime import datetime
 from fnmatch import fnmatch
@@ -613,13 +614,25 @@ class BackendBridge(QObject):
         try:
             env = os.environ.copy()
             env["STENCILFORGE_LOCALE"] = self._locale
-            if not getattr(sys, "frozen", False):
-                project_root = resolve_project_root()
-                src_root = project_root / "src"
-                existing = env.get("PYTHONPATH", "")
-                prefix = str(src_root)
-                env["PYTHONPATH"] = f"{prefix}{os.pathsep}{existing}" if existing else prefix
-                subprocess.Popen([sys.executable, "-m", "stencilforge.ui.preview", path], env=env)
+            project_root = resolve_project_root()
+            src_root = project_root / "src"
+            existing = env.get("PYTHONPATH", "")
+            prefix = str(src_root)
+            env["PYTHONPATH"] = f"{prefix}{os.pathsep}{existing}" if existing else prefix
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "stencilforge.ui.preview", path],
+                env=env,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self._emit_log(self._tr("ui.preview_launched", path=path))
+            time.sleep(0.6)
+            if proc.poll() is not None:
+                stderr_output = proc.stderr.read() if proc.stderr else ""
+                if stderr_output.strip():
+                    self._emit_log(f"Preview exited early: {stderr_output.strip()}")
+                else:
+                    self._emit_log(f"Preview exited early with code {proc.returncode}")
         except Exception as exc:
             self._emit_log(self._tr("ui.preview_launch_failed", error=exc))
 
