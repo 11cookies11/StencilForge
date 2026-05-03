@@ -666,6 +666,8 @@ def _build_stencil_report(
     # Output
     lines.append("── Output ──")
     lines.append(f"  Backend      : {model_backend}")
+    lines.append(f"  Printer      : {config.printer_profile}")
+    lines.append(f"  Resolution   : arc_steps={config.arc_steps}, curve_resolution={config.curve_resolution}")
     lines.append(f"  Thickness    : {config.thickness_mm} mm")
     lines.append(f"  Locator      : {'enabled' if config.locator_enabled else 'disabled'}")
     try:

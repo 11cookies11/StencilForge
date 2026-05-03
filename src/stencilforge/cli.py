@@ -35,6 +35,7 @@ _FIELD_MAP: list[tuple[str, str, type, str]] = [
     ("mask_opening_scale", "mask_opening_scale", float, "Scale solder-mask openings before stencil rules"),
     ("outline_margin_mm", "outline_margin_mm", float, "Stencil outline margin beyond board edge"),
     ("output_mode", "output_mode", str, '"holes_only" or "solid_with_cutouts"'),
+    ("printer_profile", "printer_profile", str, '"generic" or "fsm"'),
     ("model_backend", "model_backend", str, '"trimesh" or "cadquery"'),
     ("locator_enabled", "locator_enabled", _bool, "Enable locator/fiducial features"),
     ("locator_height_mm", "locator_height_mm", float, "Locator ring height"),
@@ -169,7 +170,7 @@ def _arg_group(field: str) -> str:
         return "file pattern options"
     if field in ("arc_steps", "curve_resolution"):
         return "resolution options"
-    if field in ("output_mode", "model_backend"):
+    if field in ("output_mode", "model_backend", "printer_profile"):
         return "output options"
     if field in ("paste_side", "mask_opening_scale"):
         return "paste options"

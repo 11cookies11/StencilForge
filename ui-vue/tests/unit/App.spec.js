@@ -57,6 +57,7 @@ describe("App", () => {
     const cfg = wrapper.vm.config;
     expect(cfg.thickness_mm).toBe(0.12);
     expect(cfg.output_mode).toBe("solid_with_cutouts");
+    expect(cfg.printer_profile).toBe("generic");
     expect(cfg.model_backend).toBe("trimesh");
   });
 

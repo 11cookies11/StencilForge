@@ -33,6 +33,7 @@ class TestParserConstruction:
         gen = parser._subparsers._group_actions[0].choices["generate"]
         flags = [a.option_strings[0] for a in gen._actions if a.option_strings]
         assert "--thickness-mm" in flags
+        assert "--printer-profile" in flags
         assert "--model-backend" in flags
         assert "--output-mode" in flags
         assert "--paste-patterns" in flags
@@ -118,6 +119,20 @@ class TestConfigMerge:
         args.model_backend = "cadquery"
         config = _build_config_from_args(args)
         assert config.model_backend == "cadquery"
+
+    def test_cli_override_printer_profile(self) -> None:
+        args = Namespace()
+        parser = build_parser()
+        gen = parser._subparsers._group_actions[0].choices["generate"]
+        for action in gen._actions:
+            if action.dest != "help":
+                setattr(args, action.dest, None)
+        args.config = None
+        args.printer_profile = "fsm"
+        config = _build_config_from_args(args)
+        assert config.printer_profile == "fsm"
+        assert config.arc_steps == 96
+        assert config.curve_resolution == 24
 
 
 class TestDumpDefaultConfig:

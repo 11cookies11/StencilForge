@@ -25,6 +25,14 @@
           :options="pasteSideOptions"
         />
       </label>
+      <label class="text-xs font-semibold text-slate-600">{{ t("config.printerProfile") }}
+        <AppSelect
+          :model-value="config.printer_profile || 'generic'"
+          @update:model-value="emitPrinterProfileChange"
+          class="mt-1"
+          :options="printerProfileOptions"
+        />
+      </label>
       <label class="text-xs font-semibold text-slate-600">{{ t("config.modelBackend") }}
         <AppSelect
           :model-value="config.model_backend"
@@ -234,6 +242,12 @@ export default {
         { value: "holes_only", label: this.t("config.outputModeHoles") },
       ];
     },
+    printerProfileOptions() {
+      return [
+        { value: "generic", label: this.t("config.printerProfileGeneric") },
+        { value: "fsm", label: this.t("config.printerProfileFsm") },
+      ];
+    },
     modelBackendOptions() {
       return [
         { value: "cadquery", label: this.t("config.modelBackendCadquery") },
@@ -258,6 +272,31 @@ export default {
   },
   methods: {
     t(key, vars) { return translate(this.locale, key, vars); },
+    printerProfileDefaults(profile) {
+      if (profile === "fsm") {
+        return {
+          stl_quality: "high_quality",
+          stl_linear_deflection: 0.02,
+          stl_angular_deflection: 0.05,
+          arc_steps: 96,
+          curve_resolution: 24,
+        };
+      }
+      return {
+        stl_quality: "balanced",
+        stl_linear_deflection: 0.05,
+        stl_angular_deflection: 0.1,
+        arc_steps: 64,
+        curve_resolution: 16,
+      };
+    },
+    emitPrinterProfileChange(profile) {
+      this.$emit("update:config", {
+        ...this.config,
+        printer_profile: profile,
+        ...this.printerProfileDefaults(profile),
+      });
+    },
     emitPatternChange(patternKey, index, value) {
       const patterns = [...this.config[patternKey]];
       patterns[index] = value;

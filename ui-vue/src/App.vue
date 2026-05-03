@@ -317,6 +317,7 @@ const DEFAULT_CONFIG = {
   locator_open_side: "none",
   locator_open_width_mm: 0.0,
   output_mode: "solid_with_cutouts",
+  printer_profile: "generic",
   model_backend: "trimesh",
   arc_steps: 64,
   curve_resolution: 16,
@@ -325,6 +326,7 @@ const DEFAULT_CONFIG = {
 const BASIC_CONFIG_KEYS = [
   "thickness_mm",
   "output_mode",
+  "printer_profile",
   "model_backend",
   "paste_offset_mm",
   "mask_opening_scale",

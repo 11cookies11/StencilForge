@@ -12,6 +12,7 @@ def test_default_config_values() -> None:
     cfg = StencilConfig.from_dict({})
     assert cfg.thickness_mm == 0.12
     assert cfg.output_mode == "solid_with_cutouts"
+    assert cfg.printer_profile == "generic"
     assert cfg.model_backend == "trimesh"
     assert "*gko*" in cfg.outline_patterns
     assert "*gtp*" in cfg.paste_patterns
@@ -54,6 +55,30 @@ def test_stl_quality_preset_does_not_override_explicit_values() -> None:
     assert cfg.stl_angular_deflection == 0.6
 
 
+def test_fsm_printer_profile_applies_high_resolution_defaults() -> None:
+    cfg = StencilConfig.from_dict({"printer_profile": "fsm"})
+    assert cfg.stl_quality == "high_quality"
+    assert cfg.stl_linear_deflection == 0.02
+    assert cfg.stl_angular_deflection == 0.05
+    assert cfg.arc_steps == 96
+    assert cfg.curve_resolution == 24
+
+
+def test_fsm_printer_profile_keeps_explicit_resolution_overrides() -> None:
+    cfg = StencilConfig.from_dict(
+        {
+            "printer_profile": "fsm",
+            "stl_linear_deflection": 0.04,
+            "arc_steps": 72,
+            "curve_resolution": 18,
+        }
+    )
+    assert cfg.stl_quality == "high_quality"
+    assert cfg.stl_linear_deflection == 0.04
+    assert cfg.arc_steps == 72
+    assert cfg.curve_resolution == 18
+
+
 def test_sfmesh_backend_maps_to_trimesh() -> None:
     cfg = StencilConfig.from_dict({"model_backend": "sfmesh"})
     assert cfg.model_backend == "trimesh"
@@ -86,6 +111,7 @@ def test_config_to_dict_round_trips_all_fields() -> None:
             "locator_open_side": "top",
             "locator_open_width_mm": 0.4,
             "output_mode": "holes_only",
+            "printer_profile": "fsm",
             "model_backend": "cadquery",
             "sfmesh_quality_mode": "auto",
             "sfmesh_voxel_pitch_mm": 0.1,
@@ -132,6 +158,7 @@ def test_config_to_dict_round_trips_all_fields() -> None:
     data = cfg.to_dict()
     assert set(data) == {field.name for field in fields(StencilConfig)}
     assert data["mask_opening_scale"] == 0.9
+    assert data["printer_profile"] == "fsm"
     assert data["outline_gap_bridge_mm"] == 0.06
     assert data["cadquery_quantize_mm"] == 0.00002
     assert StencilConfig.from_dict(data) == cfg

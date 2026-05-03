@@ -20,6 +20,7 @@ DEFAULT_DRILL_PATTERNS = [
 class StencilConfig:
     paste_patterns: list[str]
     paste_side: str
+    printer_profile: str
     outline_patterns: list[str]
     drill_patterns: list[str]
     thickness_mm: float
@@ -115,6 +116,11 @@ class StencilConfig:
         paste_side = str(data.get("paste_side", "top")).strip().lower()
         if paste_side not in ("top", "bottom", "both"):
             paste_side = "top"
+        printer_profile = str(data.get("printer_profile", "generic")).strip().lower()
+        if printer_profile in ("normal", "default", "non_fsm", "non-fsm"):
+            printer_profile = "generic"
+        if printer_profile not in ("generic", "fsm"):
+            printer_profile = "generic"
         outline_patterns = _ensure_list(data.get("outline_patterns", [])) or list(DEFAULT_OUTLINE_PATTERNS)
         drill_patterns = _ensure_list(data.get("drill_patterns", [])) or list(DEFAULT_DRILL_PATTERNS)
         thickness_mm = float(data.get("thickness_mm", 0.12))
@@ -150,9 +156,10 @@ class StencilConfig:
         sfmesh_chunked_watertight_enabled = bool(data.get("sfmesh_chunked_watertight_enabled", True))
         sfmesh_chunk_size_mm = float(data.get("sfmesh_chunk_size_mm", 70.0))
         sfmesh_chunk_overlap_mm = float(data.get("sfmesh_chunk_overlap_mm", 1.0))
-        stl_quality = str(data.get("stl_quality", "balanced"))
-        stl_linear_deflection = float(data.get("stl_linear_deflection", 0.05))
-        stl_angular_deflection = float(data.get("stl_angular_deflection", 0.1))
+        profile_defaults = _printer_profile_defaults(printer_profile)
+        stl_quality = str(data.get("stl_quality", profile_defaults["stl_quality"]))
+        stl_linear_deflection = float(data.get("stl_linear_deflection", profile_defaults["stl_linear_deflection"]))
+        stl_angular_deflection = float(data.get("stl_angular_deflection", profile_defaults["stl_angular_deflection"]))
         stl_tolerance = float(data.get("stl_tolerance", 0.0))
         stl_presets = {
             "fast": (0.2, 0.35),
@@ -165,8 +172,8 @@ class StencilConfig:
                 stl_linear_deflection = preset_linear
             if "stl_angular_deflection" not in data:
                 stl_angular_deflection = preset_angular
-        arc_steps = int(data.get("arc_steps", 64))
-        curve_resolution = int(data.get("curve_resolution", 16))
+        arc_steps = int(data.get("arc_steps", profile_defaults["arc_steps"]))
+        curve_resolution = int(data.get("curve_resolution", profile_defaults["curve_resolution"]))
         qfn_regen_enabled = bool(data.get("qfn_regen_enabled", True))
         qfn_min_feature_mm = float(data.get("qfn_min_feature_mm", 0.6))
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
@@ -187,6 +194,7 @@ class StencilConfig:
         return StencilConfig(
             paste_patterns=paste_patterns,
             paste_side=paste_side,
+            printer_profile=printer_profile,
             outline_patterns=outline_patterns,
             drill_patterns=drill_patterns,
             thickness_mm=thickness_mm,
@@ -256,6 +264,7 @@ class StencilConfig:
 
 StencilConfig._RULES = [
     ("paste_side in {top, bottom, both}", lambda s: s.paste_side in {"top", "bottom", "both"}),
+    ("printer_profile in {generic, fsm}", lambda s: s.printer_profile in {"generic", "fsm"}),
     ("thickness_mm > 0", lambda s: s.thickness_mm > 0),
     ("mask_opening_scale > 0", lambda s: s.mask_opening_scale > 0),
     ("arc_steps >= 8", lambda s: s.arc_steps >= 8),
@@ -313,6 +322,24 @@ def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
     if isinstance(value, str):
         return [value]
     return list(value)
+
+
+def _printer_profile_defaults(profile: str) -> dict[str, float | int | str]:
+    if profile == "fsm":
+        return {
+            "stl_quality": "high_quality",
+            "stl_linear_deflection": 0.02,
+            "stl_angular_deflection": 0.05,
+            "arc_steps": 96,
+            "curve_resolution": 24,
+        }
+    return {
+        "stl_quality": "balanced",
+        "stl_linear_deflection": 0.05,
+        "stl_angular_deflection": 0.1,
+        "arc_steps": 64,
+        "curve_resolution": 16,
+    }
 
 
 def _user_config_dir() -> Path:

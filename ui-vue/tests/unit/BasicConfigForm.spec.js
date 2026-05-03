@@ -5,6 +5,7 @@ import BasicConfigForm from "../../src/components/BasicConfigForm.vue";
 const DEFAULT_CONFIG = {
   thickness_mm: 0.12,
   output_mode: "solid_with_cutouts",
+  printer_profile: "generic",
   model_backend: "trimesh",
   paste_offset_mm: -0.05,
   mask_opening_scale: 0.95,
@@ -31,7 +32,11 @@ function mountForm(props = {}) {
     global: {
       stubs: {
         AppIcon: { template: "<span />" },
-        AppSelect: { template: "<select><option /></select>" },
+        AppSelect: {
+          props: ["modelValue", "options"],
+          emits: ["update:modelValue"],
+          template: "<div />",
+        },
       },
     },
   });
@@ -116,6 +121,16 @@ describe("BasicConfigForm", () => {
     expect(emitted.thickness_mm).toBe(0.25);
     expect(emitted.output_mode).toBe("solid_with_cutouts");
     expect(emitted.model_backend).toBe("trimesh");
+  });
+
+  it("applies FSM printer profile defaults when profile changes", () => {
+    const wrapper = mountForm();
+    wrapper.vm.emitPrinterProfileChange("fsm");
+    const emitted = wrapper.emitted("update:config")[0][0];
+    expect(emitted.printer_profile).toBe("fsm");
+    expect(emitted.stl_quality).toBe("high_quality");
+    expect(emitted.arc_steps).toBe(96);
+    expect(emitted.curve_resolution).toBe(24);
   });
 
   it("renders i18n labels based on locale prop", () => {
