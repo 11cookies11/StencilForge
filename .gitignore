@@ -39,7 +39,14 @@ gko_outline_raw.png
 dist-installer/
 build-logs/
 
+# AI assistant
+.claude/
+
 # Test artifacts
 tests/artifacts/
+.coverage
+
+# Generated stencil output
+output/
 
 StencilForge_项目与实现思路整理.txt
