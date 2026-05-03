@@ -74,6 +74,7 @@ def test_config_to_dict_round_trips_all_fields() -> None:
             "outline_patterns": ["*def*"],
             "thickness_mm": 0.2,
             "paste_offset_mm": -0.02,
+            "mask_opening_scale": 0.9,
             "outline_margin_mm": 4.2,
             "locator_enabled": False,
             "locator_height_mm": 3.0,
@@ -130,6 +131,7 @@ def test_config_to_dict_round_trips_all_fields() -> None:
 
     data = cfg.to_dict()
     assert set(data) == {field.name for field in fields(StencilConfig)}
+    assert data["mask_opening_scale"] == 0.9
     assert data["outline_gap_bridge_mm"] == 0.06
     assert data["cadquery_quantize_mm"] == 0.00002
     assert StencilConfig.from_dict(data) == cfg

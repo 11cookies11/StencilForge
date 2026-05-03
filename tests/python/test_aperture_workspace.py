@@ -23,7 +23,8 @@ def test_default_workspace_has_selected_rule():
     workspace = normalize_aperture_workspace({})
 
     assert workspace["profileName"] == "Balanced default"
-    assert workspace["selectedRuleId"] == "rule_qfn"
+    assert workspace["packageType"] == "Any"
+    assert workspace["selectedRuleId"] == "rule_default"
     assert len(workspace["rules"]) >= 1
 
 
@@ -35,7 +36,7 @@ def test_workspace_metrics_are_computed():
     assert snapshot["previewStatus"] == "below"
     assert isfinite(snapshot["recommendedVolumeMm3"])
     assert snapshot["generatedRulePreview"].startswith("match: { package:")
-    assert snapshot["matchedRuleGroupSummary"] == "QFN / SMD"
+    assert snapshot["matchedRuleGroupSummary"] == "Any"
     assert len(snapshot["ruleGroups"]) == 6
 
 
@@ -58,7 +59,14 @@ def test_workspace_descriptions_are_human_readable():
     assert "SMD" in match_text
     assert "Top" not in match_text
     assert "0.20-0.60 mm" in match_text
-    assert describe_action(rule) == "Delta -0.030 mm"
+    assert describe_action(rule) == "Delta -0.015 mm"
+
+
+def test_default_workspace_uses_neutral_fallback():
+    effect = resolve_aperture_workspace_effect(default_aperture_workspace(), 0.12)
+
+    assert effect["ruleId"] == "rule_default"
+    assert effect["effect"] == {"enabled": True, "mode": "scale", "deltaMm": 0.0, "scale": 1.0}
 
 
 def test_workspace_effect_prefers_package_and_pad_type_match():
@@ -74,7 +82,19 @@ def test_workspace_effect_prefers_package_and_pad_type_match():
     assert effect["groupSummary"] == "QFN / SMD"
     assert effect["matchSummary"].startswith("QFN")
     assert effect["effect"]["mode"] == "delta"
-    assert effect["effect"]["deltaMm"] == -0.03
+    assert effect["effect"]["deltaMm"] == -0.015
+
+
+def test_workspace_any_package_does_not_match_specific_package_rule():
+    workspace = default_aperture_workspace()
+    workspace["packageType"] = "Any"
+    workspace["padType"] = "SMD"
+    workspace["padWidthMm"] = 0.45
+    workspace["padHeightMm"] = 0.4
+
+    effect = resolve_aperture_workspace_effect(workspace, 0.15)
+
+    assert effect["ruleId"] == "rule_default"
 
 
 def test_workspace_payload_round_trip_keeps_rules():
@@ -90,7 +110,7 @@ def test_workspace_payload_round_trip_keeps_rules():
     assert payload["workspace"]["profileName"] == "Import / Export"
     assert payload["workspace"]["selectedRuleGroupKey"] == "qfn::smd"
     assert payload["snapshot"]["thicknessValue"] == 0.15
-    assert payload["snapshot"]["matchedRuleGroupSummary"] == "QFN / SMD"
+    assert payload["snapshot"]["matchedRuleGroupSummary"] == "Any"
 
     imported = import_aperture_workspace_payload(payload)
 
@@ -208,12 +228,12 @@ def test_pad_size_breaks_tie_in_matching():
         {
             "id": "rule_fine", "name": "Fine pitch", "enabled": True, "priority": 80,
             "match": {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"},
-            "action": {"mode": "delta", "deltaMm": -0.03, "scale": 0.96},
+            "action": {"mode": "delta", "deltaMm": -0.015, "scale": 0.98},
         },
         {
             "id": "rule_standard", "name": "Standard", "enabled": True, "priority": 80,
             "match": {"package": "QFN", "padType": "SMD", "padSize": "0.60-1.00 mm"},
-            "action": {"mode": "delta", "deltaMm": -0.02, "scale": 0.97},
+            "action": {"mode": "delta", "deltaMm": -0.01, "scale": 0.99},
         },
     ]
     effect = resolve_aperture_workspace_effect(workspace, 0.15)
@@ -267,8 +287,18 @@ def test_tht_rule_matches_workspace():
 def test_bga_rule_matches_workspace():
     workspace = default_aperture_workspace()
     workspace["packageType"] = "BGA"
-    workspace["padType"] = "SMD"
+    workspace["padType"] = "BGA"
     workspace["padWidthMm"] = 0.4
     workspace["padHeightMm"] = 0.4
     effect = resolve_aperture_workspace_effect(workspace, 0.15)
     assert effect["ruleId"] == "rule_bga"
+    assert effect["effect"]["mode"] == "scale"
+    assert effect["effect"]["scale"] == 0.96
+
+
+def test_bga_pad_type_is_preserved_and_factored():
+    workspace = normalize_aperture_workspace({"packageType": "BGA", "padType": "BGA"})
+    snapshot = compute_aperture_workspace(workspace, 0.12)
+
+    assert workspace["padType"] == "BGA"
+    assert snapshot["padTypeFactor"] == 0.92

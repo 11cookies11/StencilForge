@@ -169,6 +169,15 @@ def _generate_stencil_side(
     if paste_geom is None or paste_geom.is_empty:
         raise ValueError("No pad geometry found.")
 
+    if opening_source == "solder_mask" and config.mask_opening_scale != 1.0:
+        paste_geom = scale_geometry(
+            paste_geom,
+            xfact=config.mask_opening_scale,
+            yfact=config.mask_opening_scale,
+            origin="centroid",
+        )
+        logger.info("Mask opening scale: %.3f", config.mask_opening_scale)
+
     if config.qfn_regen_enabled:
         try:
             paste_geom = regenerate_qfn_paste(paste_geom, config)
@@ -627,6 +636,8 @@ def _build_stencil_report(
     if pad_summary:
         lines.append(f"  Breakdown    : {', '.join(f'{v} {k}' for k, v in sorted(pad_summary.items()))}")
     lines.append(f"  Opening area : {paste_geom.area:.2f} mm² (before offset)")
+    if opening_source == "solder_mask":
+        lines.append(f"  Mask scale   : {config.mask_opening_scale:.3f}")
     lines.append(f"  Offset       : {config.paste_offset_mm:+.2f} mm")
     lines.append("")
 

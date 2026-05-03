@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   output_mode: "solid_with_cutouts",
   model_backend: "trimesh",
   paste_offset_mm: -0.05,
+  mask_opening_scale: 0.95,
   outline_margin_mm: 5.0,
   locator_enabled: true,
   locator_mode: "step",
@@ -61,6 +62,14 @@ describe("BasicConfigForm", () => {
     const pasteInput = inputs[1];
     await pasteInput.setValue("-0.03");
     expect(wrapper.emitted("update:config")[0][0].paste_offset_mm).toBe(-0.03);
+  });
+
+  it("emits update:config with mask_opening_scale changed", async () => {
+    const wrapper = mountForm();
+    const inputs = wrapper.findAll("input[type='number']");
+    const maskScaleInput = inputs[2];
+    await maskScaleInput.setValue("0.9");
+    expect(wrapper.emitted("update:config")[0][0].mask_opening_scale).toBe(0.9);
   });
 
   it("toggles locator_enabled via checkbox", async () => {

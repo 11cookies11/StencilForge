@@ -24,6 +24,7 @@ class StencilConfig:
     drill_patterns: list[str]
     thickness_mm: float
     paste_offset_mm: float
+    mask_opening_scale: float
     outline_margin_mm: float
     locator_enabled: bool
     locator_height_mm: float
@@ -118,6 +119,7 @@ class StencilConfig:
         drill_patterns = _ensure_list(data.get("drill_patterns", [])) or list(DEFAULT_DRILL_PATTERNS)
         thickness_mm = float(data.get("thickness_mm", 0.12))
         paste_offset_mm = float(data.get("paste_offset_mm", -0.05))
+        mask_opening_scale = float(data.get("mask_opening_scale", 0.95))
         outline_margin_mm = float(data.get("outline_margin_mm", 5.0))
         locator_enabled = bool(data.get("locator_enabled", True))
         locator_height_mm = float(data.get("locator_height_mm", 2.0))
@@ -189,6 +191,7 @@ class StencilConfig:
             drill_patterns=drill_patterns,
             thickness_mm=thickness_mm,
             paste_offset_mm=paste_offset_mm,
+            mask_opening_scale=mask_opening_scale,
             outline_margin_mm=outline_margin_mm,
             locator_enabled=locator_enabled,
             locator_height_mm=locator_height_mm,
@@ -254,6 +257,7 @@ class StencilConfig:
 StencilConfig._RULES = [
     ("paste_side in {top, bottom, both}", lambda s: s.paste_side in {"top", "bottom", "both"}),
     ("thickness_mm > 0", lambda s: s.thickness_mm > 0),
+    ("mask_opening_scale > 0", lambda s: s.mask_opening_scale > 0),
     ("arc_steps >= 8", lambda s: s.arc_steps >= 8),
     ("curve_resolution >= 4", lambda s: s.curve_resolution >= 4),
     ("qfn_min_feature_mm > 0", lambda s: s.qfn_min_feature_mm > 0),

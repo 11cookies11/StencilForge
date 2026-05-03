@@ -32,6 +32,7 @@ _FIELD_MAP: list[tuple[str, str, type, str]] = [
     # (config_field, cli_dest, type, help_suffix)
     ("thickness_mm", "thickness_mm", float, "Stencil thickness in mm"),
     ("paste_offset_mm", "paste_offset_mm", float, "Paste aperture expansion (negative = shrink)"),
+    ("mask_opening_scale", "mask_opening_scale", float, "Scale solder-mask openings before stencil rules"),
     ("outline_margin_mm", "outline_margin_mm", float, "Stencil outline margin beyond board edge"),
     ("output_mode", "output_mode", str, '"holes_only" or "solid_with_cutouts"'),
     ("model_backend", "model_backend", str, '"trimesh" or "cadquery"'),
@@ -170,7 +171,7 @@ def _arg_group(field: str) -> str:
         return "resolution options"
     if field in ("output_mode", "model_backend"):
         return "output options"
-    if field in ("paste_side",):
+    if field in ("paste_side", "mask_opening_scale"):
         return "paste options"
     return "geometry options"
 

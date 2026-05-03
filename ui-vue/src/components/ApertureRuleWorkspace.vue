@@ -640,6 +640,7 @@ const PACKAGE_FACTOR_MAP = {
 
 const PAD_TYPE_FACTOR_MAP = {
   SMD: 1.0,
+  BGA: 0.92,
   Thermal: 0.96,
   THT: 1.04,
 };
@@ -683,10 +684,10 @@ export default {
       padAreaMm2: 0.84,
       padWidthMm: 0.45,
       padHeightMm: 0.4,
-      packageType: "QFN",
+      packageType: "Any",
       padType: "SMD",
       targetVolumeMm3: 0.062,
-      selectedRuleId: "rule_qfn",
+      selectedRuleId: "rule_default",
       selectedRuleGroupKey: null,
       workspaceHydrating: false,
       workspaceSnapshot: null,
@@ -881,13 +882,14 @@ export default {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
         { value: "QFN", label: "QFN" },
-        { value: "BGA", label: "BGA" },
+        { value: "BGA", label: this.t("config.aperturePadTypeBga") },
         { value: "Power", label: this.t("config.aperturePackagePower") },
         { value: "IC", label: "IC" },
       ];
     },
     packageTypeOptions() {
       return [
+        { value: "Any", label: this.t("config.apertureAny") },
         { value: "QFN", label: "QFN" },
         { value: "BGA", label: "BGA" },
         { value: "IC", label: "IC" },
@@ -898,6 +900,7 @@ export default {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
         { value: "SMD", label: this.t("config.aperturePadTypeSmd") },
+        { value: "BGA", label: "BGA" },
         { value: "Thermal", label: this.t("config.aperturePadTypeThermal") },
         { value: "THT", label: this.t("config.aperturePadTypeTht") },
       ];
@@ -1160,7 +1163,7 @@ priority: 100`;
         enabled: true,
         priority: 50,
         match: { package: "Any", padType: "Any", padSize: "0.20-0.80 mm" },
-        action: { mode: "delta", deltaMm: -0.02, scale: 0.98 },
+        action: { mode: "scale", deltaMm: 0.0, scale: 1.0 },
         note: "",
       };
     },

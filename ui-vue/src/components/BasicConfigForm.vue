@@ -41,6 +41,14 @@
           type="number" step="0.01"
         />
       </label>
+      <label class="text-xs font-semibold text-slate-600">{{ t("config.maskOpeningScale") }}
+        <input
+          :value="config.mask_opening_scale ?? 0.95"
+          @input="$emit('update:config', { ...config, mask_opening_scale: Number($event.target.value) })"
+          class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+          type="number" step="0.01" min="0.01"
+        />
+      </label>
       <label class="text-xs font-semibold text-slate-600">{{ t("config.outlineMargin") }}
         <input
           :value="config.outline_margin_mm"

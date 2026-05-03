@@ -18,6 +18,7 @@ PACKAGE_FACTOR_MAP = {
 
 PAD_TYPE_FACTOR_MAP = {
     "SMD": 1.0,
+    "BGA": 0.92,
     "Thermal": 0.96,
     "THT": 1.04,
 }
@@ -40,10 +41,10 @@ def default_aperture_workspace() -> dict[str, Any]:
         "padAreaMm2": 0.84,
         "padWidthMm": 0.45,
         "padHeightMm": 0.4,
-        "packageType": "QFN",
+        "packageType": "Any",
         "padType": "SMD",
         "targetVolumeMm3": 0.062,
-        "selectedRuleId": "rule_qfn",
+        "selectedRuleId": "rule_default",
         "selectedRuleGroupKey": "",
         "rules": [
             {
@@ -52,8 +53,8 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "enabled": True,
                 "priority": 0,
                 "match": {"package": "Any", "padType": "Any", "padSize": "0.20-1.00 mm"},
-                "action": {"mode": "delta", "deltaMm": -0.02, "scale": 0.98},
-                "note": "Fallback rule for the whole library.",
+                "action": {"mode": "scale", "deltaMm": 0.0, "scale": 1.0},
+                "note": "Neutral fallback; mask scale and global offset handle baseline shrink.",
             },
             {
                 "id": "rule_qfn",
@@ -61,7 +62,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "enabled": True,
                 "priority": 80,
                 "match": {"package": "QFN", "padType": "SMD", "padSize": "0.20-0.60 mm"},
-                "action": {"mode": "delta", "deltaMm": -0.03, "scale": 0.96},
+                "action": {"mode": "delta", "deltaMm": -0.015, "scale": 0.98},
                 "note": "Default recommendation for dense QFN pads.",
             },
             {
@@ -70,7 +71,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "enabled": True,
                 "priority": 70,
                 "match": {"package": "QFN", "padType": "SMD", "padSize": "0.60-1.00 mm"},
-                "action": {"mode": "delta", "deltaMm": -0.02, "scale": 0.97},
+                "action": {"mode": "delta", "deltaMm": -0.01, "scale": 0.99},
                 "note": "Larger QFN pads with moderate reduction.",
             },
             {
@@ -78,8 +79,8 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "name": "BGA",
                 "enabled": True,
                 "priority": 75,
-                "match": {"package": "BGA", "padType": "SMD", "padSize": "0.20-0.80 mm"},
-                "action": {"mode": "delta", "deltaMm": -0.015, "scale": 0.95},
+                "match": {"package": "Any", "padType": "BGA", "padSize": "0.20-0.80 mm"},
+                "action": {"mode": "scale", "deltaMm": 0.0, "scale": 0.96},
                 "note": "BGA ball pads with conservative reduction to avoid bridging.",
             },
             {
@@ -88,7 +89,7 @@ def default_aperture_workspace() -> dict[str, Any]:
                 "enabled": True,
                 "priority": 60,
                 "match": {"package": "IC", "padType": "SMD", "padSize": "0.30-0.80 mm"},
-                "action": {"mode": "delta", "deltaMm": -0.01, "scale": 0.97},
+                "action": {"mode": "delta", "deltaMm": -0.005, "scale": 0.99},
                 "note": "Standard IC pads with slight reduction for fine-pitch devices.",
             },
             {
@@ -132,8 +133,8 @@ def normalize_aperture_workspace(data: dict[str, Any] | None) -> dict[str, Any]:
     merged["padAreaMm2"] = _non_negative_float(merged.get("padAreaMm2"), 0.84)
     merged["padWidthMm"] = _positive_float(merged.get("padWidthMm"), 0.45, 0.01)
     merged["padHeightMm"] = _positive_float(merged.get("padHeightMm"), 0.4, 0.01)
-    merged["packageType"] = _coerce_choice(merged.get("packageType"), {"QFN", "BGA", "IC", "Power"}, "QFN")
-    merged["padType"] = _coerce_choice(merged.get("padType"), {"SMD", "Thermal", "THT"}, "SMD")
+    merged["packageType"] = _coerce_choice(merged.get("packageType"), {"Any", "QFN", "BGA", "IC", "Power"}, "Any")
+    merged["padType"] = _coerce_choice(merged.get("padType"), {"Any", "SMD", "BGA", "Thermal", "THT"}, "SMD")
     merged["targetVolumeMm3"] = _non_negative_float(merged.get("targetVolumeMm3"), 0.062)
     return merged
 
@@ -667,8 +668,6 @@ def _preview_status(effective_target_volume_mm3: float, recommended_volume_mm3: 
 
 def _matches_token(rule_value: str, workspace_value: str) -> bool:
     if rule_value.casefold() == "any":
-        return True
-    if workspace_value.casefold() == "any":
         return True
     return rule_value.casefold() == workspace_value.casefold()
 

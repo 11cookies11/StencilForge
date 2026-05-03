@@ -82,6 +82,28 @@ def test_solder_mask_source_excludes_paste_mask_filename(tmp_path: Path) -> None
     assert service.loaded_layers[0] == (["Gerber_TopSolderMaskLayer.GTS"], "solder mask")
 
 
+def test_mask_opening_scale_applies_only_to_solder_mask_source(tmp_path: Path) -> None:
+    (tmp_path / "Gerber_TopSolderMaskLayer.GTS").write_text("G04 mask*\n", encoding="utf-8")
+
+    service = _DummyGeometryService(StencilConfig.from_dict({}))
+    engine = _DummyEngine()
+    cfg = StencilConfig.from_dict(
+        {
+            "outline_patterns": ["*not_found*"],
+            "output_mode": "holes_only",
+            "locator_enabled": False,
+            "paste_offset_mm": 0.0,
+            "mask_opening_scale": 0.5,
+        }
+    )
+
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
+
+    assert engine.last_input is not None
+    assert engine.last_input.stencil_2d.bounds == pytest.approx((2.5, 2.0, 7.5, 6.0))
+
+
 def test_outline_falls_back_to_margin_when_no_outline_match(tmp_path: Path) -> None:
     (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
 
