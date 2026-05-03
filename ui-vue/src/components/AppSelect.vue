@@ -26,8 +26,8 @@
         class="w-full text-left px-3 py-2 text-sm transition-colors"
         :class="item.value === modelValue ? 'bg-blue-50 text-primary' : 'text-slate-700 hover:bg-slate-50'"
         type="button"
-        @mousedown.prevent.stop
-        @click.stop="selectOption(item.value)"
+        @pointerdown.prevent.stop="selectOption(item.value)"
+        @click.prevent.stop
       >
         {{ item.label }}
       </button>
@@ -70,6 +70,11 @@ export default {
     selectedLabel() {
       const matched = this.options.find((item) => item.value === this.modelValue);
       return matched ? matched.label : "";
+    },
+  },
+  watch: {
+    modelValue() {
+      this.open = false;
     },
   },
   mounted() {

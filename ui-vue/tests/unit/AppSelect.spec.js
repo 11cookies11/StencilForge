@@ -52,7 +52,7 @@ describe("AppSelect", () => {
     const wrapper = mountSelect();
     await wrapper.find("button").trigger("click");
     const opts = dropdownOptions(wrapper);
-    await opts[2].trigger("click"); // pick "c"
+    await opts[2].trigger("pointerdown"); // pick "c"
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     expect(wrapper.emitted("update:modelValue")[0]).toEqual(["c"]);
   });
@@ -61,7 +61,7 @@ describe("AppSelect", () => {
     const wrapper = mountSelect();
     await wrapper.find("button").trigger("click");
     const opts = dropdownOptions(wrapper);
-    await opts[0].trigger("click");
+    await opts[0].trigger("pointerdown");
     expect(wrapper.emitted("change")).toBeTruthy();
     expect(wrapper.emitted("change")[0]).toEqual(["a"]);
     expect(wrapper.emitted("update:modelValue")).toBeTruthy();
@@ -71,7 +71,7 @@ describe("AppSelect", () => {
     const wrapper = mountSelect();
     await wrapper.find("button").trigger("click");
     const opts = dropdownOptions(wrapper);
-    await opts[0].trigger("click");
+    await opts[0].trigger("pointerdown");
     expect(dropdownOptions(wrapper).length).toBe(0);
   });
 
@@ -84,10 +84,18 @@ describe("AppSelect", () => {
     });
     await wrapper.find("button").trigger("click");
     const opts = dropdownOptions(wrapper);
-    await opts[1].trigger("click");
+    await opts[1].trigger("pointerdown");
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.open).toBe(false);
     expect(dropdownOptions(wrapper).length).toBe(0);
+  });
+
+  it("closes when model value changes externally", async () => {
+    const wrapper = mountSelect({ modelValue: "a" });
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.vm.open).toBe(true);
+    await wrapper.setProps({ modelValue: "b" });
+    expect(wrapper.vm.open).toBe(false);
   });
 
   it("highlights selected option", async () => {
