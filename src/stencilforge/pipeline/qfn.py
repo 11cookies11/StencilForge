@@ -55,7 +55,10 @@ def regenerate_qfn_paste(geometry, config: StencilConfig):
     if qfn is None or score < config.qfn_confidence_threshold:
         return geometry
     logger.info("QFN detect: pads=%s score=%.2f", len(qfn["pads"]), score)
-    regenerated = _regenerate_qfn_geometry(qfn, polys, config)
+    if config.printer_profile == "fsm" and config.fsm_qfn_grouped_slots_enabled:
+        regenerated = _regenerate_fsm_qfn_geometry(qfn, polys, config)
+    else:
+        regenerated = _regenerate_qfn_geometry(qfn, polys, config)
     if regenerated is None:
         return geometry
     return regenerated
@@ -373,6 +376,148 @@ def _regenerate_qfn_geometry(qfn, polys, config: StencilConfig):
 
     merged = unary_union(kept + slots)
     return merged
+
+
+def _regenerate_fsm_qfn_geometry(qfn, polys, config: StencilConfig):
+    slots = []
+    kept = []
+    pad_set = {id(p["poly"]) for p in qfn["pads"]}
+    center_pad = qfn.get("center_pad")
+    for poly in polys:
+        if id(poly) in pad_set:
+            continue
+        if center_pad is not None and poly.equals(center_pad):
+            continue
+        kept.append(poly)
+
+    original_area = 0.0
+    slot_area = 0.0
+    slot_count = 0
+    replaced_pads = 0
+    for side in (qfn["top"], qfn["bottom"], qfn["left"], qfn["right"]):
+        pad_width = _median([p["short"] for p in side["pads"]])
+        pitches = _side_pitches(side)
+        web = _median(pitches) - pad_width if pitches else 0.0
+        should_replace = (
+            pad_width < config.fsm_qfn_min_slot_width_mm
+            or web < config.fsm_qfn_min_slot_gap_mm
+        )
+        if not should_replace:
+            kept.extend([p["poly"] for p in side["pads"]])
+            continue
+
+        side_slots = _generate_fsm_grouped_slots_for_side(side, qfn, config)
+        if not side_slots:
+            kept.extend([p["poly"] for p in side["pads"]])
+            continue
+        slots.extend(side_slots)
+        side_original = sum(p["poly"].area for p in side["pads"])
+        original_area += side_original
+        slot_area += sum(slot.area for slot in side_slots)
+        slot_count += len(side_slots)
+        replaced_pads += len(side["pads"])
+
+    if center_pad is not None:
+        windows = _generate_center_windowpane(center_pad, qfn, config.fsm_qfn_min_slot_width_mm)
+        if windows:
+            kept.extend(windows)
+        else:
+            kept.append(center_pad)
+
+    if slots:
+        target_area = original_area * config.fsm_qfn_target_volume_ratio
+        error = (slot_area - target_area) / target_area if target_area > 0 else 0.0
+        logger.info(
+            "FSM QFN grouped slots: pads=%s slots=%s target_area=%.4f actual_area=%.4f error=%+.1f%%",
+            replaced_pads,
+            slot_count,
+            target_area,
+            slot_area,
+            error * 100.0,
+        )
+    return unary_union(kept + slots)
+
+
+def _generate_fsm_grouped_slots_for_side(side, qfn, config: StencilConfig):
+    groups = _group_side_pads_for_fsm(side["pads"], config.fsm_qfn_max_pins_per_slot)
+    if not groups:
+        return []
+    intervals = [_fsm_group_interval(group, side, config) for group in groups]
+    groups, intervals = _merge_groups_until_gap_ok(groups, intervals, config.fsm_qfn_min_slot_gap_mm)
+
+    slots = []
+    outward = _outward_sign(side, qfn["center_norm"])
+    slot_width = config.fsm_qfn_min_slot_width_mm
+    bias = min(QFN_SLOT_SEGMENT_OFFSET * slot_width, 0.25)
+    for low, high, center in intervals:
+        slot_length = high - low
+        if slot_length <= 0:
+            continue
+        if side["axis"] == "y":
+            cx, cy = center, side["coord"] + outward * bias
+            slot = box(
+                cx - slot_length / 2.0,
+                cy - slot_width / 2.0,
+                cx + slot_length / 2.0,
+                cy + slot_width / 2.0,
+            )
+        else:
+            cx, cy = side["coord"] + outward * bias, center
+            slot = box(
+                cx - slot_width / 2.0,
+                cy - slot_length / 2.0,
+                cx + slot_width / 2.0,
+                cy + slot_length / 2.0,
+            )
+        slots.append(affinity.rotate(slot, qfn["global_angle"], origin=(0, 0)))
+    return slots
+
+
+def _group_side_pads_for_fsm(pads, max_pins_per_slot: int):
+    max_pins = max(2, int(max_pins_per_slot))
+    groups = []
+    for start in range(0, len(pads), max_pins):
+        group = pads[start:start + max_pins]
+        if len(group) == 1 and groups:
+            groups[-1].extend(group)
+        else:
+            groups.append(list(group))
+    return groups
+
+
+def _fsm_group_interval(group, side, config: StencilConfig):
+    axis_index = 0 if side["axis"] == "y" else 1
+    coords = [p["center_norm"][axis_index] for p in group]
+    center = sum(coords) / len(coords)
+    coord_span = max(coords) - min(coords) if len(coords) > 1 else 0.0
+    local_pad_width = _median([p["short"] for p in group])
+    target_area = sum(p["poly"].area for p in group) * config.fsm_qfn_target_volume_ratio
+    length_from_volume = target_area / config.fsm_qfn_min_slot_width_mm
+    slot_length = max(
+        config.fsm_qfn_min_slot_length_mm,
+        coord_span + local_pad_width,
+        length_from_volume,
+    )
+    return (center - slot_length / 2.0, center + slot_length / 2.0, center)
+
+
+def _merge_groups_until_gap_ok(groups, intervals, min_gap: float):
+    if len(groups) <= 1 or min_gap <= 0:
+        return groups, intervals
+    merged_groups = [list(groups[0])]
+    merged_intervals = [intervals[0]]
+    for group, interval in zip(groups[1:], intervals[1:]):
+        prev_low, prev_high, _prev_center = merged_intervals[-1]
+        low, high, center = interval
+        if low - prev_high < min_gap:
+            merged_groups[-1].extend(group)
+            new_low = min(prev_low, low)
+            new_high = max(prev_high, high)
+            merged_intervals[-1] = (new_low, new_high, (new_low + new_high) / 2.0)
+        else:
+            merged_groups.append(list(group))
+            merged_intervals.append((low, high, center))
+    return merged_groups, merged_intervals
 
 
 def _estimate_pitch_and_width(side):

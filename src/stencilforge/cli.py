@@ -72,6 +72,12 @@ _FIELD_MAP: list[tuple[str, str, type, str]] = [
     ("qfn_min_feature_mm", "qfn_min_feature_mm", float, "QFN min feature size"),
     ("qfn_confidence_threshold", "qfn_confidence_threshold", float, "QFN detection confidence threshold"),
     ("qfn_max_pad_width_mm", "qfn_max_pad_width_mm", float, "QFN max pad width"),
+    ("fsm_qfn_grouped_slots_enabled", "fsm_qfn_grouped_slots_enabled", _bool, "Enable FSM QFN grouped slots"),
+    ("fsm_qfn_min_slot_width_mm", "fsm_qfn_min_slot_width_mm", float, "FSM QFN min printable slot width"),
+    ("fsm_qfn_min_slot_gap_mm", "fsm_qfn_min_slot_gap_mm", float, "FSM QFN min slot gap"),
+    ("fsm_qfn_min_slot_length_mm", "fsm_qfn_min_slot_length_mm", float, "FSM QFN min slot length"),
+    ("fsm_qfn_max_pins_per_slot", "fsm_qfn_max_pins_per_slot", int, "FSM QFN max pins per grouped slot"),
+    ("fsm_qfn_target_volume_ratio", "fsm_qfn_target_volume_ratio", float, "FSM QFN target volume ratio"),
     ("outline_fill_rule", "outline_fill_rule", str, '"legacy" or "evenodd"'),
     ("outline_close_strategy", "outline_close_strategy", str, '"legacy", "graph", or "robust_polygonize"'),
     ("outline_merge_tol_mm", "outline_merge_tol_mm", float, "Outline merge tolerance"),
@@ -158,7 +164,7 @@ def _arg_group(field: str) -> str:
         return "sfmesh options"
     if field.startswith("stl_"):
         return "stl quality options"
-    if field.startswith("qfn_"):
+    if field.startswith("qfn_") or field.startswith("fsm_qfn_"):
         return "qfn options"
     if field.startswith("outline_"):
         return "outline options"

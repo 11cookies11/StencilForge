@@ -35,6 +35,7 @@ class TestParserConstruction:
         assert "--thickness-mm" in flags
         assert "--printer-profile" in flags
         assert "--model-backend" in flags
+        assert "--fsm-qfn-min-slot-width-mm" in flags
         assert "--output-mode" in flags
         assert "--paste-patterns" in flags
 

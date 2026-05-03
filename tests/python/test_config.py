@@ -148,6 +148,12 @@ def test_config_to_dict_round_trips_all_fields() -> None:
             "qfn_min_feature_mm": 0.7,
             "qfn_confidence_threshold": 0.8,
             "qfn_max_pad_width_mm": 1.1,
+            "fsm_qfn_grouped_slots_enabled": False,
+            "fsm_qfn_min_slot_width_mm": 0.45,
+            "fsm_qfn_min_slot_gap_mm": 0.42,
+            "fsm_qfn_min_slot_length_mm": 0.9,
+            "fsm_qfn_max_pins_per_slot": 3,
+            "fsm_qfn_target_volume_ratio": 0.8,
             "outline_fill_rule": "legacy",
             "outline_close_strategy": "graph",
             "outline_merge_tol_mm": 0.02,
@@ -168,6 +174,8 @@ def test_config_to_dict_round_trips_all_fields() -> None:
     assert set(data) == {field.name for field in fields(StencilConfig)}
     assert data["mask_opening_scale"] == 0.9
     assert data["printer_profile"] == "fsm"
+    assert data["fsm_qfn_min_slot_width_mm"] == 0.45
+    assert data["fsm_qfn_max_pins_per_slot"] == 3
     assert data["outline_gap_bridge_mm"] == 0.06
     assert data["cadquery_quantize_mm"] == 0.00002
     assert StencilConfig.from_dict(data) == cfg
@@ -197,6 +205,11 @@ def test_config_to_dict_round_trips_all_fields() -> None:
         ({"sfmesh_chunk_size_mm": 0}, r"Invalid config: sfmesh_chunk_size_mm > 0"),
         ({"sfmesh_chunk_overlap_mm": -0.1}, r"Invalid config: sfmesh_chunk_overlap_mm >= 0"),
         ({"stl_quality": "ultra"}, r"Invalid config: stl_quality in \{fast, balanced, high_quality\} or empty"),
+        ({"fsm_qfn_min_slot_width_mm": 0}, r"Invalid config: fsm_qfn_min_slot_width_mm > 0"),
+        ({"fsm_qfn_min_slot_gap_mm": -0.1}, r"Invalid config: fsm_qfn_min_slot_gap_mm >= 0"),
+        ({"fsm_qfn_min_slot_length_mm": 0}, r"Invalid config: fsm_qfn_min_slot_length_mm > 0"),
+        ({"fsm_qfn_max_pins_per_slot": 1}, r"Invalid config: fsm_qfn_max_pins_per_slot >= 2"),
+        ({"fsm_qfn_target_volume_ratio": 0}, r"Invalid config: fsm_qfn_target_volume_ratio > 0"),
         ({"locator_open_side": "middle"}, r"Invalid config: locator_open_side in \{none, top, right, bottom, left\}"),
     ],
 )
