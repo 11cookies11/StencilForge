@@ -22,10 +22,8 @@ function mountSelect(props = {}) {
 
 // Helper: find dropdown option buttons only (not the trigger)
 function dropdownOptions(wrapper) {
-  return wrapper.findAll("button").filter((btn) => {
-    const text = btn.text();
-    return ["Option A", "Option B", "Option C"].some((o) => text.includes(o));
-  });
+  const dropdown = wrapper.find(".absolute.left-0.right-0");
+  return dropdown.exists() ? dropdown.findAll("button") : [];
 }
 
 describe("AppSelect", () => {
@@ -74,6 +72,21 @@ describe("AppSelect", () => {
     await wrapper.find("button").trigger("click");
     const opts = dropdownOptions(wrapper);
     await opts[0].trigger("click");
+    expect(dropdownOptions(wrapper).length).toBe(0);
+  });
+
+  it("closes before parent model update is applied", async () => {
+    const wrapper = mountSelect({
+      modelValue: "a",
+      "onUpdate:modelValue": async (value) => {
+        await wrapper.setProps({ modelValue: value });
+      },
+    });
+    await wrapper.find("button").trigger("click");
+    const opts = dropdownOptions(wrapper);
+    await opts[1].trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.open).toBe(false);
     expect(dropdownOptions(wrapper).length).toBe(0);
   });
 

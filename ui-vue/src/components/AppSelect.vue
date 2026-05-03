@@ -26,7 +26,8 @@
         class="w-full text-left px-3 py-2 text-sm transition-colors"
         :class="item.value === modelValue ? 'bg-blue-50 text-primary' : 'text-slate-700 hover:bg-slate-50'"
         type="button"
-        @click="selectOption(item.value)"
+        @mousedown.prevent.stop
+        @click.stop="selectOption(item.value)"
       >
         {{ item.label }}
       </button>
@@ -85,9 +86,9 @@ export default {
       this.open = !this.open;
     },
     selectOption(value) {
+      this.open = false;
       this.$emit("update:modelValue", value);
       this.$emit("change", value);
-      this.open = false;
     },
     onDocumentClick(event) {
       if (!this.open) return;
