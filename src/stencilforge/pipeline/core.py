@@ -297,7 +297,13 @@ def _generate_stencil_side(
                 config.locator_open_width_mm,
             )
 
-    logger.info("Base thickness: %s mm", config.thickness_mm)
+    logger.info("Base thickness: %s mm", config.effective_thickness_mm)
+    if config.thickness_managed_by_printer_profile:
+        logger.info(
+            "FSM profile manages thickness: user=%s mm effective=%s mm",
+            config.thickness_mm,
+            config.effective_thickness_mm,
+        )
 
     locator_geom = None
     locator_step_geom = None
@@ -421,7 +427,7 @@ def _apply_per_class_aperture(
         ws_for_type["padAreaMm2"] = dims["padAreaMm2"]
         ws_for_type["targetVolumeMm3"] = 0.0  # let calculator derive from actual dimensions
 
-        effect_info = resolve_aperture_workspace_effect(ws_for_type, config.thickness_mm)
+        effect_info = resolve_aperture_workspace_effect(ws_for_type, config.effective_thickness_mm)
         effect = effect_info["effect"]
         snapshot = effect_info["snapshot"]
 
@@ -498,7 +504,7 @@ def _apply_per_class_aperture(
 
 def _apply_global_aperture(paste_geom, aperture_workspace: dict, config: StencilConfig):
     """Apply a single workspace rule to the entire geometry (legacy path)."""
-    aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.thickness_mm)
+    aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.effective_thickness_mm)
     effect = aperture_effect["effect"]
     if not effect["enabled"]:
         logger.info(
@@ -668,7 +674,11 @@ def _build_stencil_report(
     lines.append(f"  Backend      : {model_backend}")
     lines.append(f"  Printer      : {config.printer_profile}")
     lines.append(f"  Resolution   : arc_steps={config.arc_steps}, curve_resolution={config.curve_resolution}")
-    lines.append(f"  Thickness    : {config.thickness_mm} mm")
+    if config.thickness_managed_by_printer_profile:
+        lines.append(f"  Thickness    : {config.effective_thickness_mm} mm (FSM managed)")
+        lines.append(f"  User thickness: {config.thickness_mm} mm (ignored)")
+    else:
+        lines.append(f"  Thickness    : {config.thickness_mm} mm")
     lines.append(f"  Locator      : {'enabled' if config.locator_enabled else 'disabled'}")
     try:
         size_bytes = output_path.stat().st_size

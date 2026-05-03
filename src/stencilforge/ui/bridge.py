@@ -412,7 +412,10 @@ class BackendBridge(QObject):
         )
         if not filename:
             return ""
-        payload = export_aperture_workspace_payload(self._aperture_workspace, self._config.thickness_mm)
+        payload = export_aperture_workspace_payload(
+            self._aperture_workspace,
+            self._config.effective_thickness_mm,
+        )
         try:
             Path(filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         except OSError as exc:
@@ -688,6 +691,11 @@ class BackendBridge(QObject):
                     self._remember_path("config_dir", config_path)
                 config = self._runtime_config_for_job(config_path)
                 self._log_line(f"Effective backend: {config.model_backend}")
+                if config.thickness_managed_by_printer_profile:
+                    self._log_line(
+                        f"Effective thickness: {config.effective_thickness_mm:.2f} mm "
+                        f"(FSM managed; user {config.thickness_mm:.2f} mm ignored)"
+                    )
                 self._log_line(f"Resolved input: {resolved_input}")
                 if config.model_backend == "cadquery":
                     ctx = mp.get_context("spawn")
@@ -822,7 +830,10 @@ class BackendBridge(QObject):
         return normalize_aperture_workspace(data)
 
     def _aperture_snapshot(self) -> dict:
-        return compute_aperture_workspace(self._aperture_workspace, self._config.thickness_mm)
+        return compute_aperture_workspace(
+            self._aperture_workspace,
+            self._config.effective_thickness_mm,
+        )
 
     def _resolve_input_dir(self, input_dir: str) -> str:
         if not input_dir:

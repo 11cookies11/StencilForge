@@ -239,7 +239,10 @@ def _handle_generate(args: argparse.Namespace) -> int:
         print(f"Output:       {output_stl}")
         print(f"Backend:      {config.model_backend}")
         print(f"Output mode:  {config.output_mode}")
-        print(f"Thickness:    {config.thickness_mm} mm")
+        if config.thickness_managed_by_printer_profile:
+            print(f"Thickness:    {config.effective_thickness_mm} mm (FSM managed; user {config.thickness_mm} mm ignored)")
+        else:
+            print(f"Thickness:    {config.thickness_mm} mm")
         if aperture_workspace:
             profile = aperture_workspace.get("profileName", "(unnamed)")
             print(f"Aperture:     {profile}")

@@ -61,9 +61,10 @@ class TrimeshEngine:
 
     def export(self, data: EngineExportInput) -> None:
         cfg = data.config
+        base_thickness = cfg.effective_thickness_mm
 
         t0 = time.perf_counter()
-        mesh = extrude_geometry(data.stencil_2d, cfg.thickness_mm)
+        mesh = extrude_geometry(data.stencil_2d, base_thickness)
         logger.info("Base mesh extrusion in %.3fs", time.perf_counter() - t0)
 
         mesh = _attach_locator_mesh(mesh, data.locator_geom, data.locator_step_geom,
@@ -77,10 +78,11 @@ class SfMeshEngine:
 
     def export(self, data: EngineExportInput) -> None:
         cfg = data.config
+        base_thickness = cfg.effective_thickness_mm
 
         t0 = time.perf_counter()
         base_geom = _prepare_sfmesh_geometry(data.stencil_2d, cfg, preserve_holes=True)
-        mesh = _extrude_with_cdt(base_geom, cfg.thickness_mm)
+        mesh = _extrude_with_cdt(base_geom, base_thickness)
         logger.info("sfmesh base extrusion in %.3fs", time.perf_counter() - t0)
 
         def _cdt_extrude(g, h):
@@ -122,10 +124,11 @@ def _attach_locator_mesh(base_mesh, locator_geom, locator_step_geom,
     """Extrude and concatenate locator wall and step geometries onto base mesh."""
     prefix = f"{tag} " if tag else ""
     if locator_geom is not None and not locator_geom.is_empty and cfg.locator_height_mm > 0:
+        base_thickness = cfg.effective_thickness_mm
         t0 = time.perf_counter()
         lm = extrude_fn(locator_geom, cfg.locator_height_mm)
         logger.info("%slocator extrusion in %.3fs", prefix, time.perf_counter() - t0)
-        lm.apply_translation((0, 0, cfg.thickness_mm))
+        lm.apply_translation((0, 0, base_thickness))
         base_mesh = trimesh.util.concatenate([base_mesh, lm])
     if (locator_step_geom is not None and not locator_step_geom.is_empty
             and cfg.locator_step_height_mm > 0):

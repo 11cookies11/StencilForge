@@ -104,6 +104,30 @@ def test_mask_opening_scale_applies_only_to_solder_mask_source(tmp_path: Path) -
     assert engine.last_input.stencil_2d.bounds == pytest.approx((2.5, 2.0, 7.5, 6.0))
 
 
+def test_fsm_profile_uses_managed_effective_thickness(tmp_path: Path) -> None:
+    (tmp_path / "Gerber_TopSolderMaskLayer.GTS").write_text("G04 mask*\n", encoding="utf-8")
+
+    service = _DummyGeometryService(StencilConfig.from_dict({}))
+    engine = _DummyEngine()
+    cfg = StencilConfig.from_dict(
+        {
+            "printer_profile": "fsm",
+            "thickness_mm": 0.12,
+            "outline_patterns": ["*not_found*"],
+            "output_mode": "holes_only",
+            "locator_enabled": False,
+            "paste_offset_mm": 0.0,
+        }
+    )
+
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
+
+    assert engine.last_input is not None
+    assert engine.last_input.config.thickness_mm == 0.12
+    assert engine.last_input.config.effective_thickness_mm == pytest.approx(0.20)
+
+
 def test_outline_falls_back_to_margin_when_no_outline_match(tmp_path: Path) -> None:
     (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
 

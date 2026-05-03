@@ -62,6 +62,9 @@ def test_fsm_printer_profile_applies_high_resolution_defaults() -> None:
     assert cfg.stl_angular_deflection == 0.05
     assert cfg.arc_steps == 96
     assert cfg.curve_resolution == 24
+    assert cfg.thickness_mm == 0.12
+    assert cfg.effective_thickness_mm == 0.20
+    assert cfg.thickness_managed_by_printer_profile is True
 
 
 def test_fsm_printer_profile_keeps_explicit_resolution_overrides() -> None:
@@ -77,6 +80,12 @@ def test_fsm_printer_profile_keeps_explicit_resolution_overrides() -> None:
     assert cfg.stl_linear_deflection == 0.04
     assert cfg.arc_steps == 72
     assert cfg.curve_resolution == 18
+
+
+def test_generic_printer_profile_uses_configured_thickness() -> None:
+    cfg = StencilConfig.from_dict({"printer_profile": "generic", "thickness_mm": 0.16})
+    assert cfg.effective_thickness_mm == 0.16
+    assert cfg.thickness_managed_by_printer_profile is False
 
 
 def test_sfmesh_backend_maps_to_trimesh() -> None:

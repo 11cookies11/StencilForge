@@ -38,8 +38,9 @@ def export_cadquery_stl(
         main_stats["holes"],
         main_stats["points"],
     )
+    base_thickness = config.effective_thickness_mm
     base_solids = cadquery_extrude_geometry(
-        stencil_2d, config.thickness_mm, cq, config
+        stencil_2d, base_thickness, cq, config
     )
     solids = list(base_solids)
     # Locator solids extrude and merge.
@@ -59,7 +60,7 @@ def export_cadquery_stl(
             locator_geom, config.locator_height_mm, cq, config
         )
         for solid in locator_solids:
-            solids.append(solid.translate((0, 0, config.thickness_mm)))
+            solids.append(solid.translate((0, 0, base_thickness)))
     step_solids = []
     if locator_step_geom is not None and not locator_step_geom.is_empty and config.locator_step_height_mm > 0:
         step_stats = _geometry_complexity(locator_step_geom)

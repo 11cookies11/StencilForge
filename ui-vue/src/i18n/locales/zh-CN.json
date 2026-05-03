@@ -37,6 +37,7 @@
   "config.hideAdvanced": "隐藏高级",
   "config.advancedSection": "高级 / 实验项",
   "config.thickness": "厚度 (mm)",
+  "config.thicknessFsmManaged": "FSM 模式接管厚度：0.20 mm",
   "config.outputMode": "输出模式",
   "config.outputModeSolid": "实体（含开孔）",
   "config.outputModeHoles": "仅开孔",

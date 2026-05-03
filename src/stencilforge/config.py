@@ -9,6 +9,7 @@ from typing import Iterable
 
 DEFAULT_PASTE_PATTERNS = ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"]
 DEFAULT_OUTLINE_PATTERNS = ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"]
+FSM_EFFECTIVE_THICKNESS_MM = 0.20
 DEFAULT_DRILL_PATTERNS = [
     "*.drl", "*.txt", "*.drd", "*.exc",
     "*drill*", "*hole*", "*pth*", "*npth*",
@@ -255,6 +256,16 @@ class StencilConfig:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @property
+    def effective_thickness_mm(self) -> float:
+        if self.printer_profile == "fsm":
+            return FSM_EFFECTIVE_THICKNESS_MM
+        return self.thickness_mm
+
+    @property
+    def thickness_managed_by_printer_profile(self) -> bool:
+        return self.printer_profile == "fsm"
 
     def validate(self) -> None:
         for desc, check in self._RULES:

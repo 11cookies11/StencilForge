@@ -177,7 +177,7 @@
               embedded
               :backend="backend"
               :locale="locale"
-              :stencil-thickness-mm="config.thickness_mm"
+              :stencil-thickness-mm="effectiveStencilThicknessMm"
             />
           </div>
         </div>
@@ -392,6 +392,12 @@ export default {
         error: this.t("status.error"),
       };
       return map[this.status] || this.status;
+    },
+    effectiveStencilThicknessMm() {
+      if ((this.config.printer_profile || "generic") === "fsm") {
+        return 0.2;
+      }
+      return Number(this.config.thickness_mm) || 0.12;
     },
   },
   mounted() {

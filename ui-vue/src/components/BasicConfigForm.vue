@@ -3,11 +3,15 @@
     <div class="grid gap-4 md:grid-cols-2">
       <label class="text-xs font-semibold text-slate-600">{{ t("config.thickness") }}
         <input
-          :value="config.thickness_mm"
-          @input="$emit('update:config', { ...config, thickness_mm: Number($event.target.value) })"
-          class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg"
+          :value="effectiveThicknessValue"
+          :disabled="isFsmProfile"
+          @input="emitThicknessChange"
+          class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg disabled:text-slate-500 disabled:bg-slate-100"
           type="number" step="0.01"
         />
+        <span v-if="isFsmProfile" class="mt-1 block text-[11px] font-medium text-slate-500">
+          {{ t("config.thicknessFsmManaged") }}
+        </span>
       </label>
       <label class="text-xs font-semibold text-slate-600">{{ t("config.outputMode") }}
         <AppSelect
@@ -269,9 +273,19 @@ export default {
         { value: "left", label: this.t("config.locatorOpenSideLeft") },
       ];
     },
+    isFsmProfile() {
+      return (this.config.printer_profile || "generic") === "fsm";
+    },
+    effectiveThicknessValue() {
+      return this.isFsmProfile ? 0.2 : this.config.thickness_mm;
+    },
   },
   methods: {
     t(key, vars) { return translate(this.locale, key, vars); },
+    emitThicknessChange(event) {
+      if (this.isFsmProfile) return;
+      this.$emit("update:config", { ...this.config, thickness_mm: Number(event.target.value) });
+    },
     printerProfileDefaults(profile) {
       if (profile === "fsm") {
         return {

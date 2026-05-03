@@ -37,6 +37,7 @@
   "config.hideAdvanced": "Hide Advanced",
   "config.advancedSection": "Advanced / Experimental",
   "config.thickness": "Thickness (mm)",
+  "config.thicknessFsmManaged": "FSM profile manages thickness: 0.20 mm",
   "config.outputMode": "Output mode",
   "config.outputModeSolid": "Solid with cutouts",
   "config.outputModeHoles": "Holes only",

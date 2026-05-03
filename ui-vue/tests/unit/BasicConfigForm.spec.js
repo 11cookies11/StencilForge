@@ -133,6 +133,17 @@ describe("BasicConfigForm", () => {
     expect(emitted.curve_resolution).toBe(24);
   });
 
+  it("shows managed thickness when FSM profile is selected", () => {
+    const wrapper = mountForm({
+      config: { ...DEFAULT_CONFIG, printer_profile: "fsm", thickness_mm: 0.12 },
+    });
+    const inputs = wrapper.findAll("input[type='number']");
+    const thicknessInput = inputs.find((i) => i.attributes("step") === "0.01");
+    expect(thicknessInput.element.value).toBe("0.2");
+    expect(thicknessInput.element.disabled).toBe(true);
+    expect(wrapper.text()).toContain("FSM profile manages thickness");
+  });
+
   it("renders i18n labels based on locale prop", () => {
     const wrapper = mountForm({ locale: "zh-CN" });
     expect(wrapper.text()).toContain("厚度"); // Chinese label
