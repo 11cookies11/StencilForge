@@ -40,6 +40,23 @@ _PASTE_FALLBACK_PATTERNS = [
 
 _BOTTOM_PASTE_MARKERS = ["gbp", "bottom", "bcream"]
 
+_MASK_FALLBACK_PATTERNS = [
+    "*gts*",
+    "*.gts",
+    "*gbs*",
+    "*.gbs",
+    "*soldermask*top*",
+    "*top*soldermask*",
+    "*soldermask*bottom*",
+    "*bottom*soldermask*",
+    "*solder*mask*top*",
+    "*top*solder*mask*",
+    "*solder*mask*bottom*",
+    "*bottom*solder*mask*",
+]
+
+_BOTTOM_MASK_MARKERS = ["gbs", "bottom", "bmask"]
+
 _OUTLINE_FALLBACK_PATTERNS = [
     "*gko*",
     "*.gko",
@@ -104,45 +121,53 @@ def _generate_stencil_side(
     logger.info("Paste side: %s", side)
     overall_start = time.perf_counter()
 
-    paste_files = _find_files(input_dir, config.paste_patterns)
-    if not paste_files:
-        paste_files = _find_files(input_dir, _PASTE_FALLBACK_PATTERNS)
-        if paste_files:
-            logger.warning(
-                "Paste layer fallback matched %s file(s) using builtin patterns.",
-                len(paste_files),
-            )
-    if not paste_files:
+    opening_files = _find_files(input_dir, _MASK_FALLBACK_PATTERNS)
+    opening_files = _filter_mask_side(opening_files, side)
+    opening_source = "solder_mask"
+    other_side_info = _side_availability_note(
+        _find_files(input_dir, _MASK_FALLBACK_PATTERNS),
+        side,
+        _filter_mask_side,
+        "mask",
+    )
+
+    if not opening_files:
+        paste_files = _find_files(input_dir, config.paste_patterns)
+        if not paste_files:
+            paste_files = _find_files(input_dir, _PASTE_FALLBACK_PATTERNS)
+            if paste_files:
+                logger.warning(
+                    "Paste layer fallback matched %s file(s) using builtin patterns.",
+                    len(paste_files),
+                )
+        opening_files = _filter_paste_side(paste_files, side)
+        opening_source = "paste"
+        other_side_info = _side_availability_note(
+            paste_files,
+            side,
+            _filter_paste_side,
+            "paste",
+        )
+
+    if not opening_files:
         seen = [p.name for p in sorted(input_dir.rglob("*")) if p.is_file()]
         preview = ", ".join(seen[:20]) if seen else "(no files)"
         raise FileNotFoundError(
-            f"No paste layer files found in input directory. Seen: {preview}"
+            f"No solder mask or paste files found for side '{side}'. Seen: {preview}"
         )
-    all_paste = paste_files.copy()
-    other_side_info = ""
-    if side != "both":
-        paste_files = _filter_paste_side(paste_files, side)
-        if not paste_files:
-            other = "bottom" if side == "top" else "top"
-            other_files = _filter_paste_side(all_paste, other)
-            hint = f" ({len(other_files)} file(s) found for '{other}' side)" if other_files else ""
-            raise FileNotFoundError(
-                f"No paste files found for side '{side}'.{hint}"
-            )
-        other = "bottom" if side == "top" else "top"
-        other_files = _filter_paste_side(all_paste, other)
-        if not other_files:
-            other_side_info = f" (no '{other}' paste layer in input)"
-        else:
-            other_side_info = f" ({len(other_files)} '{other}' paste file(s) found but not selected)"
-        logger.info("Paste side filter: %s%s", side, other_side_info)
-    logger.info("Paste layers: %s", ", ".join([p.name for p in paste_files]))
+
+    logger.info("Opening source: %s", opening_source)
+    logger.info("Opening layers: %s", ", ".join([p.name for p in opening_files]))
+    if other_side_info:
+        logger.info("Opening side note: %s", other_side_info)
 
     t0 = time.perf_counter()
-    paste_geom = geometry_service.load_paste_geometry(paste_files)
-    logger.info("Paste geometry loaded in %.3fs", time.perf_counter() - t0)
+    geometry_label = "solder mask" if opening_source == "solder_mask" else "paste"
+    paste_geom = geometry_service.load_paste_geometry(opening_files, label=geometry_label)
+    logger.info("Opening geometry loaded in %.3fs", time.perf_counter() - t0)
+
     if paste_geom is None or paste_geom.is_empty:
-        raise ValueError("Paste layer produced empty geometry.")
+        raise ValueError("No pad geometry found.")
 
     if config.qfn_regen_enabled:
         try:
@@ -350,8 +375,9 @@ def _generate_stencil_side(
         input_dir=input_dir,
         output_path=output_path,
         side=side,
+        opening_source=opening_source,
         config=config,
-        paste_files=paste_files,
+        opening_files=opening_files,
         paste_geom=paste_geom,
         pad_summary=pad_summary,
         outline_files=outline_files,
@@ -527,6 +553,36 @@ def _filter_paste_side(paste_files: list[Path], side: str) -> list[Path]:
     return filtered
 
 
+def _filter_mask_side(mask_files: list[Path], side: str) -> list[Path]:
+    """Filter solder mask files by board side (top/bottom)."""
+    filtered = []
+    for f in mask_files:
+        name = f.name.lower()
+        if any(marker in name for marker in ("paste", "cream")):
+            continue
+        is_bottom = any(marker in name for marker in _BOTTOM_MASK_MARKERS)
+        if side == "top" and not is_bottom:
+            filtered.append(f)
+        elif side == "bottom" and is_bottom:
+            filtered.append(f)
+    return filtered
+
+
+def _side_availability_note(
+    files: list[Path],
+    side: str,
+    side_filter,
+    layer_name: str,
+) -> str:
+    if side == "both":
+        return ""
+    other = "bottom" if side == "top" else "top"
+    other_files = side_filter(files, other)
+    if not other_files:
+        return f"no '{other}' {layer_name} layer in input"
+    return f"{len(other_files)} '{other}' {layer_name} file(s) found but not selected"
+
+
 def _outline_from_paste(paste_geom, margin_mm: float):
     min_x, min_y, max_x, max_y = paste_geom.bounds
     return box(min_x - margin_mm, min_y - margin_mm, max_x + margin_mm, max_y + margin_mm)
@@ -537,8 +593,9 @@ def _build_stencil_report(
     input_dir: Path,
     output_path: Path,
     side: str,
+    opening_source: str,
     config: StencilConfig,
-    paste_files: list[Path],
+    opening_files: list[Path],
     paste_geom,
     pad_summary: dict[str, int],
     outline_files: list[Path],
@@ -558,17 +615,18 @@ def _build_stencil_report(
     lines.append(f"  Date        : {time.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
 
-    # Paste info
-    lines.append("── Paste Layers ──")
+    # Opening info
+    lines.append("── Opening Layers ──")
     lines.append(f"  Side         : {side}")
-    for f in paste_files:
+    lines.append(f"  Source       : {opening_source}")
+    for f in opening_files:
         lines.append(f"  File         : {f.name} ({f.stat().st_size:,} bytes)")
     if other_side_info:
-        lines.append(f"  Note         : {other_side_info.strip()}")
+        lines.append(f"  Note         : {other_side_info}")
     lines.append(f"  Total pads   : {sum(pad_summary.values()) if pad_summary else 'N/A'}")
     if pad_summary:
         lines.append(f"  Breakdown    : {', '.join(f'{v} {k}' for k, v in sorted(pad_summary.items()))}")
-    lines.append(f"  Paste area   : {paste_geom.area:.2f} mm² (before offset)")
+    lines.append(f"  Opening area : {paste_geom.area:.2f} mm² (before offset)")
     lines.append(f"  Offset       : {config.paste_offset_mm:+.2f} mm")
     lines.append("")
 

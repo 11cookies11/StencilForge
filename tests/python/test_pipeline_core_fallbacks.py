@@ -25,8 +25,10 @@ class _DummyGeometryService:
     def __init__(self, config: StencilConfig) -> None:
         self.config = config
         self.outline_loaded: Path | None = None
+        self.loaded_layers: list[tuple[list[str], str]] = []
 
-    def load_paste_geometry(self, _files):
+    def load_paste_geometry(self, files, label: str = "paste"):
+        self.loaded_layers.append(([f.name for f in files], label))
         return box(0, 0, 10, 8)
 
     def load_outline_geometry(self, path: Path):
@@ -57,6 +59,27 @@ def test_outline_builtin_fallback_matches_gko(tmp_path: Path) -> None:
     assert engine.called is True
     assert service.outline_loaded is not None
     assert service.outline_loaded.name.lower().endswith(".gko")
+
+
+def test_solder_mask_source_excludes_paste_mask_filename(tmp_path: Path) -> None:
+    (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
+    (tmp_path / "Gerber_TopSolderMaskLayer.GTS").write_text("G04 mask*\n", encoding="utf-8")
+
+    service = _DummyGeometryService(StencilConfig.from_dict({}))
+    engine = _DummyEngine()
+
+    cfg = StencilConfig.from_dict(
+        {
+            "outline_patterns": ["*not_found*"],
+            "output_mode": "holes_only",
+            "locator_enabled": False,
+        }
+    )
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
+
+    assert engine.called is True
+    assert service.loaded_layers[0] == (["Gerber_TopSolderMaskLayer.GTS"], "solder mask")
 
 
 def test_outline_falls_back_to_margin_when_no_outline_match(tmp_path: Path) -> None:

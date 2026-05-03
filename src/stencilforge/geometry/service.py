@@ -6,6 +6,7 @@ import builtins
 from contextlib import contextmanager
 import logging
 from pathlib import Path
+import re
 from threading import RLock
 from typing import Iterable
 
@@ -33,10 +34,10 @@ class GerberGeometryService:
         self._outline_builder = OutlineBuilder(config)
         self._last_outline_debug: dict | None = None
 
-    def load_paste_geometry(self, paths: Iterable[Path]):
+    def load_paste_geometry(self, paths: Iterable[Path], label: str = "paste"):
         geometries = []
         for path in paths:
-            layer = self._load_layer(path, "paste")
+            layer = self._load_layer(path, label)
             geom = self._primitive_builder.build(layer.primitives)
             geom = self._scale_to_mm(geom, layer.cam_source.units)
             geometries.append(geom)
@@ -121,8 +122,9 @@ class GerberGeometryService:
     def _load_layer(path: Path, label: str):
         logger.info("Loading %s layer: %s", label, path.name)
         with _legacy_open_mode_compat():
-            with _legacy_outline_primitive_compat():
-                layer = load_layer(str(path))
+            with _legacy_am_subtraction_compat():
+                with _legacy_outline_primitive_compat():
+                    layer = load_layer(str(path))
         logger.info("Units: %s, primitives: %s", layer.cam_source.units, len(layer.primitives))
         return layer
 
@@ -206,3 +208,74 @@ def _legacy_outline_primitive_compat():
             yield
         finally:
             am_statements.AMOutlinePrimitive.__init__ = original_init
+
+
+@contextmanager
+def _legacy_am_subtraction_compat():
+    # pcb-tools has a typo in AM macro subtraction (op2 - op2), which breaks
+    # common EasyEDA/JLC macros such as 0-$2 used by RoundRect apertures.
+    with _OPEN_PATCH_LOCK:
+        try:
+            import gerber.am_eval as am_eval
+            import gerber.am_read as am_read
+            import gerber.gerber_statements as gerber_statements
+        except Exception:
+            yield
+            return
+
+        original_eval = am_eval.eval_macro
+        original_read_eval = am_read.eval_macro
+        original_statement_eval = gerber_statements.eval_macro
+        original_read_macro = am_read.read_macro
+        original_statement_read_macro = gerber_statements.read_macro
+
+        def compat_eval_macro(instructions, parameters={}):
+            if not isinstance(parameters, dict):
+                parameters = {i + 1: val for i, val in enumerate(parameters)}
+
+            stack = []
+
+            for opcode, argument in instructions:
+                if opcode == am_eval.OpCode.PUSH:
+                    stack.append(argument)
+                elif opcode == am_eval.OpCode.LOAD:
+                    stack.append(parameters.get(argument, 0))
+                elif opcode == am_eval.OpCode.STORE:
+                    parameters[argument] = stack.pop()
+                elif opcode == am_eval.OpCode.ADD:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    stack.append(op2 + op1)
+                elif opcode == am_eval.OpCode.SUB:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    stack.append(op2 - op1)
+                elif opcode == am_eval.OpCode.MUL:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    stack.append(op2 * op1)
+                elif opcode == am_eval.OpCode.DIV:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    stack.append(op2 / op1)
+                elif opcode == am_eval.OpCode.PRIM:
+                    yield "%d,%s" % (argument, ",".join([str(x) for x in stack]))
+                    stack = []
+
+        def compat_read_macro(macro):
+            macro = re.sub(r"0-\$(\d+)", r"-1X$\1", macro)
+            return original_read_macro(macro)
+
+        am_eval.eval_macro = compat_eval_macro
+        am_read.eval_macro = compat_eval_macro
+        am_read.read_macro = compat_read_macro
+        gerber_statements.eval_macro = compat_eval_macro
+        gerber_statements.read_macro = compat_read_macro
+        try:
+            yield
+        finally:
+            am_eval.eval_macro = original_eval
+            am_read.eval_macro = original_read_eval
+            am_read.read_macro = original_read_macro
+            gerber_statements.eval_macro = original_statement_eval
+            gerber_statements.read_macro = original_statement_read_macro

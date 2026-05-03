@@ -6,7 +6,7 @@ import math
 import logging
 
 from gerber import primitives as gprim
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from shapely.ops import unary_union
 
 from ..config import StencilConfig
@@ -71,7 +71,43 @@ class PrimitiveGeometryBuilder:
             return self._arc_to_shape(prim)
         if isinstance(prim, gprim.Region):
             return _region_to_shape(self, prim)
+        if isinstance(prim, gprim.AMGroup):
+            rounded = self._amgroup_to_rounded_shape(prim)
+            if rounded is not None:
+                return rounded
+            return self._primitives_to_geometry(prim.primitives)
+        if isinstance(prim, gprim.Outline):
+            return _outline_to_polygon(prim)
         return None
+
+    def _amgroup_to_rounded_shape(self, prim: gprim.AMGroup):
+        circles = [p for p in prim.primitives if isinstance(p, gprim.Circle)]
+        outlines = [p for p in prim.primitives if isinstance(p, gprim.Outline)]
+        if not outlines or len(circles) not in (2, 4):
+            return None
+        radii = [float(c.radius) for c in circles]
+        if not radii or max(radii) <= 0:
+            return None
+        radius = max(radii)
+        if max(abs(r - radius) for r in radii) > max(radius * 0.05, 1e-6):
+            return None
+        points = [c.position for c in circles]
+        if len(circles) == 2:
+            return LineString(points).buffer(
+                radius,
+                cap_style=1,
+                join_style=1,
+                resolution=self._config.curve_resolution,
+            )
+        hull = MultiPoint(points).convex_hull
+        if hull.is_empty or hull.geom_type != "Polygon":
+            return None
+        return hull.buffer(
+            radius,
+            cap_style=1,
+            join_style=1,
+            resolution=self._config.curve_resolution,
+        )
 
     @staticmethod
     def _subtract_hole(geom, prim):
@@ -140,6 +176,24 @@ def get_arc_points(arc: gprim.Arc, steps: int):
         angles = [start + (end - start) * i / (steps - 1) for i in range(steps)]
     cx, cy = arc.center
     return [(cx + arc.radius * math.cos(a), cy + arc.radius * math.sin(a)) for a in angles]
+
+
+def _outline_to_polygon(outline: "gprim.Outline"):
+    """Convert a gerber Outline primitive to a Shapely Polygon."""
+    points = []
+    for sub in outline.primitives:
+        if isinstance(sub, gprim.Line):
+            if not points:
+                points.append(sub.start)
+            points.append(sub.end)
+    if len(points) >= 3:
+        if points[0] != points[-1]:
+            points.append(points[0])
+        poly = Polygon(points)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        return poly
+    return None
 
 
 # This method is part of PrimitiveGeometryBuilder but moved here as a
