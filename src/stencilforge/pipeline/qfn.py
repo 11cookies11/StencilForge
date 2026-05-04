@@ -55,11 +55,11 @@ def regenerate_qfn_paste(geometry, config: StencilConfig):
     if qfn is None or score < config.qfn_confidence_threshold:
         return geometry
     logger.info("QFN detect: pads=%s score=%.2f", len(qfn["pads"]), score)
-    if config.printer_profile == "fsm" and config.fsm_qfn_grouped_slots_enabled:
+    if config.printer_profile == "fdm" and config.fdm_qfn_grouped_slots_enabled:
         if qfn.get("center_pad") is None:
-            logger.info("FSM QFN grouped slots skipped: no center thermal pad detected")
+            logger.info("FDM QFN grouped slots skipped: no center thermal pad detected")
             return geometry
-        regenerated = _regenerate_fsm_qfn_geometry(qfn, polys, config)
+        regenerated = _regenerate_fdm_qfn_geometry(qfn, polys, config)
     else:
         regenerated = _regenerate_qfn_geometry(qfn, polys, config)
     if regenerated is None:
@@ -439,7 +439,7 @@ def _regenerate_qfn_geometry(qfn, polys, config: StencilConfig):
     return merged
 
 
-def _regenerate_fsm_qfn_geometry(qfn, polys, config: StencilConfig):
+def _regenerate_fdm_qfn_geometry(qfn, polys, config: StencilConfig):
     slots = []
     kept = []
     pad_set = {id(p["poly"]) for p in qfn["pads"]}
@@ -460,15 +460,15 @@ def _regenerate_fsm_qfn_geometry(qfn, polys, config: StencilConfig):
         pitches = _side_pitches(side)
         web = _median(pitches) - pad_width if pitches else 0.0
         should_replace = (
-            pad_width < config.fsm_qfn_min_slot_width_mm
-            or web < config.fsm_qfn_min_slot_gap_mm
+            pad_width < config.fdm_qfn_min_slot_width_mm
+            or web < config.fdm_qfn_min_slot_gap_mm
         )
         if not should_replace:
             kept.extend([p["poly"] for p in side["pads"]])
             continue
 
         side_original = sum(p["poly"].area for p in side["pads"])
-        side_slots = _generate_fsm_grouped_slots_for_side(side, qfn, config, side_original)
+        side_slots = _generate_fdm_grouped_slots_for_side(side, qfn, config, side_original)
         if not side_slots:
             kept.extend([p["poly"] for p in side["pads"]])
             continue
@@ -479,17 +479,17 @@ def _regenerate_fsm_qfn_geometry(qfn, polys, config: StencilConfig):
         replaced_pads += len(side["pads"])
 
     if center_pad is not None:
-        windows = _generate_center_windowpane(center_pad, qfn, config.fsm_qfn_min_slot_width_mm)
+        windows = _generate_center_windowpane(center_pad, qfn, config.fdm_qfn_min_slot_width_mm)
         if windows:
             kept.extend(windows)
         else:
             kept.append(center_pad)
 
     if slots:
-        target_area = original_area * config.fsm_qfn_target_volume_ratio
+        target_area = original_area * config.fdm_qfn_target_volume_ratio
         error = (slot_area - target_area) / target_area if target_area > 0 else 0.0
         logger.info(
-            "FSM QFN grouped slots: pads=%s slots=%s target_area=%.4f actual_area=%.4f error=%+.1f%%",
+            "FDM QFN grouped slots: pads=%s slots=%s target_area=%.4f actual_area=%.4f error=%+.1f%%",
             replaced_pads,
             slot_count,
             target_area,
@@ -499,38 +499,38 @@ def _regenerate_fsm_qfn_geometry(qfn, polys, config: StencilConfig):
     return unary_union(kept + slots)
 
 
-def _generate_fsm_grouped_slots_for_side(side, qfn, config: StencilConfig, target_area: float | None = None):
-    groups = _group_side_pads_for_fsm(side["pads"], config.fsm_qfn_max_pins_per_slot)
+def _generate_fdm_grouped_slots_for_side(side, qfn, config: StencilConfig, target_area: float | None = None):
+    groups = _group_side_pads_for_fdm(side["pads"], config.fdm_qfn_max_pins_per_slot)
     if not groups:
         return []
     while True:
-        intervals = [_fsm_group_interval(group, side, config) for group in groups]
+        intervals = [_fdm_group_interval(group, side, config) for group in groups]
         merged_groups, _merged_intervals = _merge_groups_until_gap_ok(
             groups,
             intervals,
-            config.fsm_qfn_min_slot_gap_mm,
+            config.fdm_qfn_min_slot_gap_mm,
         )
         if len(merged_groups) == len(groups):
             break
         groups = merged_groups
-    intervals = [_fsm_group_interval(group, side, config) for group in groups]
+    intervals = [_fdm_group_interval(group, side, config) for group in groups]
 
-    slots = _make_fsm_slots_from_intervals(side, qfn, intervals, config.fsm_qfn_min_slot_width_mm)
-    slots = _apply_fsm_qfn_corner_bridges(slots, qfn, config)
+    slots = _make_fdm_slots_from_intervals(side, qfn, intervals, config.fdm_qfn_min_slot_width_mm)
+    slots = _apply_fdm_qfn_corner_bridges(slots, qfn, config)
     if target_area is None:
         return slots
 
-    target_area *= config.fsm_qfn_target_volume_ratio
+    target_area *= config.fdm_qfn_target_volume_ratio
     current_area = sum(slot.area for slot in slots)
     if current_area <= 0 or current_area >= target_area:
         return slots
-    compensated_width = config.fsm_qfn_min_slot_width_mm * (target_area / current_area)
-    compensated_slots = _make_fsm_slots_from_intervals(side, qfn, intervals, compensated_width)
-    compensated_slots = _apply_fsm_qfn_corner_bridges(compensated_slots, qfn, config)
+    compensated_width = config.fdm_qfn_min_slot_width_mm * (target_area / current_area)
+    compensated_slots = _make_fdm_slots_from_intervals(side, qfn, intervals, compensated_width)
+    compensated_slots = _apply_fdm_qfn_corner_bridges(compensated_slots, qfn, config)
     return compensated_slots
 
 
-def _make_fsm_slots_from_intervals(side, qfn, intervals, slot_width: float):
+def _make_fdm_slots_from_intervals(side, qfn, intervals, slot_width: float):
     slots = []
     outward = _outward_sign(side, qfn["center_norm"])
     bias = min(QFN_SLOT_SEGMENT_OFFSET * slot_width, 0.25)
@@ -558,7 +558,7 @@ def _make_fsm_slots_from_intervals(side, qfn, intervals, slot_width: float):
     return slots
 
 
-def _group_side_pads_for_fsm(pads, max_pins_per_slot: int):
+def _group_side_pads_for_fdm(pads, max_pins_per_slot: int):
     max_pins = max(2, int(max_pins_per_slot))
     groups = []
     for start in range(0, len(pads), max_pins):
@@ -570,29 +570,29 @@ def _group_side_pads_for_fsm(pads, max_pins_per_slot: int):
     return groups
 
 
-def _fsm_group_interval(group, side, config: StencilConfig):
+def _fdm_group_interval(group, side, config: StencilConfig):
     axis_index = 0 if side["axis"] == "y" else 1
     coords = [p["center_norm"][axis_index] for p in group]
     center = sum(coords) / len(coords)
     coord_span = max(coords) - min(coords) if len(coords) > 1 else 0.0
     local_pad_width = _median([p["short"] for p in group])
-    target_area = sum(p["poly"].area for p in group) * config.fsm_qfn_target_volume_ratio
-    length_from_volume = target_area / config.fsm_qfn_min_slot_width_mm
+    target_area = sum(p["poly"].area for p in group) * config.fdm_qfn_target_volume_ratio
+    length_from_volume = target_area / config.fdm_qfn_min_slot_width_mm
     slot_length = max(
-        config.fsm_qfn_min_slot_length_mm,
+        config.fdm_qfn_min_slot_length_mm,
         coord_span + local_pad_width,
         length_from_volume,
     )
     return (center - slot_length / 2.0, center + slot_length / 2.0, center)
 
 
-def _apply_fsm_qfn_corner_bridges(slots, qfn, config: StencilConfig):
-    if not config.fsm_qfn_bridge_enabled:
+def _apply_fdm_qfn_corner_bridges(slots, qfn, config: StencilConfig):
+    if not config.fdm_qfn_bridge_enabled:
         return slots
     bridge_width = max(
-        config.fsm_qfn_bridge_width_mm,
-        config.fsm_qfn_min_slot_width_mm * 2.0,
-        config.fsm_qfn_min_slot_gap_mm * 2.0,
+        config.fdm_qfn_bridge_width_mm,
+        config.fdm_qfn_min_slot_width_mm * 2.0,
+        config.fdm_qfn_min_slot_gap_mm * 2.0,
     )
     x_values = [qfn["left"]["coord"], qfn["right"]["coord"]]
     y_values = [qfn["bottom"]["coord"], qfn["top"]["coord"]]

@@ -57,17 +57,17 @@ def _outer_qfn_slot_segments(polygons):
     ]
 
 
-def test_fsm_qfn_grouped_slots_replace_thin_pins() -> None:
+def test_fdm_qfn_grouped_slots_replace_thin_pins() -> None:
     original = _qfn_fixture()
     cfg = StencilConfig.from_dict(
         {
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "qfn_confidence_threshold": 0.6,
-            "fsm_qfn_min_slot_width_mm": 0.4,
-            "fsm_qfn_min_slot_gap_mm": 0.4,
-            "fsm_qfn_min_slot_length_mm": 0.8,
-            "fsm_qfn_max_pins_per_slot": 4,
-            "fsm_qfn_target_volume_ratio": 1.0,
+            "fdm_qfn_min_slot_width_mm": 0.4,
+            "fdm_qfn_min_slot_gap_mm": 0.4,
+            "fdm_qfn_min_slot_length_mm": 0.8,
+            "fdm_qfn_max_pins_per_slot": 4,
+            "fdm_qfn_target_volume_ratio": 1.0,
         }
     )
 
@@ -81,18 +81,18 @@ def test_fsm_qfn_grouped_slots_replace_thin_pins() -> None:
     assert sum(p.area for p in grouped_segments) >= 16 * 0.10
 
 
-def test_fsm_qfn_grouped_slots_can_disable_support_bridges() -> None:
+def test_fdm_qfn_grouped_slots_can_disable_support_bridges() -> None:
     original = _qfn_fixture()
     cfg = StencilConfig.from_dict(
         {
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "qfn_confidence_threshold": 0.6,
-            "fsm_qfn_min_slot_width_mm": 0.4,
-            "fsm_qfn_min_slot_gap_mm": 0.4,
-            "fsm_qfn_min_slot_length_mm": 0.8,
-            "fsm_qfn_max_pins_per_slot": 4,
-            "fsm_qfn_target_volume_ratio": 1.0,
-            "fsm_qfn_bridge_enabled": False,
+            "fdm_qfn_min_slot_width_mm": 0.4,
+            "fdm_qfn_min_slot_gap_mm": 0.4,
+            "fdm_qfn_min_slot_length_mm": 0.8,
+            "fdm_qfn_max_pins_per_slot": 4,
+            "fdm_qfn_target_volume_ratio": 1.0,
+            "fdm_qfn_bridge_enabled": False,
         }
     )
 
@@ -119,16 +119,16 @@ def test_generic_qfn_regeneration_keeps_printable_existing_strategy() -> None:
     assert len(polygons) >= 5
 
 
-def test_fsm_qfn_detection_ignores_nearby_distractor_pads() -> None:
+def test_fdm_qfn_detection_ignores_nearby_distractor_pads() -> None:
     original = _qfn_fixture_with_distractors()
     cfg = StencilConfig.from_dict(
         {
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "qfn_confidence_threshold": 0.6,
-            "fsm_qfn_min_slot_width_mm": 0.4,
-            "fsm_qfn_min_slot_gap_mm": 0.4,
-            "fsm_qfn_min_slot_length_mm": 0.8,
-            "fsm_qfn_max_pins_per_slot": 4,
+            "fdm_qfn_min_slot_width_mm": 0.4,
+            "fdm_qfn_min_slot_gap_mm": 0.4,
+            "fdm_qfn_min_slot_length_mm": 0.8,
+            "fdm_qfn_max_pins_per_slot": 4,
         }
     )
 
@@ -144,14 +144,14 @@ def test_fsm_qfn_detection_ignores_nearby_distractor_pads() -> None:
     assert len(grouped_slots) >= 4
 
 
-def test_fsm_qfn_grouped_slots_requires_center_pad() -> None:
+def test_fdm_qfn_grouped_slots_requires_center_pad() -> None:
     original = _qfn_like_fixture_without_center_pad()
     cfg = StencilConfig.from_dict(
         {
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "qfn_confidence_threshold": 0.6,
-            "fsm_qfn_min_slot_width_mm": 0.4,
-            "fsm_qfn_min_slot_gap_mm": 0.4,
+            "fdm_qfn_min_slot_width_mm": 0.4,
+            "fdm_qfn_min_slot_gap_mm": 0.4,
         }
     )
 

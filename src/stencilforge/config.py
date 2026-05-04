@@ -9,7 +9,7 @@ from typing import Iterable
 
 DEFAULT_PASTE_PATTERNS = ["*gtp*", "*gbp*", "*paste*top*", "*paste*bottom*", "*cream*"]
 DEFAULT_OUTLINE_PATTERNS = ["*gko*", "*gm1*", "*boardoutline*", "*outline*", "*edge*cuts*"]
-FSM_EFFECTIVE_THICKNESS_MM = 0.20
+FDM_EFFECTIVE_THICKNESS_MM = 0.20
 DEFAULT_DRILL_PATTERNS = [
     "*.drl", "*.txt", "*.drd", "*.exc",
     "*drill*", "*hole*", "*pth*", "*npth*",
@@ -65,14 +65,14 @@ class StencilConfig:
     qfn_min_feature_mm: float
     qfn_confidence_threshold: float
     qfn_max_pad_width_mm: float
-    fsm_qfn_grouped_slots_enabled: bool
-    fsm_qfn_min_slot_width_mm: float
-    fsm_qfn_min_slot_gap_mm: float
-    fsm_qfn_min_slot_length_mm: float
-    fsm_qfn_max_pins_per_slot: int
-    fsm_qfn_target_volume_ratio: float
-    fsm_qfn_bridge_enabled: bool
-    fsm_qfn_bridge_width_mm: float
+    fdm_qfn_grouped_slots_enabled: bool
+    fdm_qfn_min_slot_width_mm: float
+    fdm_qfn_min_slot_gap_mm: float
+    fdm_qfn_min_slot_length_mm: float
+    fdm_qfn_max_pins_per_slot: int
+    fdm_qfn_target_volume_ratio: float
+    fdm_qfn_bridge_enabled: bool
+    fdm_qfn_bridge_width_mm: float
     outline_fill_rule: str
     outline_close_strategy: str
     outline_merge_tol_mm: float
@@ -126,9 +126,11 @@ class StencilConfig:
         if paste_side not in ("top", "bottom", "both"):
             paste_side = "top"
         printer_profile = str(data.get("printer_profile", "generic")).strip().lower()
-        if printer_profile in ("normal", "default", "non_fsm", "non-fsm"):
+        if printer_profile in ("normal", "default", "non_fdm", "non-fdm"):
             printer_profile = "generic"
-        if printer_profile not in ("generic", "fsm"):
+        if printer_profile in ("fsm",):
+            printer_profile = "fdm"
+        if printer_profile not in ("generic", "fdm"):
             printer_profile = "generic"
         outline_patterns = _ensure_list(data.get("outline_patterns", [])) or list(DEFAULT_OUTLINE_PATTERNS)
         drill_patterns = _ensure_list(data.get("drill_patterns", [])) or list(DEFAULT_DRILL_PATTERNS)
@@ -187,14 +189,14 @@ class StencilConfig:
         qfn_min_feature_mm = float(data.get("qfn_min_feature_mm", 0.6))
         qfn_confidence_threshold = float(data.get("qfn_confidence_threshold", 0.75))
         qfn_max_pad_width_mm = float(data.get("qfn_max_pad_width_mm", 1.2))
-        fsm_qfn_grouped_slots_enabled = bool(data.get("fsm_qfn_grouped_slots_enabled", True))
-        fsm_qfn_min_slot_width_mm = float(data.get("fsm_qfn_min_slot_width_mm", 0.4))
-        fsm_qfn_min_slot_gap_mm = float(data.get("fsm_qfn_min_slot_gap_mm", 0.4))
-        fsm_qfn_min_slot_length_mm = float(data.get("fsm_qfn_min_slot_length_mm", 0.8))
-        fsm_qfn_max_pins_per_slot = int(data.get("fsm_qfn_max_pins_per_slot", 4))
-        fsm_qfn_target_volume_ratio = float(data.get("fsm_qfn_target_volume_ratio", 1.0))
-        fsm_qfn_bridge_enabled = bool(data.get("fsm_qfn_bridge_enabled", True))
-        fsm_qfn_bridge_width_mm = float(data.get("fsm_qfn_bridge_width_mm", 0.9))
+        fdm_qfn_grouped_slots_enabled = bool(data.get("fdm_qfn_grouped_slots_enabled", True))
+        fdm_qfn_min_slot_width_mm = float(data.get("fdm_qfn_min_slot_width_mm", 0.4))
+        fdm_qfn_min_slot_gap_mm = float(data.get("fdm_qfn_min_slot_gap_mm", 0.4))
+        fdm_qfn_min_slot_length_mm = float(data.get("fdm_qfn_min_slot_length_mm", 0.8))
+        fdm_qfn_max_pins_per_slot = int(data.get("fdm_qfn_max_pins_per_slot", 4))
+        fdm_qfn_target_volume_ratio = float(data.get("fdm_qfn_target_volume_ratio", 1.0))
+        fdm_qfn_bridge_enabled = bool(data.get("fdm_qfn_bridge_enabled", True))
+        fdm_qfn_bridge_width_mm = float(data.get("fdm_qfn_bridge_width_mm", 0.9))
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
         outline_close_strategy = str(data.get("outline_close_strategy", "robust_polygonize"))
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
@@ -255,14 +257,14 @@ class StencilConfig:
             qfn_min_feature_mm=qfn_min_feature_mm,
             qfn_confidence_threshold=qfn_confidence_threshold,
             qfn_max_pad_width_mm=qfn_max_pad_width_mm,
-            fsm_qfn_grouped_slots_enabled=fsm_qfn_grouped_slots_enabled,
-            fsm_qfn_min_slot_width_mm=fsm_qfn_min_slot_width_mm,
-            fsm_qfn_min_slot_gap_mm=fsm_qfn_min_slot_gap_mm,
-            fsm_qfn_min_slot_length_mm=fsm_qfn_min_slot_length_mm,
-            fsm_qfn_max_pins_per_slot=fsm_qfn_max_pins_per_slot,
-            fsm_qfn_target_volume_ratio=fsm_qfn_target_volume_ratio,
-            fsm_qfn_bridge_enabled=fsm_qfn_bridge_enabled,
-            fsm_qfn_bridge_width_mm=fsm_qfn_bridge_width_mm,
+            fdm_qfn_grouped_slots_enabled=fdm_qfn_grouped_slots_enabled,
+            fdm_qfn_min_slot_width_mm=fdm_qfn_min_slot_width_mm,
+            fdm_qfn_min_slot_gap_mm=fdm_qfn_min_slot_gap_mm,
+            fdm_qfn_min_slot_length_mm=fdm_qfn_min_slot_length_mm,
+            fdm_qfn_max_pins_per_slot=fdm_qfn_max_pins_per_slot,
+            fdm_qfn_target_volume_ratio=fdm_qfn_target_volume_ratio,
+            fdm_qfn_bridge_enabled=fdm_qfn_bridge_enabled,
+            fdm_qfn_bridge_width_mm=fdm_qfn_bridge_width_mm,
             outline_fill_rule=outline_fill_rule,
             outline_close_strategy=outline_close_strategy,
             outline_merge_tol_mm=outline_merge_tol_mm,
@@ -283,13 +285,13 @@ class StencilConfig:
 
     @property
     def effective_thickness_mm(self) -> float:
-        if self.printer_profile == "fsm":
-            return FSM_EFFECTIVE_THICKNESS_MM
+        if self.printer_profile == "fdm":
+            return FDM_EFFECTIVE_THICKNESS_MM
         return self.thickness_mm
 
     @property
     def thickness_managed_by_printer_profile(self) -> bool:
-        return self.printer_profile == "fsm"
+        return self.printer_profile == "fdm"
 
     def validate(self) -> None:
         for desc, check in self._RULES:
@@ -299,7 +301,7 @@ class StencilConfig:
 
 StencilConfig._RULES = [
     ("paste_side in {top, bottom, both}", lambda s: s.paste_side in {"top", "bottom", "both"}),
-    ("printer_profile in {generic, fsm}", lambda s: s.printer_profile in {"generic", "fsm"}),
+    ("printer_profile in {generic, fdm}", lambda s: s.printer_profile in {"generic", "fdm"}),
     ("thickness_mm > 0", lambda s: s.thickness_mm > 0),
     ("mask_opening_scale > 0", lambda s: s.mask_opening_scale > 0),
     ("arc_steps >= 8", lambda s: s.arc_steps >= 8),
@@ -307,12 +309,12 @@ StencilConfig._RULES = [
     ("qfn_min_feature_mm > 0", lambda s: s.qfn_min_feature_mm > 0),
     ("qfn_confidence_threshold in (0, 1]", lambda s: 0.0 < s.qfn_confidence_threshold <= 1.0),
     ("qfn_max_pad_width_mm > 0", lambda s: s.qfn_max_pad_width_mm > 0),
-    ("fsm_qfn_min_slot_width_mm > 0", lambda s: s.fsm_qfn_min_slot_width_mm > 0),
-    ("fsm_qfn_min_slot_gap_mm >= 0", lambda s: s.fsm_qfn_min_slot_gap_mm >= 0),
-    ("fsm_qfn_min_slot_length_mm > 0", lambda s: s.fsm_qfn_min_slot_length_mm > 0),
-    ("fsm_qfn_max_pins_per_slot >= 2", lambda s: s.fsm_qfn_max_pins_per_slot >= 2),
-    ("fsm_qfn_target_volume_ratio > 0", lambda s: s.fsm_qfn_target_volume_ratio > 0),
-    ("fsm_qfn_bridge_width_mm > 0", lambda s: s.fsm_qfn_bridge_width_mm > 0),
+    ("fdm_qfn_min_slot_width_mm > 0", lambda s: s.fdm_qfn_min_slot_width_mm > 0),
+    ("fdm_qfn_min_slot_gap_mm >= 0", lambda s: s.fdm_qfn_min_slot_gap_mm >= 0),
+    ("fdm_qfn_min_slot_length_mm > 0", lambda s: s.fdm_qfn_min_slot_length_mm > 0),
+    ("fdm_qfn_max_pins_per_slot >= 2", lambda s: s.fdm_qfn_max_pins_per_slot >= 2),
+    ("fdm_qfn_target_volume_ratio > 0", lambda s: s.fdm_qfn_target_volume_ratio > 0),
+    ("fdm_qfn_bridge_width_mm > 0", lambda s: s.fdm_qfn_bridge_width_mm > 0),
     ("output_mode in {holes_only, solid_with_cutouts}", lambda s: s.output_mode in {"holes_only", "solid_with_cutouts"}),
     ("model_backend in {trimesh, cadquery}", lambda s: s.model_backend in {"trimesh", "cadquery"}),
     ("sfmesh_quality_mode in {fast, auto, watertight}", lambda s: s.sfmesh_quality_mode in {"fast", "auto", "watertight"}),
@@ -366,7 +368,7 @@ def _ensure_list(value: Iterable[str] | str | None) -> list[str]:
 
 
 def _printer_profile_defaults(profile: str) -> dict[str, float | int | str]:
-    if profile == "fsm":
+    if profile == "fdm":
         return {
             "stl_quality": "high_quality",
             "stl_linear_deflection": 0.02,

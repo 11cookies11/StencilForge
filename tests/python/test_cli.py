@@ -35,7 +35,7 @@ class TestParserConstruction:
         assert "--thickness-mm" in flags
         assert "--printer-profile" in flags
         assert "--model-backend" in flags
-        assert "--fsm-qfn-min-slot-width-mm" in flags
+        assert "--fdm-qfn-min-slot-width-mm" in flags
         assert "--output-mode" in flags
         assert "--paste-patterns" in flags
 
@@ -129,9 +129,9 @@ class TestConfigMerge:
             if action.dest != "help":
                 setattr(args, action.dest, None)
         args.config = None
-        args.printer_profile = "fsm"
+        args.printer_profile = "fdm"
         config = _build_config_from_args(args)
-        assert config.printer_profile == "fsm"
+        assert config.printer_profile == "fdm"
         assert config.arc_steps == 96
         assert config.curve_resolution == 24
 

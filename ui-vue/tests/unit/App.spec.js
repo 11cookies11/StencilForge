@@ -61,9 +61,9 @@ describe("App", () => {
     expect(cfg.model_backend).toBe("trimesh");
   });
 
-  it("uses FSM managed thickness for aperture calculations", () => {
+  it("uses FDM managed thickness for aperture calculations", () => {
     const wrapper = mountApp();
-    wrapper.vm.config = { ...wrapper.vm.config, printer_profile: "fsm", thickness_mm: 0.12 };
+    wrapper.vm.config = { ...wrapper.vm.config, printer_profile: "fdm", thickness_mm: 0.12 };
     expect(wrapper.vm.effectiveStencilThicknessMm).toBe(0.2);
   });
 

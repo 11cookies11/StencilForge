@@ -695,7 +695,7 @@ class BackendBridge(QObject):
                 if config.thickness_managed_by_printer_profile:
                     self._log_line(
                         f"Effective thickness: {config.effective_thickness_mm:.2f} mm "
-                        f"(FSM managed; user {config.thickness_mm:.2f} mm ignored)"
+                        f"(FDM managed; user {config.thickness_mm:.2f} mm ignored)"
                     )
                 self._log_line(f"Resolved input: {resolved_input}")
                 if config.model_backend == "cadquery":

@@ -394,7 +394,7 @@ export default {
       return map[this.status] || this.status;
     },
     effectiveStencilThicknessMm() {
-      if ((this.config.printer_profile || "generic") === "fsm") {
+      if ((this.config.printer_profile || "generic") === "fdm") {
         return 0.2;
       }
       return Number(this.config.thickness_mm) || 0.12;

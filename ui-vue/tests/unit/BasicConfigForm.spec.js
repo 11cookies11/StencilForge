@@ -123,25 +123,25 @@ describe("BasicConfigForm", () => {
     expect(emitted.model_backend).toBe("trimesh");
   });
 
-  it("applies FSM printer profile defaults when profile changes", () => {
+  it("applies FDM printer profile defaults when profile changes", () => {
     const wrapper = mountForm();
-    wrapper.vm.emitPrinterProfileChange("fsm");
+    wrapper.vm.emitPrinterProfileChange("fdm");
     const emitted = wrapper.emitted("update:config")[0][0];
-    expect(emitted.printer_profile).toBe("fsm");
+    expect(emitted.printer_profile).toBe("fdm");
     expect(emitted.stl_quality).toBe("high_quality");
     expect(emitted.arc_steps).toBe(96);
     expect(emitted.curve_resolution).toBe(24);
   });
 
-  it("shows managed thickness when FSM profile is selected", () => {
+  it("shows managed thickness when FDM profile is selected", () => {
     const wrapper = mountForm({
-      config: { ...DEFAULT_CONFIG, printer_profile: "fsm", thickness_mm: 0.12 },
+      config: { ...DEFAULT_CONFIG, printer_profile: "fdm", thickness_mm: 0.12 },
     });
     const inputs = wrapper.findAll("input[type='number']");
     const thicknessInput = inputs.find((i) => i.attributes("step") === "0.01");
     expect(thicknessInput.element.value).toBe("0.2");
     expect(thicknessInput.element.disabled).toBe(true);
-    expect(wrapper.text()).toContain("FSM profile manages thickness");
+    expect(wrapper.text()).toContain("FDM profile manages thickness");
   });
 
   it("renders i18n labels based on locale prop", () => {

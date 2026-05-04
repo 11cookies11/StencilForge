@@ -302,7 +302,7 @@ def _generate_stencil_side(
     logger.info("Base thickness: %s mm", config.effective_thickness_mm)
     if config.thickness_managed_by_printer_profile:
         logger.info(
-            "FSM profile manages thickness: user=%s mm effective=%s mm",
+            "FDM profile manages thickness: user=%s mm effective=%s mm",
             config.thickness_mm,
             config.effective_thickness_mm,
         )
@@ -685,7 +685,7 @@ def _build_stencil_report(
     lines.append(_t("report.printer", profile=config.printer_profile))
     lines.append(_t("report.resolution", arc_steps=config.arc_steps, curve_resolution=config.curve_resolution))
     if config.thickness_managed_by_printer_profile:
-        lines.append(_t("report.thickness_fsm", value=config.effective_thickness_mm))
+        lines.append(_t("report.thickness_fdm", value=config.effective_thickness_mm))
         lines.append(_t("report.user_thickness", value=config.thickness_mm))
     else:
         lines.append(_t("report.thickness", value=config.thickness_mm))

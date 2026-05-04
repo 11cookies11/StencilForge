@@ -4,13 +4,13 @@
       <label class="text-xs font-semibold text-slate-600">{{ t("config.thickness") }}
         <input
           :value="effectiveThicknessValue"
-          :disabled="isFsmProfile"
+          :disabled="isFdmProfile"
           @input="emitThicknessChange"
           class="mt-1 w-full h-9 px-2 text-sm bg-slate-50 border border-slate-200 rounded-lg disabled:text-slate-500 disabled:bg-slate-100"
           type="number" step="0.01"
         />
-        <span v-if="isFsmProfile" class="mt-1 block text-[11px] font-medium text-slate-500">
-          {{ t("config.thicknessFsmManaged") }}
+        <span v-if="isFdmProfile" class="mt-1 block text-[11px] font-medium text-slate-500">
+          {{ t("config.thicknessFdmManaged") }}
         </span>
       </label>
       <label class="text-xs font-semibold text-slate-600">{{ t("config.outputMode") }}
@@ -249,7 +249,7 @@ export default {
     printerProfileOptions() {
       return [
         { value: "generic", label: this.t("config.printerProfileGeneric") },
-        { value: "fsm", label: this.t("config.printerProfileFsm") },
+        { value: "fdm", label: this.t("config.printerProfileFdm") },
       ];
     },
     modelBackendOptions() {
@@ -273,21 +273,21 @@ export default {
         { value: "left", label: this.t("config.locatorOpenSideLeft") },
       ];
     },
-    isFsmProfile() {
-      return (this.config.printer_profile || "generic") === "fsm";
+    isFdmProfile() {
+      return (this.config.printer_profile || "generic") === "fdm";
     },
     effectiveThicknessValue() {
-      return this.isFsmProfile ? 0.2 : this.config.thickness_mm;
+      return this.isFdmProfile ? 0.2 : this.config.thickness_mm;
     },
   },
   methods: {
     t(key, vars) { return translate(this.locale, key, vars); },
     emitThicknessChange(event) {
-      if (this.isFsmProfile) return;
+      if (this.isFdmProfile) return;
       this.$emit("update:config", { ...this.config, thickness_mm: Number(event.target.value) });
     },
     printerProfileDefaults(profile) {
-      if (profile === "fsm") {
+      if (profile === "fdm") {
         return {
           stl_quality: "high_quality",
           stl_linear_deflection: 0.02,

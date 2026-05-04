@@ -55,8 +55,8 @@ def test_stl_quality_preset_does_not_override_explicit_values() -> None:
     assert cfg.stl_angular_deflection == 0.6
 
 
-def test_fsm_printer_profile_applies_high_resolution_defaults() -> None:
-    cfg = StencilConfig.from_dict({"printer_profile": "fsm"})
+def test_fdm_printer_profile_applies_high_resolution_defaults() -> None:
+    cfg = StencilConfig.from_dict({"printer_profile": "fdm"})
     assert cfg.stl_quality == "high_quality"
     assert cfg.stl_linear_deflection == 0.02
     assert cfg.stl_angular_deflection == 0.05
@@ -67,10 +67,10 @@ def test_fsm_printer_profile_applies_high_resolution_defaults() -> None:
     assert cfg.thickness_managed_by_printer_profile is True
 
 
-def test_fsm_printer_profile_keeps_explicit_resolution_overrides() -> None:
+def test_fdm_printer_profile_keeps_explicit_resolution_overrides() -> None:
     cfg = StencilConfig.from_dict(
         {
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "stl_linear_deflection": 0.04,
             "arc_steps": 72,
             "curve_resolution": 18,
@@ -120,7 +120,7 @@ def test_config_to_dict_round_trips_all_fields() -> None:
             "locator_open_side": "top",
             "locator_open_width_mm": 0.4,
             "output_mode": "holes_only",
-            "printer_profile": "fsm",
+            "printer_profile": "fdm",
             "model_backend": "cadquery",
             "sfmesh_quality_mode": "auto",
             "sfmesh_voxel_pitch_mm": 0.1,
@@ -148,12 +148,12 @@ def test_config_to_dict_round_trips_all_fields() -> None:
             "qfn_min_feature_mm": 0.7,
             "qfn_confidence_threshold": 0.8,
             "qfn_max_pad_width_mm": 1.1,
-            "fsm_qfn_grouped_slots_enabled": False,
-            "fsm_qfn_min_slot_width_mm": 0.45,
-            "fsm_qfn_min_slot_gap_mm": 0.42,
-            "fsm_qfn_min_slot_length_mm": 0.9,
-            "fsm_qfn_max_pins_per_slot": 3,
-            "fsm_qfn_target_volume_ratio": 0.8,
+            "fdm_qfn_grouped_slots_enabled": False,
+            "fdm_qfn_min_slot_width_mm": 0.45,
+            "fdm_qfn_min_slot_gap_mm": 0.42,
+            "fdm_qfn_min_slot_length_mm": 0.9,
+            "fdm_qfn_max_pins_per_slot": 3,
+            "fdm_qfn_target_volume_ratio": 0.8,
             "outline_fill_rule": "legacy",
             "outline_close_strategy": "graph",
             "outline_merge_tol_mm": 0.02,
@@ -173,9 +173,9 @@ def test_config_to_dict_round_trips_all_fields() -> None:
     data = cfg.to_dict()
     assert set(data) == {field.name for field in fields(StencilConfig)}
     assert data["mask_opening_scale"] == 0.9
-    assert data["printer_profile"] == "fsm"
-    assert data["fsm_qfn_min_slot_width_mm"] == 0.45
-    assert data["fsm_qfn_max_pins_per_slot"] == 3
+    assert data["printer_profile"] == "fdm"
+    assert data["fdm_qfn_min_slot_width_mm"] == 0.45
+    assert data["fdm_qfn_max_pins_per_slot"] == 3
     assert data["outline_gap_bridge_mm"] == 0.06
     assert data["cadquery_quantize_mm"] == 0.00002
     assert StencilConfig.from_dict(data) == cfg
@@ -205,11 +205,11 @@ def test_config_to_dict_round_trips_all_fields() -> None:
         ({"sfmesh_chunk_size_mm": 0}, r"Invalid config: sfmesh_chunk_size_mm > 0"),
         ({"sfmesh_chunk_overlap_mm": -0.1}, r"Invalid config: sfmesh_chunk_overlap_mm >= 0"),
         ({"stl_quality": "ultra"}, r"Invalid config: stl_quality in \{fast, balanced, high_quality\} or empty"),
-        ({"fsm_qfn_min_slot_width_mm": 0}, r"Invalid config: fsm_qfn_min_slot_width_mm > 0"),
-        ({"fsm_qfn_min_slot_gap_mm": -0.1}, r"Invalid config: fsm_qfn_min_slot_gap_mm >= 0"),
-        ({"fsm_qfn_min_slot_length_mm": 0}, r"Invalid config: fsm_qfn_min_slot_length_mm > 0"),
-        ({"fsm_qfn_max_pins_per_slot": 1}, r"Invalid config: fsm_qfn_max_pins_per_slot >= 2"),
-        ({"fsm_qfn_target_volume_ratio": 0}, r"Invalid config: fsm_qfn_target_volume_ratio > 0"),
+        ({"fdm_qfn_min_slot_width_mm": 0}, r"Invalid config: fdm_qfn_min_slot_width_mm > 0"),
+        ({"fdm_qfn_min_slot_gap_mm": -0.1}, r"Invalid config: fdm_qfn_min_slot_gap_mm >= 0"),
+        ({"fdm_qfn_min_slot_length_mm": 0}, r"Invalid config: fdm_qfn_min_slot_length_mm > 0"),
+        ({"fdm_qfn_max_pins_per_slot": 1}, r"Invalid config: fdm_qfn_max_pins_per_slot >= 2"),
+        ({"fdm_qfn_target_volume_ratio": 0}, r"Invalid config: fdm_qfn_target_volume_ratio > 0"),
         ({"locator_open_side": "middle"}, r"Invalid config: locator_open_side in \{none, top, right, bottom, left\}"),
     ],
 )
