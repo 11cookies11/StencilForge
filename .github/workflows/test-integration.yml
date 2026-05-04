@@ -7,6 +7,9 @@ name: Integration Tests
 # ──────────────────────────────────────────────────────────────────────
 
 on:
+  push:
+    tags:
+      - "v*.*.*"
   schedule:
     - cron: "23 2 * * *"   # 2:23 AM UTC daily
   workflow_dispatch:        # manual trigger from GitHub UI

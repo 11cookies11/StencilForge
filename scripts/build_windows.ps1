@@ -46,7 +46,7 @@ $python = Join-Path $venvPath "Scripts\python.exe"
 
 Push-Location ui-vue
 if (!(Test-Path node_modules)) {
-  Invoke-Logged { npm install } "== Build UI: npm install =="
+  Invoke-Logged { npm ci } "== Build UI: npm ci =="
 }
 Invoke-Logged { npm run build } "== Build UI: npm run build =="
 Pop-Location

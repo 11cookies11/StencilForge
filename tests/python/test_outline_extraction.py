@@ -12,6 +12,8 @@ from stencilforge.geometry.outline import OutlineBuilder
 from stencilforge.geometry.service import _legacy_open_mode_compat
 from gerber import load_layer
 
+pytestmark = pytest.mark.integration
+
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "gerber"
 
