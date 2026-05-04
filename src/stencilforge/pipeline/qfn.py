@@ -56,6 +56,9 @@ def regenerate_qfn_paste(geometry, config: StencilConfig):
         return geometry
     logger.info("QFN detect: pads=%s score=%.2f", len(qfn["pads"]), score)
     if config.printer_profile == "fsm" and config.fsm_qfn_grouped_slots_enabled:
+        if qfn.get("center_pad") is None:
+            logger.info("FSM QFN grouped slots skipped: no center thermal pad detected")
+            return geometry
         regenerated = _regenerate_fsm_qfn_geometry(qfn, polys, config)
     else:
         regenerated = _regenerate_qfn_geometry(qfn, polys, config)

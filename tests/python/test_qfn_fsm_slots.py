@@ -35,6 +35,18 @@ def _qfn_fixture_with_distractors():
     return unary_union(pads)
 
 
+def _qfn_like_fixture_without_center_pad():
+    pads = []
+    coords = [-3.0, -2.2, -1.4, -0.6, 0.6, 1.4, 2.2, 3.0]
+    for x in coords:
+        pads.append(box(x - 0.10, 3.0 - 0.25, x + 0.10, 3.0 + 0.25))
+        pads.append(box(x - 0.10, -3.0 - 0.25, x + 0.10, -3.0 + 0.25))
+    for y in coords:
+        pads.append(box(3.0 - 0.25, y - 0.10, 3.0 + 0.25, y + 0.10))
+        pads.append(box(-3.0 - 0.25, y - 0.10, -3.0 + 0.25, y + 0.10))
+    return unary_union(pads)
+
+
 def _outer_qfn_slot_segments(polygons):
     return [
         p for p in polygons
@@ -130,3 +142,19 @@ def test_fsm_qfn_detection_ignores_nearby_distractor_pads() -> None:
 
     assert len(polygons) < len(flatten_to_polygons(original))
     assert len(grouped_slots) >= 4
+
+
+def test_fsm_qfn_grouped_slots_requires_center_pad() -> None:
+    original = _qfn_like_fixture_without_center_pad()
+    cfg = StencilConfig.from_dict(
+        {
+            "printer_profile": "fsm",
+            "qfn_confidence_threshold": 0.6,
+            "fsm_qfn_min_slot_width_mm": 0.4,
+            "fsm_qfn_min_slot_gap_mm": 0.4,
+        }
+    )
+
+    regenerated = regenerate_qfn_paste(original, cfg)
+
+    assert regenerated.equals(original)
