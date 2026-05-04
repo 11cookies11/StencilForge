@@ -35,6 +35,16 @@ def _qfn_fixture_with_distractors():
     return unary_union(pads)
 
 
+def _outer_qfn_slot_segments(polygons):
+    return [
+        p for p in polygons
+        if max(abs(p.centroid.x), abs(p.centroid.y)) > 2.0
+        and min(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1]) >= 0.39
+        and max(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1]) >= 0.79
+        and p.area < 2.0
+    ]
+
+
 def test_fsm_qfn_grouped_slots_replace_thin_pins() -> None:
     original = _qfn_fixture()
     cfg = StencilConfig.from_dict(
@@ -52,14 +62,32 @@ def test_fsm_qfn_grouped_slots_replace_thin_pins() -> None:
     regenerated = regenerate_qfn_paste(original, cfg)
     polygons = flatten_to_polygons(regenerated)
     small_pins = [p for p in polygons if p.area == pytest.approx(0.10)]
-    grouped_slots = [
-        p for p in polygons
-        if min(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1]) >= 0.39
-        and max(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1]) >= 0.79
-        and p.area < 2.0
-    ]
+    grouped_segments = _outer_qfn_slot_segments(polygons)
 
     assert len(small_pins) == 0
+    assert len(grouped_segments) >= 4
+    assert sum(p.area for p in grouped_segments) >= 16 * 0.10
+
+
+def test_fsm_qfn_grouped_slots_can_disable_support_bridges() -> None:
+    original = _qfn_fixture()
+    cfg = StencilConfig.from_dict(
+        {
+            "printer_profile": "fsm",
+            "qfn_confidence_threshold": 0.6,
+            "fsm_qfn_min_slot_width_mm": 0.4,
+            "fsm_qfn_min_slot_gap_mm": 0.4,
+            "fsm_qfn_min_slot_length_mm": 0.8,
+            "fsm_qfn_max_pins_per_slot": 4,
+            "fsm_qfn_target_volume_ratio": 1.0,
+            "fsm_qfn_bridge_enabled": False,
+        }
+    )
+
+    regenerated = regenerate_qfn_paste(original, cfg)
+    polygons = flatten_to_polygons(regenerated)
+    grouped_slots = _outer_qfn_slot_segments(polygons)
+
     assert len(grouped_slots) == 4
     assert sum(p.area for p in grouped_slots) >= 16 * 0.10
 

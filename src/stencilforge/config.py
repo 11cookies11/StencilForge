@@ -71,6 +71,8 @@ class StencilConfig:
     fsm_qfn_min_slot_length_mm: float
     fsm_qfn_max_pins_per_slot: int
     fsm_qfn_target_volume_ratio: float
+    fsm_qfn_bridge_enabled: bool
+    fsm_qfn_bridge_width_mm: float
     outline_fill_rule: str
     outline_close_strategy: str
     outline_merge_tol_mm: float
@@ -191,6 +193,8 @@ class StencilConfig:
         fsm_qfn_min_slot_length_mm = float(data.get("fsm_qfn_min_slot_length_mm", 0.8))
         fsm_qfn_max_pins_per_slot = int(data.get("fsm_qfn_max_pins_per_slot", 4))
         fsm_qfn_target_volume_ratio = float(data.get("fsm_qfn_target_volume_ratio", 1.0))
+        fsm_qfn_bridge_enabled = bool(data.get("fsm_qfn_bridge_enabled", True))
+        fsm_qfn_bridge_width_mm = float(data.get("fsm_qfn_bridge_width_mm", 0.9))
         outline_fill_rule = str(data.get("outline_fill_rule", "evenodd"))
         outline_close_strategy = str(data.get("outline_close_strategy", "robust_polygonize"))
         outline_merge_tol_mm = float(data.get("outline_merge_tol_mm", 0.01))
@@ -257,6 +261,8 @@ class StencilConfig:
             fsm_qfn_min_slot_length_mm=fsm_qfn_min_slot_length_mm,
             fsm_qfn_max_pins_per_slot=fsm_qfn_max_pins_per_slot,
             fsm_qfn_target_volume_ratio=fsm_qfn_target_volume_ratio,
+            fsm_qfn_bridge_enabled=fsm_qfn_bridge_enabled,
+            fsm_qfn_bridge_width_mm=fsm_qfn_bridge_width_mm,
             outline_fill_rule=outline_fill_rule,
             outline_close_strategy=outline_close_strategy,
             outline_merge_tol_mm=outline_merge_tol_mm,
@@ -306,6 +312,7 @@ StencilConfig._RULES = [
     ("fsm_qfn_min_slot_length_mm > 0", lambda s: s.fsm_qfn_min_slot_length_mm > 0),
     ("fsm_qfn_max_pins_per_slot >= 2", lambda s: s.fsm_qfn_max_pins_per_slot >= 2),
     ("fsm_qfn_target_volume_ratio > 0", lambda s: s.fsm_qfn_target_volume_ratio > 0),
+    ("fsm_qfn_bridge_width_mm > 0", lambda s: s.fsm_qfn_bridge_width_mm > 0),
     ("output_mode in {holes_only, solid_with_cutouts}", lambda s: s.output_mode in {"holes_only", "solid_with_cutouts"}),
     ("model_backend in {trimesh, cadquery}", lambda s: s.model_backend in {"trimesh", "cadquery"}),
     ("sfmesh_quality_mode in {fast, auto, watertight}", lambda s: s.sfmesh_quality_mode in {"fast", "auto", "watertight"}),
