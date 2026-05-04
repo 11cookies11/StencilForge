@@ -136,30 +136,9 @@ jobs:
             $zip.Dispose()
           }
 
-      - name: Install Inno Setup
-        run: choco install innosetup -y
-
-      - name: Build installer
-        shell: pwsh
-        run: |
-          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*" -Recurse -Filter ISCC.exe |
-            Sort-Object FullName -Descending |
-            Select-Object -First 1
-          if (-not $iscc) {
-            $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-          }
-          if (-not $iscc) {
-            throw "ISCC.exe not found. Install Inno Setup and ensure it is on PATH."
-          }
-          $isccPath = ($iscc.FullName, $iscc.Source, $iscc.Path | Where-Object { $_ } | Select-Object -First 1)
-          if (-not $isccPath) { throw "Cannot resolve ISCC.exe path." }
-          Write-Host "Using ISCC: $isccPath"
-          & $isccPath "packaging\installer.iss"
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            dist-installer/StencilForge-Setup.exe
             dist-msix/*.msix
