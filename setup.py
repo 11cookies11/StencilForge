@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="stencilforge",
-    version="0.1.0",
+    version="0.5.0",
     description="Fast PCB stencil model generator (Gerber -> STL)",
     package_dir={"": "src"},
     packages=find_packages("src"),
