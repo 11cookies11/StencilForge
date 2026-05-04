@@ -9,6 +9,7 @@ from pathlib import Path
 from shapely.ops import unary_union
 from shapely.geometry import Polygon
 
+from ..i18n import text as _text
 from ..config import StencilConfig
 from .geometry import as_polygon_list, ensure_valid, orient_geometry, solidify_geometry
 
@@ -21,6 +22,7 @@ def export_cadquery_stl(
     locator_step_geom,
     output_path: Path,
     config: StencilConfig,
+    locale: str | None = None,
 ) -> None:
     # CadQuery 在处理复杂孔洞时更稳，但依赖安装
     try:
@@ -80,7 +82,7 @@ def export_cadquery_stl(
             solids.append(solid)
 
     if not solids:
-        raise ValueError("Failed to create CadQuery solids from geometry.")
+        raise ValueError(_text(locale, "pipeline.error_cadquery_solids"))
 
     logger.info(
         "CadQuery solids: base=%s locator=%s step=%s total=%s",
@@ -116,7 +118,7 @@ def export_cadquery_stl(
         size = 0
     logger.info("STL size: %s bytes", size)
     if size <= 0:
-        raise ValueError("Exported STL file is empty.")
+        raise ValueError(_text(locale, "pipeline.error_empty_stl"))
 
 
 def _geometry_complexity(geometry) -> dict[str, object]:

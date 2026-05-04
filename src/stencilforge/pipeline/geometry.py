@@ -10,6 +10,8 @@ from shapely.geometry import MultiPolygon, Polygon
 from shapely.geometry.polygon import orient
 from shapely.ops import triangulate, unary_union
 
+from ..i18n import text as _text
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,7 +31,7 @@ def as_polygon_list(geometry) -> list[Polygon]:
     return []
 
 
-def extrude_geometry(geometry, thickness_mm: float):
+def extrude_geometry(geometry, thickness_mm: float, locale=None):
     geometry = ensure_valid(geometry)
     geometry = orient_geometry(geometry)
     geometry = solidify_geometry(geometry)
@@ -38,14 +40,14 @@ def extrude_geometry(geometry, thickness_mm: float):
     for poly in as_polygon_list(geometry):
         poly = ensure_valid(poly)
         if poly.area > 0:
-            meshes.append(extrude_polygon_solid(poly, thickness_mm))
+            meshes.append(extrude_polygon_solid(poly, thickness_mm, locale=locale))
 
     if not meshes:
-        raise ValueError("Failed to create STL mesh from geometry.")
+        raise ValueError(_text(locale, "pipeline.error_mesh_creation"))
 
     mesh = trimesh.util.concatenate(meshes)
     if mesh.is_empty or mesh.faces.size == 0:
-        raise ValueError("Failed to create non-empty STL mesh from geometry.")
+        raise ValueError(_text(locale, "pipeline.error_empty_mesh_from_geometry"))
     return mesh
 
 
@@ -85,7 +87,7 @@ def count_polygons(geometry) -> int:
     return 0
 
 
-def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
+def extrude_polygon_solid(poly, thickness_mm: float, locale=None) -> trimesh.Trimesh:
     triangles, coverage = _triangulate_polygon_robust(poly)
     if coverage < 0.995:
         logger.warning(
@@ -100,7 +102,7 @@ def extrude_polygon_solid(poly, thickness_mm: float) -> trimesh.Trimesh:
             logger.warning("Earcut fallback failed: %s", exc)
 
     if not triangles:
-        raise ValueError("Triangulation failed for polygon.")
+        raise ValueError(_text(locale, "pipeline.error_triangulation"))
 
     vertices = []
     faces = []

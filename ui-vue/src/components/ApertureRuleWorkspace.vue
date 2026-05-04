@@ -138,7 +138,7 @@
                   {{ t("config.apertureSummaryThickness") }}
                 </div>
                 <div class="mt-2 flex items-center justify-between gap-3">
-                  <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ thicknessValue.toFixed(2) }} <span class="text-xs font-medium text-slate-500">mm</span></div>
+                  <div class="whitespace-nowrap text-base font-semibold text-slate-900">{{ thicknessValue.toFixed(2) }} <span class="text-xs font-medium text-slate-500">{{ t("unit.mm") }}</span></div>
                 </div>
                 <div class="absolute right-2 top-2 z-30">
                   <HelpTooltip :text="t('config.apertureSummaryThicknessHint')" variant="blue" />
@@ -675,7 +675,7 @@ export default {
   data() {
     return {
       studioTab: "basic",
-      profileName: "Balanced default",
+      profileName: "",
       transferRatio: 0.88,
       strategy: "balanced",
       minApertureMm: 0.1,
@@ -698,6 +698,7 @@ export default {
     };
   },
   mounted() {
+    if (!this.profileName) this.profileName = this.t("config.apertureDefaultProfileName");
     this.connectWorkspaceBackend(this.backend);
   },
   beforeUnmount() {
@@ -747,7 +748,7 @@ export default {
       return Number.isFinite(value) && value > 0 ? value : 0.12;
     },
     thicknessLabel() {
-      return `${this.thicknessValue.toFixed(2)} mm`;
+      return this.t("format.delta", { sign: "", value: this.thicknessValue.toFixed(2) });
     },
     currentThicknessFactor() {
       const backendValue = this.workspaceSnapshot?.currentThicknessFactor;
@@ -881,18 +882,18 @@ export default {
     packageOptions() {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
-        { value: "QFN", label: "QFN" },
+        { value: "QFN", label: this.t("config.aperturePackageQfn") },
         { value: "BGA", label: this.t("config.aperturePadTypeBga") },
         { value: "Power", label: this.t("config.aperturePackagePower") },
-        { value: "IC", label: "IC" },
+        { value: "IC", label: this.t("config.aperturePackageIc") },
       ];
     },
     packageTypeOptions() {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
-        { value: "QFN", label: "QFN" },
-        { value: "BGA", label: "BGA" },
-        { value: "IC", label: "IC" },
+        { value: "QFN", label: this.t("config.aperturePackageQfn") },
+        { value: "BGA", label: this.t("config.aperturePadTypeBga") },
+        { value: "IC", label: this.t("config.aperturePackageIc") },
         { value: "Power", label: this.t("config.aperturePackagePower") },
       ];
     },
@@ -900,7 +901,7 @@ export default {
       return [
         { value: "Any", label: this.t("config.apertureAny") },
         { value: "SMD", label: this.t("config.aperturePadTypeSmd") },
-        { value: "BGA", label: "BGA" },
+        { value: "BGA", label: this.t("config.aperturePadTypeBga") },
         { value: "Thermal", label: this.t("config.aperturePadTypeThermal") },
         { value: "THT", label: this.t("config.aperturePadTypeTht") },
       ];
@@ -922,9 +923,12 @@ export default {
       const backendValue = this.workspaceSnapshot?.generatedRulePreview;
       if (backendValue) return backendValue;
       const delta = Number.isFinite(this.recommendedDeltaMm) ? this.recommendedDeltaMm.toFixed(3) : "0.000";
-      return `match: { package: "${this.packageType}", padType: "${this.padType}" }
-action: { deltaMm: ${delta}, scale: ${this.recommendedScale.toFixed(3)} }
-priority: 100`;
+      const matchLabel = this.t("config.aperturePreviewMatchLabel");
+      const actionLabel = this.t("config.aperturePreviewActionLabel");
+      const priorityLabel = this.t("config.aperturePreviewPriorityLabel");
+      return `${matchLabel} { package: "${this.packageType}", padType: "${this.padType}" }
+${actionLabel} { deltaMm: ${delta}, scale: ${this.recommendedScale.toFixed(3)} }
+${priorityLabel} 100`;
     },
     strategyKey() {
       const backendValue = this.workspaceSnapshot?.strategy;
@@ -1037,24 +1041,25 @@ priority: 100`;
     },
     formatVolume(value) {
       const next = Number(value);
-      return `${(Number.isFinite(next) ? next : 0).toFixed(3)} mm³`;
+      return this.t("format.volume", { value: (Number.isFinite(next) ? next : 0).toFixed(3) });
     },
     formatArea(value) {
       const next = Number(value);
-      return `${(Number.isFinite(next) ? next : 0).toFixed(3)} mm²`;
+      return this.t("format.area", { value: (Number.isFinite(next) ? next : 0).toFixed(3) });
     },
     formatScale(value) {
       const next = Number(value);
-      return `x ${(Number.isFinite(next) ? next : 1).toFixed(3)}`;
+      return this.t("format.scale", { value: (Number.isFinite(next) ? next : 1).toFixed(3) });
     },
     formatDelta(value) {
       const next = Number(value);
       const normalized = Number.isFinite(next) ? next : 0;
-      return `${normalized >= 0 ? "+" : ""}${normalized.toFixed(3)} mm`;
+      const sign = normalized >= 0 ? "+" : "";
+      return this.t("format.delta", { sign, value: normalized.toFixed(3) });
     },
     percentLabel(value) {
       const next = Number(value);
-      return `${((Number.isFinite(next) ? next : 0) * 100).toFixed(0)}%`;
+      return this.t("format.percent", { value: ((Number.isFinite(next) ? next : 0) * 100).toFixed(0) });
     },
     solveDeltaForRectangle(width, height, targetArea) {
       const w = Number(width);
@@ -1162,7 +1167,7 @@ priority: 100`;
         name: this.t("config.apertureNewRule"),
         enabled: true,
         priority: 50,
-        match: { package: "Any", padType: "Any", padSize: "0.20-0.80 mm" },
+        match: { package: "Any", padType: "Any", padSize: this.t("config.aperturePadSizeDefault") },
         action: { mode: "scale", deltaMm: 0.0, scale: 1.0 },
         note: "",
       };

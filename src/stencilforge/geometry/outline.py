@@ -19,6 +19,7 @@ from shapely.strtree import STRtree
 from shapely.ops import linemerge, polygonize, unary_union
 
 from ..config import StencilConfig
+from ..i18n import text as _text
 from .primitives import PrimitiveGeometryBuilder, _region_to_shape
 
 logger = logging.getLogger(__name__)
@@ -45,9 +46,10 @@ class RobustOutlineConfig:
 
 
 class RobustOutlineExtractor:
-    def __init__(self, cfg: RobustOutlineConfig, primitive_builder: PrimitiveGeometryBuilder) -> None:
+    def __init__(self, cfg: RobustOutlineConfig, primitive_builder: PrimitiveGeometryBuilder, locale: str | None = None) -> None:
         self.cfg = cfg
         self._primitive_builder = primitive_builder
+        self._locale = locale
         self.debug: Dict[str, Any] = {}
 
     def extract(self, primitives) -> Polygon:
@@ -146,10 +148,10 @@ class RobustOutlineExtractor:
 
     def _discretize_arc(self, arc: gprim.Arc) -> list[Point2D]:
         if arc.center is None or arc.radius is None:
-            raise ValueError("R-arc not supported: missing arc center or radius")
+            raise ValueError(_text(self._locale, "pipeline.error_arc_no_center"))
         radius = float(arc.radius)
         if radius <= 0:
-            raise ValueError("Arc radius must be > 0")
+            raise ValueError(_text(self._locale, "pipeline.error_arc_radius"))
         start = float(arc.start_angle)
         end = float(arc.end_angle)
         if arc.direction == "counterclockwise":
@@ -350,10 +352,15 @@ class RobustOutlineExtractor:
         return []
 
     def _format_error(self, reason: str) -> str:
-        return (
-            f"robust outline failed: {reason}; eps_mm={self.cfg.eps_mm} "
-            f"arc_err={self.cfg.arc_max_chord_error_mm} raw={self.debug.get('raw_segments_count')} "
-            f"deduped={self.debug.get('deduped_segments_count')} fallback={self.cfg.use_buffer_fallback}"
+        return _text(
+            self._locale,
+            "pipeline.error_outline_failed",
+            reason=reason,
+            eps=self.cfg.eps_mm,
+            arc_err=self.cfg.arc_max_chord_error_mm,
+            raw=self.debug.get("raw_segments_count"),
+            deduped=self.debug.get("deduped_segments_count"),
+            fallback=self.cfg.use_buffer_fallback,
         )
 
 
@@ -805,7 +812,7 @@ def _cli() -> int:
 
     path = Path(args.input)
     if not path.exists():
-        raise SystemExit(f"input not found: {path}")
+        raise SystemExit(_text(None, "pipeline.error_input_not_found", path=path))
 
     config = StencilConfig.from_dict({"outline_close_strategy": args.strategy})
     layer = load_layer(str(path))

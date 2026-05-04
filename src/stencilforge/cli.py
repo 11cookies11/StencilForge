@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,16 +14,24 @@ from .aperture_workspace import (
     validate_aperture_workspace_payload,
 )
 from .config import StencilConfig
+from .i18n import normalize_locale, text as _text
 from .pipeline import generate_stencil
 from .pipeline.core import _find_files
 
-def _bool(value: str) -> bool:
+
+def _t(locale: str, key: str, **kwargs) -> str:
+    return _text(locale, key, **kwargs)
+
+
+def _bool(value: str, locale: str | None = None) -> bool:
     """Parse a boolean string for argparse."""
     lowered = value.lower()
     if lowered in ("true", "1", "yes", "on"):
         return True
     if lowered in ("false", "0", "no", "off"):
         return False
+    if locale:
+        raise argparse.ArgumentTypeError(_t(locale, "cli.err_expected_bool", value=value))
     raise argparse.ArgumentTypeError(f"Expected boolean, got {value!r}")
 
 
@@ -105,6 +114,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Fast PCB stencil model generator (Gerber -> STL).",
     )
     sub = parser.add_subparsers(dest="command", title="subcommands")
+
+    parser.add_argument("--locale", default=None, help="Locale for output messages (default: STENCILFORGE_LOCALE env or en)")
 
     # ── generate ──────────────────────────────────────────────────
     gen = sub.add_parser("generate", help="Generate STL from Gerber files")
@@ -207,78 +218,78 @@ def _build_config_from_args(args: argparse.Namespace) -> StencilConfig:
     return StencilConfig.from_dict(merged)
 
 
-def _load_aperture_rules(path: Path | None) -> dict | None:
+def _load_aperture_rules(path: Path | None, locale: str) -> dict | None:
     """Load and validate aperture rules JSON from a file path."""
     if path is None:
         return None
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Failed to read aperture rules file: {exc}") from exc
+        raise SystemExit(_t(locale, "cli.error_rules_read_failed", exc=exc)) from exc
     result = validate_aperture_workspace_payload(raw)
     if not result["ok"]:
         issues = "\n".join(result["issues"])
-        raise SystemExit(f"Invalid aperture rules:\n{issues}")
+        raise SystemExit(_t(locale, "cli.error_rules_invalid", issues=issues))
     return normalize_aperture_workspace(result.get("workspace", raw))
 
 
-def _handle_generate(args: argparse.Namespace) -> int:
+def _handle_generate(args: argparse.Namespace, locale: str) -> int:
     input_dir: Path = args.input_dir
     output_stl: Path = args.output_stl
 
     if not input_dir.exists():
-        print(f"Error: input path does not exist: {input_dir}", file=sys.stderr)
+        print(_t(locale, "cli.error_input_not_found", path=input_dir), file=sys.stderr)
         return 1
 
     config = _build_config_from_args(args)
     try:
         config.validate()
     except ValueError as exc:
-        print(f"Error: invalid config — {exc}", file=sys.stderr)
+        print(_t(locale, "cli.error_invalid_config", exc=exc), file=sys.stderr)
         return 1
 
-    aperture_workspace = _load_aperture_rules(getattr(args, "aperture_rules", None))
+    aperture_workspace = _load_aperture_rules(getattr(args, "aperture_rules", None), locale)
     verbose: bool = getattr(args, "verbose", False)
 
     if verbose:
-        print(f"Input:        {input_dir}")
-        print(f"Output:       {output_stl}")
-        print(f"Backend:      {config.model_backend}")
-        print(f"Output mode:  {config.output_mode}")
+        print(_t(locale, "cli.verbose_input", value=input_dir))
+        print(_t(locale, "cli.verbose_output", value=output_stl))
+        print(_t(locale, "cli.verbose_backend", value=config.model_backend))
+        print(_t(locale, "cli.verbose_output_mode", value=config.output_mode))
         if config.thickness_managed_by_printer_profile:
-            print(f"Thickness:    {config.effective_thickness_mm} mm (FSM managed; user {config.thickness_mm} mm ignored)")
+            print(_t(locale, "cli.verbose_thickness_fsm", value=config.effective_thickness_mm, user=config.thickness_mm))
         else:
-            print(f"Thickness:    {config.thickness_mm} mm")
+            print(_t(locale, "cli.verbose_thickness", value=config.thickness_mm))
         if aperture_workspace:
             profile = aperture_workspace.get("profileName", "(unnamed)")
-            print(f"Aperture:     {profile}")
-        print("Generating...")
+            print(_t(locale, "cli.verbose_aperture", value=profile))
+        print(_t(locale, "cli.verbose_generating"))
 
     try:
         result = generate_stencil(input_dir, output_stl, config, aperture_workspace)
     except Exception as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        print(_t(locale, "cli.error_generic", exc=exc), file=sys.stderr)
         return 1
 
     if output_stl.exists():
         size_kb = output_stl.stat().st_size / 1024
         if verbose:
-            print(f"Done: {output_stl} ({size_kb:.1f} KB)")
+            print(_t(locale, "cli.done_stl", path=output_stl, size=size_kb))
         else:
             print(str(output_stl))
         if result and verbose:
             import pprint
             pprint.pprint(result)
     else:
-        print(f"Error: STL was not created at {output_stl}", file=sys.stderr)
+        print(_t(locale, "cli.error_stl_not_created", path=output_stl), file=sys.stderr)
         return 1
     return 0
 
 
-def _handle_scan(args: argparse.Namespace) -> int:
+def _handle_scan(args: argparse.Namespace, locale: str) -> int:
     input_dir: Path = args.input_dir
     if not input_dir.exists():
-        print(f"Error: input path does not exist: {input_dir}", file=sys.stderr)
+        print(_t(locale, "cli.error_input_not_found", path=input_dir), file=sys.stderr)
         return 1
 
     config = _build_config_from_args(args)
@@ -288,19 +299,19 @@ def _handle_scan(args: argparse.Namespace) -> int:
         ("drill", config.drill_patterns),
     ]:
         files = _find_files(input_dir, patterns)
-        print(f"[{category}] ({len(files)} files):")
+        print(_t(locale, "cli.scan_category", category=category, count=len(files)))
         for f in files:
             try:
                 print(f"  {f.relative_to(input_dir)}")
             except UnicodeEncodeError:
                 print(f"  {f.name}")
         if not files:
-            print("  (none)")
+            print(_t(locale, "cli.scan_none"))
         print()
     return 0
 
 
-def _handle_validate(args: argparse.Namespace) -> int:
+def _handle_validate(args: argparse.Namespace, locale: str) -> int:
     config_path: Path | None = getattr(args, "config", None)
     if config_path is None:
         config_path = StencilConfig.default_path(Path.cwd())
@@ -308,16 +319,16 @@ def _handle_validate(args: argparse.Namespace) -> int:
         config = StencilConfig.from_json(config_path)
         config.validate()
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"Error: cannot read config — {exc}", file=sys.stderr)
+        print(_t(locale, "cli.error_cannot_read_config", exc=exc), file=sys.stderr)
         return 1
     except ValueError as exc:
-        print(f"Invalid config: {exc}", file=sys.stderr)
+        print(_t(locale, "cli.error_invalid_config_detail", exc=exc), file=sys.stderr)
         return 1
-    print("Config OK")
+    print(_t(locale, "cli.config_ok"))
     return 0
 
 
-def _handle_dump_config(args: argparse.Namespace) -> int:  # noqa: ARG001
+def _handle_dump_config(args: argparse.Namespace, locale: str) -> int:  # noqa: ARG001
     config = StencilConfig.from_dict({})
     print(json.dumps(config.to_dict(), indent=2, ensure_ascii=False))
     return 0
@@ -344,15 +355,17 @@ def main() -> int:
     fixed_args = _guess_command(raw_args)
     args = parser.parse_args(fixed_args)
 
+    locale = normalize_locale(getattr(args, "locale", None) or os.environ.get("STENCILFORGE_LOCALE") or "en")
+
     cmd = args.command
     if cmd == "generate":
-        return _handle_generate(args)
+        return _handle_generate(args, locale)
     if cmd == "scan":
-        return _handle_scan(args)
+        return _handle_scan(args, locale)
     if cmd == "validate":
-        return _handle_validate(args)
+        return _handle_validate(args, locale)
     if cmd == "dump-default-config":
-        return _handle_dump_config(args)
+        return _handle_dump_config(args, locale)
 
     parser.print_help()
     return 1

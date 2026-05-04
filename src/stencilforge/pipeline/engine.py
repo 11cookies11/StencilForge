@@ -11,6 +11,7 @@ from shapely.geometry import MultiPolygon, Polygon
 from shapely import constrained_delaunay_triangles
 from shapely.ops import unary_union
 
+from ..i18n import text as _text
 from ..config import StencilConfig
 from .cadquery import export_cadquery_stl
 from .geometry import as_polygon_list, ensure_valid, extrude_geometry, orient_geometry
@@ -34,6 +35,7 @@ class EngineExportInput:
     locator_step_geom: object
     output_path: object
     config: StencilConfig
+    locale: str | None = None
 
 
 class ModelEngine(Protocol):
@@ -53,6 +55,7 @@ class CadQueryEngine:
             data.locator_step_geom,
             data.output_path,
             data.config,
+            locale=data.locale,
         )
 
 
@@ -70,7 +73,7 @@ class TrimeshEngine:
         mesh = _attach_locator_mesh(mesh, data.locator_geom, data.locator_step_geom,
                                     extrude_geometry, cfg)
         _finalize_mesh(mesh)
-        _export_and_validate_stl(mesh, data.output_path, file_type="stl_ascii")
+        _export_and_validate_stl(mesh, data.output_path, file_type="stl_ascii", locale=data.locale)
 
 
 class SfMeshEngine:
@@ -82,11 +85,11 @@ class SfMeshEngine:
 
         t0 = time.perf_counter()
         base_geom = _prepare_sfmesh_geometry(data.stencil_2d, cfg, preserve_holes=True)
-        mesh = _extrude_with_cdt(base_geom, base_thickness)
+        mesh = _extrude_with_cdt(base_geom, base_thickness, locale=data.locale)
         logger.info("sfmesh base extrusion in %.3fs", time.perf_counter() - t0)
 
         def _cdt_extrude(g, h):
-            return _extrude_with_cdt(_prepare_sfmesh_geometry(g, cfg, preserve_holes=False), h)
+            return _extrude_with_cdt(_prepare_sfmesh_geometry(g, cfg, preserve_holes=False), h, locale=data.locale)
 
         mesh = _attach_locator_mesh(mesh, data.locator_geom, data.locator_step_geom,
                                     _cdt_extrude, cfg, tag="sfmesh")
@@ -114,7 +117,7 @@ class SfMeshEngine:
 
         _finalize_mesh(mesh)
         _repair_mesh_topology(mesh)
-        _export_and_validate_stl(mesh, data.output_path, file_type="stl")
+        _export_and_validate_stl(mesh, data.output_path, file_type="stl", locale=data.locale)
 
 
 # --- shared engine helpers ---
@@ -158,11 +161,11 @@ def _finalize_mesh(mesh):
         logger.warning("Mesh translation failed: %s", exc)
 
 
-def _export_and_validate_stl(mesh, output_path, file_type="stl_ascii"):
+def _export_and_validate_stl(mesh, output_path, file_type="stl_ascii", locale=None):
     """Write STL to disk and perform basic validation checks."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if mesh.is_empty or mesh.faces.size == 0:
-        raise ValueError("Generated mesh is empty; check outline/paste geometry.")
+        raise ValueError(_text(locale, "pipeline.error_empty_mesh"))
 
     watertight = getattr(mesh, "is_watertight", None)
     euler = getattr(mesh, "euler_number", None)
@@ -178,7 +181,7 @@ def _export_and_validate_stl(mesh, output_path, file_type="stl_ascii"):
         size = 0
     logger.info("STL size: %s bytes", size)
     if size <= 0:
-        raise ValueError("Exported STL file is empty.")
+        raise ValueError(_text(locale, "pipeline.error_empty_stl"))
 
     try:
         t0 = time.perf_counter()
@@ -188,9 +191,9 @@ def _export_and_validate_stl(mesh, output_path, file_type="stl_ascii"):
         logger.info("STL reload check in %.3fs", time.perf_counter() - t0)
         logger.info("STL check: faces=%s", face_count)
         if face_count == 0:
-            raise ValueError("Exported STL has no faces; check geometry.")
+            raise ValueError(_text(locale, "pipeline.error_stl_no_faces"))
     except Exception as exc:
-        raise ValueError(f"Failed to validate exported STL: {exc}") from exc
+        raise ValueError(_text(locale, "pipeline.error_stl_validation", exc=exc)) from exc
 
     logger.info("STL export complete")
 
@@ -202,7 +205,7 @@ _ENGINES: dict[str, ModelEngine] = {
 }
 
 
-def get_model_engine(name: str) -> ModelEngine:
+def get_model_engine(name: str, locale=None) -> ModelEngine:
     key = (name or "").strip().lower()
     if key == "sfmesh":
         logger.warning("Backend 'sfmesh' is deprecated and mapped to 'trimesh'.")
@@ -210,15 +213,15 @@ def get_model_engine(name: str) -> ModelEngine:
     engine = _ENGINES.get(key)
     if engine is None:
         supported = ", ".join(sorted(_ENGINES.keys()))
-        raise ValueError(f"Unsupported model backend '{name}'. Supported: {supported}")
+        raise ValueError(_text(locale, "pipeline.error_unsupported_backend", name=name, supported=supported))
     return engine
 
 
-def _extrude_with_cdt(geometry, thickness_mm: float) -> trimesh.Trimesh:
+def _extrude_with_cdt(geometry, thickness_mm: float, locale=None) -> trimesh.Trimesh:
     geometry = ensure_valid(geometry)
     geometry = orient_geometry(geometry)
     if geometry.is_empty:
-        raise ValueError("Geometry is empty after preprocessing.")
+        raise ValueError(_text(locale, "pipeline.error_geometry_empty"))
 
     polygons = as_polygon_list(geometry)
 
@@ -230,10 +233,10 @@ def _extrude_with_cdt(geometry, thickness_mm: float) -> trimesh.Trimesh:
         meshes.append(_extrude_polygon_with_cdt(poly, thickness_mm))
 
     if not meshes:
-        raise ValueError("Failed to create STL mesh from geometry.")
+        raise ValueError(_text(locale, "pipeline.error_mesh_creation"))
     mesh = trimesh.util.concatenate(meshes)
     if mesh.is_empty or mesh.faces.size == 0:
-        raise ValueError("Failed to create non-empty STL mesh from geometry.")
+        raise ValueError(_text(locale, "pipeline.error_empty_mesh_from_geometry"))
     return mesh
 
 

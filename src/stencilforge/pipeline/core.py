@@ -13,6 +13,7 @@ from ..aperture_workspace import resolve_aperture_workspace_effect
 from ..config import StencilConfig
 from ..geometry import GerberGeometryService
 from ..geometry.service import flatten_to_polygons
+from ..i18n import text as _text
 from .engine import EngineExportInput, ModelEngine, get_model_engine
 from .geometry import count_holes
 from .locator import build_locator_bridge, build_locator_ring, build_locator_step
@@ -78,6 +79,7 @@ def generate_stencil(
     *,
     geometry_service: GerberGeometryService | None = None,
     model_engine: ModelEngine | None = None,
+    locale: str | None = None,
 ) -> dict | None:
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -102,6 +104,7 @@ def generate_stencil(
             geometry_service=geometry_service,
             model_engine=model_engine,
             aperture_workspace=aperture_workspace,
+            locale=locale,
         )
     return last_debug
 
@@ -115,6 +118,7 @@ def _generate_stencil_side(
     geometry_service: GerberGeometryService,
     model_engine: ModelEngine,
     aperture_workspace: dict | None,
+    locale: str | None = None,
 ) -> dict | None:
     logger.info("Generating stencil from %s", input_dir)
     logger.info("Output STL: %s", output_path)
@@ -152,9 +156,7 @@ def _generate_stencil_side(
     if not opening_files:
         seen = [p.name for p in sorted(input_dir.rglob("*")) if p.is_file()]
         preview = ", ".join(seen[:20]) if seen else "(no files)"
-        raise FileNotFoundError(
-            f"No solder mask or paste files found for side '{side}'. Seen: {preview}"
-        )
+        raise FileNotFoundError(_text(locale, "pipeline.error_no_mask_or_paste", side=side, preview=preview))
 
     logger.info("Opening source: %s", opening_source)
     logger.info("Opening layers: %s", ", ".join([p.name for p in opening_files]))
@@ -167,7 +169,7 @@ def _generate_stencil_side(
     logger.info("Opening geometry loaded in %.3fs", time.perf_counter() - t0)
 
     if paste_geom is None or paste_geom.is_empty:
-        raise ValueError("No pad geometry found.")
+        raise ValueError(_text(locale, "pipeline.error_no_pad_geometry"))
 
     if opening_source == "solder_mask" and config.mask_opening_scale != 1.0:
         paste_geom = scale_geometry(
@@ -202,21 +204,21 @@ def _generate_stencil_side(
         if pad_infos:
             # Per-class rule application
             _apply_per_class_aperture(
-                pad_infos, aperture_workspace, config
+                pad_infos, aperture_workspace, config, locale=locale
             )
             paste_geom = unary_union([pi.polygon for pi in pad_infos])
             logger.info("Aperture workspace applied per pad type.")
         else:
             # Global fallback: apply one rule to the entire merged geometry
             paste_geom = _apply_global_aperture(
-                paste_geom, aperture_workspace, config
+                paste_geom, aperture_workspace, config, locale=locale
             )
 
     t0 = time.perf_counter()
     paste_geom = paste_geom.buffer(config.paste_offset_mm, resolution=config.curve_resolution)
     logger.info("Paste offset geometry in %.3fs", time.perf_counter() - t0)
     if paste_geom.is_empty:
-        raise ValueError("Paste offset produced empty geometry.")
+        raise ValueError(_text(locale, "pipeline.error_paste_offset_empty"))
     logger.info("Paste offset: %s mm", config.paste_offset_mm)
 
     outline_geom = None
@@ -402,6 +404,7 @@ def _generate_stencil_side(
         model_backend=model_engine.name,
         elapsed_s=total_elapsed,
         other_side_info=other_side_info,
+        locale=locale,
     )
     _write_stencil_report(output_path, report)
     return outline_debug
@@ -411,6 +414,7 @@ def _apply_per_class_aperture(
     pad_infos,
     aperture_workspace: dict,
     config: StencilConfig,
+    locale: str | None = None,
 ) -> None:
     """Apply aperture effects per pad type, using actual polygon dimensions
     to drive the solder-volume calculator and rule engine."""
@@ -427,7 +431,7 @@ def _apply_per_class_aperture(
         ws_for_type["padAreaMm2"] = dims["padAreaMm2"]
         ws_for_type["targetVolumeMm3"] = 0.0  # let calculator derive from actual dimensions
 
-        effect_info = resolve_aperture_workspace_effect(ws_for_type, config.effective_thickness_mm)
+        effect_info = resolve_aperture_workspace_effect(ws_for_type, config.effective_thickness_mm, locale=locale)
         effect = effect_info["effect"]
         snapshot = effect_info["snapshot"]
 
@@ -502,9 +506,9 @@ def _apply_per_class_aperture(
                         )
 
 
-def _apply_global_aperture(paste_geom, aperture_workspace: dict, config: StencilConfig):
+def _apply_global_aperture(paste_geom, aperture_workspace: dict, config: StencilConfig, locale: str | None = None):
     """Apply a single workspace rule to the entire geometry (legacy path)."""
-    aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.effective_thickness_mm)
+    aperture_effect = resolve_aperture_workspace_effect(aperture_workspace, config.effective_thickness_mm, locale=locale)
     effect = aperture_effect["effect"]
     if not effect["enabled"]:
         logger.info(
@@ -620,74 +624,81 @@ def _build_stencil_report(
     model_backend: str,
     elapsed_s: float,
     other_side_info: str = "",
+    locale: str | None = None,
 ) -> str:
+    def _t(key, **kwargs):
+        return _text(locale, key, **kwargs)
+
     lines = []
-    lines.append("=" * 60)
-    lines.append("  StencilForge — Generation Report")
-    lines.append("=" * 60)
-    lines.append(f"  Input       : {input_dir}")
-    lines.append(f"  Output      : {output_path}")
-    lines.append(f"  Date        : {time.strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append("")
+    lines.append(_t("report.header"))
+    lines.append(_t("report.input", value=input_dir))
+    lines.append(_t("report.output", value=output_path))
+    lines.append(_t("report.date", value=time.strftime("%Y-%m-%d %H:%M:%S")))
+    lines.append(_t("report.blank"))
 
     # Opening info
-    lines.append("── Opening Layers ──")
-    lines.append(f"  Side         : {side}")
-    lines.append(f"  Source       : {opening_source}")
+    lines.append(_t("report.section_opening"))
+    lines.append(_t("report.side", value=side))
+    lines.append(_t("report.source", value=opening_source))
     for f in opening_files:
-        lines.append(f"  File         : {f.name} ({f.stat().st_size:,} bytes)")
+        lines.append(_t("report.file_entry", name=f.name, size=f.stat().st_size))
     if other_side_info:
-        lines.append(f"  Note         : {other_side_info}")
-    lines.append(f"  Total pads   : {sum(pad_summary.values()) if pad_summary else 'N/A'}")
+        lines.append(_t("report.note", value=other_side_info))
+    pad_total = sum(pad_summary.values()) if pad_summary else 0
     if pad_summary:
-        lines.append(f"  Breakdown    : {', '.join(f'{v} {k}' for k, v in sorted(pad_summary.items()))}")
-    lines.append(f"  Opening area : {paste_geom.area:.2f} mm² (before offset)")
+        lines.append(_t("report.total_pads", count=pad_total))
+    else:
+        lines.append(_t("report.total_pads", count=_t("report.na")))
+    if pad_summary:
+        lines.append(_t("report.breakdown", details=", ".join(f"{v} {k}" for k, v in sorted(pad_summary.items()))))
+    lines.append(_t("report.opening_area", area=paste_geom.area))
     if opening_source == "solder_mask":
-        lines.append(f"  Mask scale   : {config.mask_opening_scale:.3f}")
-    lines.append(f"  Offset       : {config.paste_offset_mm:+.2f} mm")
-    lines.append("")
+        lines.append(_t("report.mask_scale", scale=config.mask_opening_scale))
+    lines.append(_t("report.offset", offset=config.paste_offset_mm))
+    lines.append(_t("report.blank"))
 
     # Outline info
-    lines.append("── Board Outline ──")
+    lines.append(_t("report.section_outline"))
     if outline_files:
         outlines = ", ".join(f.name for f in outline_files)
-        lines.append(f"  Layer        : {outlines}")
+        lines.append(_t("report.outline_layer", layers=outlines))
     else:
-        lines.append(f"  Layer        : (none found)")
+        lines.append(_t("report.outline_layer_none"))
     if has_outline_fallback:
-        lines.append(f"  Method       : paste bounding box + margin ({config.outline_margin_mm} mm)")
+        lines.append(_t("report.outline_method_bbox", margin=config.outline_margin_mm))
     else:
-        lines.append(f"  Method       : {config.outline_close_strategy}")
+        lines.append(_t("report.outline_method", strategy=config.outline_close_strategy))
         if outline_geom is not None and not outline_geom.is_empty:
-            lines.append(f"  Area         : {outline_geom.area:.2f} mm²")
+            lines.append(_t("report.outline_area", area=outline_geom.area))
             b = outline_geom.bounds
-            lines.append(f"  Dimensions   : {b[2]-b[0]:.1f} × {b[3]-b[1]:.1f} mm")
-    lines.append("")
+            lines.append(_t("report.outline_dimensions", width=b[2] - b[0], height=b[3] - b[1]))
+    lines.append(_t("report.blank"))
 
     # Drill
-    lines.append("── Drill Holes ──")
-    lines.append(f"  Loaded       : {drill_count}")
-    lines.append("")
+    lines.append(_t("report.section_drill"))
+    lines.append(_t("report.drill_loaded", count=drill_count))
+    lines.append(_t("report.blank"))
 
     # Output
-    lines.append("── Output ──")
-    lines.append(f"  Backend      : {model_backend}")
-    lines.append(f"  Printer      : {config.printer_profile}")
-    lines.append(f"  Resolution   : arc_steps={config.arc_steps}, curve_resolution={config.curve_resolution}")
+    lines.append(_t("report.section_output"))
+    lines.append(_t("report.backend", name=model_backend))
+    lines.append(_t("report.printer", profile=config.printer_profile))
+    lines.append(_t("report.resolution", arc_steps=config.arc_steps, curve_resolution=config.curve_resolution))
     if config.thickness_managed_by_printer_profile:
-        lines.append(f"  Thickness    : {config.effective_thickness_mm} mm (FSM managed)")
-        lines.append(f"  User thickness: {config.thickness_mm} mm (ignored)")
+        lines.append(_t("report.thickness_fsm", value=config.effective_thickness_mm))
+        lines.append(_t("report.user_thickness", value=config.thickness_mm))
     else:
-        lines.append(f"  Thickness    : {config.thickness_mm} mm")
-    lines.append(f"  Locator      : {'enabled' if config.locator_enabled else 'disabled'}")
+        lines.append(_t("report.thickness", value=config.thickness_mm))
+    locator_state = "enabled" if config.locator_enabled else "disabled"
+    lines.append(_t("report.locator", state=locator_state))
     try:
         size_bytes = output_path.stat().st_size
-        lines.append(f"  File size    : {size_bytes:,} bytes ({size_bytes/1024:.0f} KB)")
+        lines.append(_t("report.file_size", size=size_bytes, size_kb=size_bytes / 1024))
     except OSError:
         pass
-    lines.append(f"  Duration     : {elapsed_s:.1f}s")
-    lines.append("")
-    lines.append("=" * 60)
+    lines.append(_t("report.duration", elapsed=elapsed_s))
+    lines.append(_t("report.blank"))
+    lines.append(_t("report.separator"))
 
     return "\n".join(lines)
 

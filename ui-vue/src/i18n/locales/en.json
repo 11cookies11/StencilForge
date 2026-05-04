@@ -202,5 +202,21 @@
   "config.aperturePreviewRuleEffect": "Matched rule effect",
   "config.aperturePreviewRuleEffectHint": "The actual effect of the matched rule on this pad.",
   "config.aperturePreviewBelow": "Below recommendation",
-  "config.apertureRuleEffectSummary": "Rule effect"
+  "config.apertureRuleEffectSummary": "Rule effect",
+  "upload.configPlaceholder": "config/stencilforge.json",
+  "config.aperturePadWidth": "Pad width",
+  "config.aperturePadHeight": "Pad height",
+  "config.apertureDefaultProfileName": "Balanced default",
+  "unit.mm": "mm",
+  "format.volume": "{value} mm³",
+  "format.area": "{value} mm²",
+  "format.delta": "{sign}{value} mm",
+  "format.scale": "x {value}",
+  "format.percent": "{value}%",
+  "config.aperturePackageQfn": "QFN",
+  "config.aperturePackageIc": "IC",
+  "config.aperturePreviewMatchLabel": "match:",
+  "config.aperturePreviewActionLabel": "action:",
+  "config.aperturePreviewPriorityLabel": "priority:",
+  "config.aperturePadSizeDefault": "0.20-0.80 mm"
 }

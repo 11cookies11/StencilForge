@@ -379,7 +379,7 @@ class BackendBridge(QObject):
             self._emit_log(self._tr("ui.aperture_workspace_import_invalid", error=exc))
             return ""
 
-        validation = validate_aperture_workspace_payload(payload)
+        validation = validate_aperture_workspace_payload(payload, self._locale)
         if not validation["ok"]:
             self._emit_log(
                 self._tr("ui.aperture_workspace_import_invalid", error="; ".join(validation["issues"]))
@@ -415,6 +415,7 @@ class BackendBridge(QObject):
         payload = export_aperture_workspace_payload(
             self._aperture_workspace,
             self._config.effective_thickness_mm,
+            self._locale,
         )
         try:
             Path(filename).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -833,6 +834,7 @@ class BackendBridge(QObject):
         return compute_aperture_workspace(
             self._aperture_workspace,
             self._config.effective_thickness_mm,
+            self._locale,
         )
 
     def _resolve_input_dir(self, input_dir: str) -> str:

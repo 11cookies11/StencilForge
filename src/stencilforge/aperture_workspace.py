@@ -4,6 +4,8 @@ from copy import deepcopy
 from math import isfinite, sqrt
 from typing import Any
 
+from .i18n import text as _text
+
 APERTURE_WORKSPACE_FORMAT = "stencilforge.aperture_workspace"
 APERTURE_WORKSPACE_SCHEMA_VERSION = 1
 APERTURE_WORKSPACE_SUPPORTED_SCHEMA_VERSIONS = {1}
@@ -139,7 +141,7 @@ def normalize_aperture_workspace(data: dict[str, Any] | None) -> dict[str, Any]:
     return merged
 
 
-def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm: float | None = None) -> dict[str, Any]:
+def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm: float | None = None, locale: str | None = None) -> dict[str, Any]:
     workspace = normalize_aperture_workspace(data)
     thickness_value = _positive_float(stencil_thickness_mm, 0.12, 0.01)
     transfer_ratio = workspace["transferRatio"]
@@ -172,7 +174,7 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         workspace["rules"][0],
     )
     matched_rule = resolve_matching_rule(workspace)
-    rule_groups = build_rule_groups(workspace, matched_rule=matched_rule, active_rule=active_rule)
+    rule_groups = build_rule_groups(workspace, matched_rule=matched_rule, active_rule=active_rule, locale=locale)
     matched_rule_group = next((group for group in rule_groups if group.get("matched")), None)
     active_rule_group = next((group for group in rule_groups if group.get("active")), None)
     return {
@@ -187,7 +189,7 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         "recommendedScale": recommended_scale,
         "recommendedDeltaMm": recommended_delta_mm if isfinite(recommended_delta_mm) else 0.0,
         "calculatorStatus": calculator_status,
-        "previewStatus": _preview_status(effective_target_volume_mm3, recommended_volume_mm3),
+        "previewStatus": _preview_status(effective_target_volume_mm3, recommended_volume_mm3, locale=locale),
         "packageFactor": package_factor,
         "padTypeFactor": pad_type_factor,
         "strategyFactor": strategy_factor,
@@ -196,22 +198,23 @@ def compute_aperture_workspace(data: dict[str, Any] | None, stencil_thickness_mm
         "ruleGroups": rule_groups,
         "activeRuleGroup": active_rule_group,
         "matchedRuleGroup": matched_rule_group,
-        "activeRuleGroupSummary": describe_rule_group(active_rule_group),
-        "matchedRuleGroupSummary": describe_rule_group(matched_rule_group),
-        "generatedRulePreview": build_generated_rule_preview(workspace, recommended_delta_mm, recommended_scale),
-        "activeRuleMatchSummary": describe_match(active_rule),
-        "activeRuleActionSummary": describe_action(active_rule),
-        "matchedRuleMatchSummary": describe_match(matched_rule),
-        "matchedRuleActionSummary": describe_action(matched_rule),
+        "activeRuleGroupSummary": describe_rule_group(active_rule_group, locale=locale),
+        "matchedRuleGroupSummary": describe_rule_group(matched_rule_group, locale=locale),
+        "generatedRulePreview": build_generated_rule_preview(workspace, recommended_delta_mm, recommended_scale, locale=locale),
+        "activeRuleMatchSummary": describe_match(active_rule, locale=locale),
+        "activeRuleActionSummary": describe_action(active_rule, locale=locale),
+        "matchedRuleMatchSummary": describe_match(matched_rule, locale=locale),
+        "matchedRuleActionSummary": describe_action(matched_rule, locale=locale),
     }
 
 
 def export_aperture_workspace_payload(
     data: dict[str, Any] | None,
     stencil_thickness_mm: float | None = None,
+    locale: str | None = None,
 ) -> dict[str, Any]:
     workspace = normalize_aperture_workspace(data)
-    snapshot = compute_aperture_workspace(workspace, stencil_thickness_mm)
+    snapshot = compute_aperture_workspace(workspace, stencil_thickness_mm, locale=locale)
     return {
         "schemaVersion": APERTURE_WORKSPACE_SCHEMA_VERSION,
         "kind": APERTURE_WORKSPACE_FORMAT,
@@ -254,14 +257,14 @@ def import_aperture_workspace_payload(data: Any) -> dict[str, Any]:
     return normalize_aperture_workspace(data)
 
 
-def validate_aperture_workspace_payload(data: Any) -> dict[str, Any]:
+def validate_aperture_workspace_payload(data: Any, locale: str | None = None) -> dict[str, Any]:
     issues: list[str] = []
     schema_version = None
     kind = None
     legacy = False
     workspace: dict[str, Any] | None = None
     if not isinstance(data, dict):
-        issues.append("payload must be an object")
+        issues.append(_text(locale, "aperture.error_payload_not_object"))
         return {
             "ok": False,
             "issues": issues,
@@ -273,17 +276,17 @@ def validate_aperture_workspace_payload(data: Any) -> dict[str, Any]:
 
     kind = str(data.get("kind") or "")
     if kind and kind != APERTURE_WORKSPACE_FORMAT:
-        issues.append(f"unsupported kind: {kind}")
+        issues.append(_text(locale, "aperture.error_unsupported_kind", kind=kind))
 
     raw_schema_version = data.get("schemaVersion")
     if raw_schema_version is not None:
         try:
             schema_version = int(raw_schema_version)
         except (TypeError, ValueError):
-            issues.append(f"invalid schemaVersion: {raw_schema_version!r}")
+            issues.append(_text(locale, "aperture.error_invalid_schema_version", version=raw_schema_version))
         else:
             if schema_version not in APERTURE_WORKSPACE_SUPPORTED_SCHEMA_VERSIONS:
-                issues.append(f"unsupported schemaVersion: {schema_version}")
+                issues.append(_text(locale, "aperture.error_unsupported_schema_version", version=schema_version))
 
     workspace_data = data.get("workspace")
     if isinstance(workspace_data, dict):
@@ -306,8 +309,9 @@ def validate_aperture_workspace_payload(data: Any) -> dict[str, Any]:
 def resolve_aperture_workspace_effect(
     data: dict[str, Any] | None,
     stencil_thickness_mm: float | None = None,
+    locale: str | None = None,
 ) -> dict[str, Any]:
-    snapshot = compute_aperture_workspace(data, stencil_thickness_mm)
+    snapshot = compute_aperture_workspace(data, stencil_thickness_mm, locale=locale)
     active_rule = snapshot["matchedRule"] or snapshot["activeRule"] or {}
     action = active_rule.get("action") or {}
     enabled = bool(active_rule.get("enabled", True))
@@ -332,18 +336,21 @@ def resolve_aperture_workspace_effect(
     }
 
 
-def build_generated_rule_preview(workspace: dict[str, Any], recommended_delta_mm: float, recommended_scale: float) -> str:
+def build_generated_rule_preview(workspace: dict[str, Any], recommended_delta_mm: float, recommended_scale: float, locale: str | None = None) -> str:
     package = workspace.get("packageType", "Any")
     pad_type = workspace.get("padType", "Any")
     delta = recommended_delta_mm if isfinite(recommended_delta_mm) else 0.0
+    match_label = _text(locale, "aperture.preview_match_label")
+    action_label = _text(locale, "aperture.preview_action_label")
+    priority_label = _text(locale, "aperture.preview_priority_label")
     return (
-        f'match: {{ package: "{package}", padType: "{pad_type}" }}\n'
-        f"action: {{ deltaMm: {delta:.3f}, scale: {recommended_scale:.3f} }}\n"
-        f"priority: 100"
+        f'{match_label} {{ package: "{package}", padType: "{pad_type}" }}\n'
+        f'{action_label} {{ deltaMm: {delta:.3f}, scale: {recommended_scale:.3f} }}\n'
+        f'{priority_label} 100'
     )
 
 
-def describe_match(rule: dict[str, Any] | None) -> str:
+def describe_match(rule: dict[str, Any] | None, locale: str | None = None) -> str:
     if not rule:
         return ""
     match = rule.get("match") or {}
@@ -357,12 +364,12 @@ def describe_match(rule: dict[str, Any] | None) -> str:
         parts.append(str(pad_type))
     if pad_size:
         parts.append(str(pad_size))
-    return " 路 ".join(parts) if parts else "Any"
+    return " 路 ".join(parts) if parts else _text(locale, "aperture.any")
 
 
-def describe_rule_group(group: dict[str, Any] | None) -> str:
+def describe_rule_group(group: dict[str, Any] | None, locale: str | None = None) -> str:
     if not isinstance(group, dict):
-        return "Any"
+        return _text(locale, "aperture.any")
     label = str(group.get("label") or "").strip()
     if label:
         return label
@@ -373,26 +380,26 @@ def describe_rule_group(group: dict[str, Any] | None) -> str:
         parts.append(package)
     if pad_type and pad_type != "Any":
         parts.append(pad_type)
-    return " / ".join(parts) if parts else "Any"
+    return " / ".join(parts) if parts else _text(locale, "aperture.any")
 
 
 
-def describe_action(rule: dict[str, Any] | None) -> str:
+def describe_action(rule: dict[str, Any] | None, locale: str | None = None) -> str:
     if not rule:
         return ""
     action = rule.get("action") or {}
     mode = str(_first_present(action, ("mode", "actionMode")) or "delta")
     if mode == "scale":
         scale = _positive_float(_first_present(action, ("scale", "scaleFactor", "scale_factor")), 1.0, 0.01)
-        return f"Scale x {scale:.3f}"
+        return _text(locale, "aperture.action_scale", scale=scale)
     delta_mm = float(_first_present(action, ("deltaMm", "delta_mm", "delta")) or 0.0)
-    return f"Delta {delta_mm:+.3f} mm"
+    return _text(locale, "aperture.action_delta", delta=delta_mm)
 
 
-def normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
+def normalize_rule(rule: dict[str, Any] | None, locale: str | None = None) -> dict[str, Any]:
     base = {
         "id": f"rule_{len(str(rule or {}))}",
-        "name": "Untitled rule",
+        "name": _text(locale, "aperture.untitled_rule"),
         "enabled": True,
         "priority": 0,
         "match": {"package": "Any", "padType": "Any", "padSize": ""},
@@ -417,7 +424,7 @@ def normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
     }
     merged["enabled"] = bool(merged.get("enabled", True))
     merged["priority"] = int(merged.get("priority", 0) or 0)
-    merged["name"] = str(merged.get("name") or "Untitled rule")
+    merged["name"] = str(merged.get("name") or _text(locale, "aperture.untitled_rule"))
     fallback_name = str(merged["name"]).strip().lower().replace(" ", "_") or "rule"
     merged["id"] = str(merged.get("id") or f"{fallback_name}_{merged['priority']}")
     merged["note"] = str(merged.get("note") or "")
@@ -553,6 +560,7 @@ def build_rule_groups(
     workspace: dict[str, Any],
     matched_rule: dict[str, Any] | None = None,
     active_rule: dict[str, Any] | None = None,
+    locale: str | None = None,
 ) -> list[dict[str, Any]]:
     groups: dict[str, dict[str, Any]] = {}
     for index, rule in enumerate(_ensure_list(workspace.get("rules"))):
@@ -564,7 +572,7 @@ def build_rule_groups(
         if group is None:
             group = {
                 "key": group_key,
-                "label": _group_label(match),
+                "label": _group_label(match, locale=locale),
                 "package": _normalize_match_token(_first_present(match, ("package", "packageType", "package_type"))),
                 "padType": _normalize_match_token(_first_present(match, ("padType", "pad_type"))),
                 "ruleIds": [],
@@ -609,7 +617,7 @@ def _rule_group_key(match: dict[str, Any]) -> str:
     return f"{package.casefold()}::{pad_type.casefold()}"
 
 
-def _group_label(match: dict[str, Any]) -> str:
+def _group_label(match: dict[str, Any], locale: str | None = None) -> str:
     package = _normalize_match_token(_first_present(match, ("package", "packageType", "package_type")))
     pad_type = _normalize_match_token(_first_present(match, ("padType", "pad_type")))
     parts: list[str] = []
@@ -617,7 +625,7 @@ def _group_label(match: dict[str, Any]) -> str:
         parts.append(package)
     if pad_type and pad_type != "Any":
         parts.append(pad_type)
-    return " / ".join(parts) if parts else "Any"
+    return " / ".join(parts) if parts else _text(locale, "aperture.any")
 
 
 
@@ -658,12 +666,12 @@ def _normalize_match_token(value: Any) -> str:
     return token or "Any"
 
 
-def _preview_status(effective_target_volume_mm3: float, recommended_volume_mm3: float) -> str:
+def _preview_status(effective_target_volume_mm3: float, recommended_volume_mm3: float, locale: str | None = None) -> str:
     if effective_target_volume_mm3 > recommended_volume_mm3 * 1.005:
-        return "above"
+        return _text(locale, "aperture.status_above")
     if effective_target_volume_mm3 < recommended_volume_mm3 * 0.995:
-        return "below"
-    return "recommended"
+        return _text(locale, "aperture.status_below")
+    return _text(locale, "aperture.status_recommended")
 
 
 def _matches_token(rule_value: str, workspace_value: str) -> bool:

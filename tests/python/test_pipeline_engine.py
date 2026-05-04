@@ -13,4 +13,4 @@ def test_get_model_engine_supported(name: str) -> None:
 
 def test_get_model_engine_rejects_unknown() -> None:
     with pytest.raises(ValueError, match="Unsupported model backend"):
-        get_model_engine("unknown")
+        get_model_engine("unknown", locale="en")

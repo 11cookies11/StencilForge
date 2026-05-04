@@ -76,7 +76,7 @@
                 <input
                   v-model="configPath"
                   class="flex-1 block w-full rounded-none rounded-l-md border-slate-300 bg-white text-slate-600 focus:border-primary focus:ring-primary sm:text-sm py-2.5 px-4"
-                  placeholder="config/stencilforge.json"
+                  :placeholder="t('upload.configPlaceholder')"
                   type="text"
                 />
                 <button

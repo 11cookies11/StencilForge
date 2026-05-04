@@ -29,7 +29,7 @@ def test_default_workspace_has_selected_rule():
 
 
 def test_workspace_metrics_are_computed():
-    snapshot = compute_aperture_workspace({}, 0.12)
+    snapshot = compute_aperture_workspace({}, 0.12, locale="en")
 
     assert snapshot["thicknessLabel"] == "0.12 mm"
     assert snapshot["calculatorStatus"] == "ok"
@@ -54,12 +54,12 @@ def test_workspace_descriptions_are_human_readable():
     workspace = default_aperture_workspace()
     rule = workspace["rules"][1]
 
-    match_text = describe_match(rule)
+    match_text = describe_match(rule, locale="en")
     assert "QFN" in match_text
     assert "SMD" in match_text
     assert "Top" not in match_text
     assert "0.20-0.60 mm" in match_text
-    assert describe_action(rule) == "Delta -0.015 mm"
+    assert describe_action(rule, locale="en") == "Delta -0.015 mm"
 
 
 def test_default_workspace_uses_neutral_fallback():
@@ -103,7 +103,7 @@ def test_workspace_payload_round_trip_keeps_rules():
     workspace["rules"][1]["name"] = "Round trip rule"
     workspace["selectedRuleGroupKey"] = "qfn::smd"
 
-    payload = export_aperture_workspace_payload(workspace, 0.15)
+    payload = export_aperture_workspace_payload(workspace, 0.15, locale="en")
 
     assert payload["schemaVersion"] == 1
     assert payload["kind"] == "stencilforge.aperture_workspace"
@@ -175,7 +175,8 @@ def test_workspace_payload_rejects_unsupported_schema_version():
             "kind": "stencilforge.aperture_workspace",
             "schemaVersion": 99,
             "workspace": default_aperture_workspace(),
-        }
+        },
+        locale="en",
     )
 
     assert validation["ok"] is False
