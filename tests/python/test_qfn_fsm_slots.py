@@ -13,11 +13,24 @@ def _qfn_fixture():
     pads = []
     coords = [-1.5, -0.5, 0.5, 1.5]
     for x in coords:
-        pads.append(box(x - 0.25, 3.0 - 0.10, x + 0.25, 3.0 + 0.10))
-        pads.append(box(x - 0.25, -3.0 - 0.10, x + 0.25, -3.0 + 0.10))
+        pads.append(box(x - 0.10, 3.0 - 0.25, x + 0.10, 3.0 + 0.25))
+        pads.append(box(x - 0.10, -3.0 - 0.25, x + 0.10, -3.0 + 0.25))
     for y in coords:
-        pads.append(box(3.0 - 0.10, y - 0.25, 3.0 + 0.10, y + 0.25))
-        pads.append(box(-3.0 - 0.10, y - 0.25, -3.0 + 0.10, y + 0.25))
+        pads.append(box(3.0 - 0.25, y - 0.10, 3.0 + 0.25, y + 0.10))
+        pads.append(box(-3.0 - 0.25, y - 0.10, -3.0 + 0.25, y + 0.10))
+    pads.append(box(-1.0, -1.0, 1.0, 1.0))
+    return unary_union(pads)
+
+
+def _qfn_fixture_with_distractors():
+    pads = [box(10, 0, 11.2, 0.6), box(10, 1, 11.2, 1.6)]
+    coords = [-1.5, -0.5, 0.5, 1.5]
+    for x in coords:
+        pads.append(box(x - 0.10, 3.0 - 0.25, x + 0.10, 3.0 + 0.25))
+        pads.append(box(x - 0.10, -3.0 - 0.25, x + 0.10, -3.0 + 0.25))
+    for y in coords:
+        pads.append(box(3.0 - 0.25, y - 0.10, 3.0 + 0.25, y + 0.10))
+        pads.append(box(-3.0 - 0.25, y - 0.10, -3.0 + 0.25, y + 0.10))
     pads.append(box(-1.0, -1.0, 1.0, 1.0))
     return unary_union(pads)
 
@@ -64,3 +77,28 @@ def test_generic_qfn_regeneration_keeps_printable_existing_strategy() -> None:
     polygons = flatten_to_polygons(regenerated)
 
     assert len(polygons) >= 5
+
+
+def test_fsm_qfn_detection_ignores_nearby_distractor_pads() -> None:
+    original = _qfn_fixture_with_distractors()
+    cfg = StencilConfig.from_dict(
+        {
+            "printer_profile": "fsm",
+            "qfn_confidence_threshold": 0.6,
+            "fsm_qfn_min_slot_width_mm": 0.4,
+            "fsm_qfn_min_slot_gap_mm": 0.4,
+            "fsm_qfn_min_slot_length_mm": 0.8,
+            "fsm_qfn_max_pins_per_slot": 4,
+        }
+    )
+
+    regenerated = regenerate_qfn_paste(original, cfg)
+    polygons = flatten_to_polygons(regenerated)
+    grouped_slots = [
+        p for p in polygons
+        if min(p.bounds[2] - p.bounds[0], p.bounds[3] - p.bounds[1]) >= 0.39
+        and p.area < 3.0
+    ]
+
+    assert len(polygons) < len(flatten_to_polygons(original))
+    assert len(grouped_slots) >= 4

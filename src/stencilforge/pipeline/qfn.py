@@ -137,13 +137,59 @@ def _rotate_point(point, angle_deg: float):
 
 
 def _build_qfn_group(pads, polys, config: StencilConfig):
+    best_qfn = None
+    best_score = 0.0
+    for component in _candidate_pad_components(pads, config):
+        qfn, score = _build_qfn_group_from_component(component, polys, config)
+        if qfn is not None and score > best_score:
+            best_qfn = qfn
+            best_score = score
+    return best_qfn, best_score
+
+
+def _candidate_pad_components(pads, config: StencilConfig):
+    if len(pads) < QFN_MIN_CANDIDATE_COUNT:
+        return []
+    widths = [p["short"] for p in pads if p["short"] > 0]
+    longs = [p["long"] for p in pads if p["long"] > 0]
+    width_median = _median(widths) if widths else config.qfn_min_feature_mm
+    long_median = _median(longs) if longs else config.qfn_min_feature_mm
+    link_distance = max(config.qfn_min_feature_mm * 4.0, width_median * 5.0, long_median * 2.2)
+
+    remaining = set(range(len(pads)))
+    components = []
+    while remaining:
+        start = remaining.pop()
+        stack = [start]
+        component_indices = [start]
+        while stack:
+            current = stack.pop()
+            cx, cy = pads[current]["center"]
+            linked = []
+            for idx in list(remaining):
+                px, py = pads[idx]["center"]
+                if math.hypot(px - cx, py - cy) <= link_distance:
+                    linked.append(idx)
+            for idx in linked:
+                remaining.remove(idx)
+                stack.append(idx)
+                component_indices.append(idx)
+        if len(component_indices) >= QFN_MIN_CANDIDATE_COUNT:
+            components.append([pads[idx] for idx in component_indices])
+    components.sort(key=len, reverse=True)
+    return components
+
+
+def _build_qfn_group_from_component(pads, polys, config: StencilConfig):
     # 通过旋转归一化 + 行列聚类，尝试构建 QFN 四边
     centers = [p["center"] for p in pads]
     rect = MultiPoint(centers).minimum_rotated_rectangle
     rect_metrics = _polygon_rect_metrics(rect)
     if rect_metrics is None:
         return None, 0.0
-    _, _, _, global_angle = rect_metrics
+    _, rect_long, rect_short, global_angle = rect_metrics
+    if rect_short > 0 and rect_long / rect_short < 1.15:
+        global_angle = _estimate_square_qfn_angle(pads, global_angle)
     for pad in pads:
         pad["center_norm"] = _rotate_point(pad["center"], -global_angle)
         pad["angle_norm"] = _normalize_angle(pad["angle"] - global_angle)
@@ -153,9 +199,9 @@ def _build_qfn_group(pads, polys, config: StencilConfig):
     for pad in pads:
         angle = pad["angle_norm"]
         if angle <= QFN_HORIZONTAL_ANGLE_MAX or angle >= 180 - QFN_HORIZONTAL_ANGLE_MAX:
-            horizontal.append(pad)
-        elif QFN_VERTICAL_ANGLE_MIN <= angle <= QFN_VERTICAL_ANGLE_MAX:
             vertical.append(pad)
+        elif QFN_VERTICAL_ANGLE_MIN <= angle <= QFN_VERTICAL_ANGLE_MAX:
+            horizontal.append(pad)
     if len(horizontal) < 6 or len(vertical) < 6:
         return None, 0.0
 
@@ -174,6 +220,18 @@ def _build_qfn_group(pads, polys, config: StencilConfig):
     qfn["global_angle"] = global_angle
     score = _score_qfn(qfn)
     return qfn, score
+
+
+def _estimate_square_qfn_angle(pads, fallback_angle: float) -> float:
+    angle_offsets = []
+    for pad in pads:
+        angle = pad["angle"] % 90.0
+        if angle > 45.0:
+            angle -= 90.0
+        angle_offsets.append(angle)
+    if not angle_offsets:
+        return fallback_angle
+    return _normalize_angle(_median(angle_offsets))
 
 
 def _cluster_rows(pads, axis: str, config: StencilConfig):
@@ -442,8 +500,17 @@ def _generate_fsm_grouped_slots_for_side(side, qfn, config: StencilConfig):
     groups = _group_side_pads_for_fsm(side["pads"], config.fsm_qfn_max_pins_per_slot)
     if not groups:
         return []
+    while True:
+        intervals = [_fsm_group_interval(group, side, config) for group in groups]
+        merged_groups, _merged_intervals = _merge_groups_until_gap_ok(
+            groups,
+            intervals,
+            config.fsm_qfn_min_slot_gap_mm,
+        )
+        if len(merged_groups) == len(groups):
+            break
+        groups = merged_groups
     intervals = [_fsm_group_interval(group, side, config) for group in groups]
-    groups, intervals = _merge_groups_until_gap_ok(groups, intervals, config.fsm_qfn_min_slot_gap_mm)
 
     slots = []
     outward = _outward_sign(side, qfn["center_norm"])
