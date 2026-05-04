@@ -41,6 +41,7 @@ build-logs/
 
 # AI assistant
 .claude/
+.where-agent-progress.md
 
 # Test artifacts
 tests/artifacts/
