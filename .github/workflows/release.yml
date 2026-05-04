@@ -19,6 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system deps
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libegl1 libgl1 libopengl0
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
