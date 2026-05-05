@@ -2,7 +2,7 @@
 
 ## Test Layers
 
-```
+```text
 ┌──────────────────────────────────────────────────────────┐
 │ LAYER 1: Backend Unit (pytest, fast, CI on every push)   │
 │   tests/python/test_*.py  (93 tests, ~3 sec)              │
