@@ -138,7 +138,6 @@ def _attach_locator_mesh(base_mesh, locator_geom, locator_step_geom,
         t0 = time.perf_counter()
         sm = extrude_fn(locator_step_geom, cfg.locator_step_height_mm)
         logger.info("%slocator step extrusion in %.3fs", prefix, time.perf_counter() - t0)
-        sm.apply_translation((0, 0, -cfg.locator_step_height_mm))
         base_mesh = trimesh.util.concatenate([base_mesh, sm])
     return base_mesh
 

@@ -256,6 +256,10 @@ def _generate_stencil_side(
         outline_geom = _outline_from_paste(paste_geom, config.outline_margin_mm)
         logger.info("Outline fallback margin: %s mm", config.outline_margin_mm)
 
+    paste_geom = _mirror_geometry_for_physical_stencil(paste_geom, outline_geom)
+    outline_geom = _mirror_geometry_for_physical_stencil(outline_geom, outline_geom)
+    logger.info("Output mirrored horizontally for physical stencil use")
+
     logger.info("Output mode: %s", config.output_mode)
     if config.output_mode == "holes_only":
         stencil_2d = paste_geom
@@ -605,6 +609,15 @@ def _side_availability_note(
 def _outline_from_paste(paste_geom, margin_mm: float):
     min_x, min_y, max_x, max_y = paste_geom.bounds
     return box(min_x - margin_mm, min_y - margin_mm, max_x + margin_mm, max_y + margin_mm)
+
+
+def _mirror_geometry_for_physical_stencil(geom, outline_geom):
+    """Mirror output geometry so a printed stencil matches physical PCB placement."""
+    if geom is None or geom.is_empty or outline_geom is None or outline_geom.is_empty:
+        return geom
+    min_x, min_y, max_x, max_y = outline_geom.bounds
+    origin = ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
+    return scale_geometry(geom, xfact=-1.0, yfact=1.0, origin=origin)
 
 
 def _build_stencil_report(

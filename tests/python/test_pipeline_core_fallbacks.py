@@ -39,6 +39,16 @@ class _DummyGeometryService:
         return {"ok": True}
 
 
+class _AsymmetricGeometryService(_DummyGeometryService):
+    def load_paste_geometry(self, files, label: str = "paste"):
+        self.loaded_layers.append(([f.name for f in files], label))
+        return box(1, 2, 3, 4)
+
+    def load_outline_geometry(self, path: Path):
+        self.outline_loaded = path
+        return box(0, 0, 10, 10)
+
+
 def test_outline_builtin_fallback_matches_gko(tmp_path: Path) -> None:
     (tmp_path / "Gerber_TopPasteMaskLayer.GTP").write_text("G04 paste*\n", encoding="utf-8")
     (tmp_path / "Gerber_BoardOutlineLayer.GKO").write_text("G04 outline*\n", encoding="utf-8")
@@ -80,6 +90,36 @@ def test_solder_mask_source_excludes_paste_mask_filename(tmp_path: Path) -> None
 
     assert engine.called is True
     assert service.loaded_layers[0] == (["Gerber_TopSolderMaskLayer.GTS"], "solder mask")
+
+
+@pytest.mark.parametrize(
+    ("side", "layer_name"),
+    [
+        ("top", "Gerber_TopSolderMaskLayer.GTS"),
+        ("bottom", "Gerber_BottomSolderMaskLayer.GBS"),
+    ],
+)
+def test_output_mirrors_for_physical_stencil_use(tmp_path: Path, side: str, layer_name: str) -> None:
+    (tmp_path / layer_name).write_text("G04 mask*\n", encoding="utf-8")
+    (tmp_path / "Gerber_BoardOutlineLayer.GKO").write_text("G04 outline*\n", encoding="utf-8")
+
+    service = _AsymmetricGeometryService(StencilConfig.from_dict({}))
+    engine = _DummyEngine()
+    cfg = StencilConfig.from_dict(
+        {
+            "paste_side": side,
+            "output_mode": "holes_only",
+            "locator_enabled": False,
+            "paste_offset_mm": 0.0,
+            "mask_opening_scale": 1.0,
+        }
+    )
+
+    generate_stencil(tmp_path, tmp_path / "out.stl", cfg,
+                     geometry_service=service, model_engine=engine)
+
+    assert engine.last_input is not None
+    assert engine.last_input.stencil_2d.bounds == pytest.approx((7, 2, 9, 4))
 
 
 def test_mask_opening_scale_applies_only_to_solder_mask_source(tmp_path: Path) -> None:
