@@ -35,5 +35,5 @@ def test_backend_i18n_keys_and_placeholders_are_consistent() -> None:
 
 def test_text_fallback_and_formatting() -> None:
     assert text("de-DE", "dialog.error_title") == "Job fehlgeschlagen"
-    assert text("fr-FR", "dialog.error_title") == "运行失败"
+    assert text("fr-FR", "dialog.error_title") == "\u8fd0\u884c\u5931\u8d25"
     assert text("es", "dialog.error_detail", message="boom") == "Error: boom"

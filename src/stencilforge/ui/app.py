@@ -3,9 +3,12 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+import warnings
 from ctypes import Structure
 from ctypes import wintypes
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"gerber(\.|$)")
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QCursor, QIcon
