@@ -186,7 +186,7 @@ def test_sfmesh_chunked_watertight_exports_mesh(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("engine_cls", [TrimeshEngine, SfMeshEngine])
-def test_locator_step_keeps_same_base_plane(tmp_path: Path, engine_cls) -> None:
+def test_locator_step_uses_bottom_plane(tmp_path: Path, engine_cls) -> None:
     cfg = StencilConfig.from_dict(
         {
             "thickness_mm": 0.12,
@@ -228,4 +228,8 @@ def test_locator_step_keeps_same_base_plane(tmp_path: Path, engine_cls) -> None:
     bounds = mesh.bounds
     assert bounds is not None
     assert float(bounds[0][2]) == pytest.approx(0.0, abs=1e-6)
-    assert float(bounds[1][2]) == pytest.approx(max(cfg.thickness_mm, cfg.locator_step_height_mm), rel=0.05, abs=0.02)
+    assert float(bounds[1][2]) == pytest.approx(
+        cfg.locator_step_height_mm + cfg.thickness_mm,
+        rel=0.05,
+        abs=0.02,
+    )
